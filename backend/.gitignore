@@ -1,0 +1,58 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- Virtualenv / Poetry ---
+.env
+.venv/
+.venv*/
+pip-wheel-metadata/
+poetry.lock
+
+# --- Environment ---
+.env.local
+.env.test
+.env.dev
+.env.prod
+*.env
+
+# --- Bytecode cache ---
+__pypackages__/
+*.egg-info/
+.eggs/
+
+# --- Testing ---
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+nosetests.xml
+coverage.xml
+
+# --- Logs ---
+*.log
+*.out
+*.err
+
+# --- IDE / Editors ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS files ---
+.DS_Store
+Thumbs.db
+
+# --- Docker ---
+docker-compose.override.yml
+.docker/
+*.pid
+
+# --- Migrations (optional: keep your Alembic if you use it) ---
+alembic.ini
+migrations/versions/*.pyc
+
+# --- Cache / Misc ---
+*.cache
+.cache/
