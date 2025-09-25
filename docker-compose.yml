@@ -1,0 +1,85 @@
+name: wow-bis-dev
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: wowbis
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/wowbis
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: '["http://localhost:5173"]'
+      # if you use external APIs, add your keys here or via env_file
+      # WCL_API_KEY: ""
+      # BLIZZARD_CLIENT_ID: ""
+      # BLIZZARD_CLIENT_SECRET: ""
+    volumes:
+      - ./backend:/app:cached
+      - poetry_venv:/app/.venv
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+    command: >
+      bash -lc "poetry install --no-interaction &&
+                poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/wowbis
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./backend:/app:cached
+      - poetry_venv:/app/.venv
+    depends_on:
+      - db
+      - redis
+    command: >
+      bash -lc "poetry install --no-root --no-interaction &&
+                exec poetry run python -m etl.scheduler"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: src/config/docker/Dockerfile.dev
+    environment:
+      # SvelteKit calls /api, Vite proxies it to http://api:8000 inside the compose network
+      PUBLIC_API_BASE: /api
+    volumes:
+      - ./frontend:/app:cached
+      - node_modules:/app/node_modules
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    command: >
+      sh -lc "pnpm dev --host 0.0.0.0 --port 5173"
+
+volumes:
+  pgdata:
+  redisdata:
+  poetry_venv:
+  node_modules:

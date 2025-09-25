@@ -11,5 +11,14 @@ export default defineConfig({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide'
 		})
-	]
+	],
+	server: {
+		port: 5173,
+		proxy: {
+			'/api': {
+				target: 'http://api:8000',
+				changeOrigin: true
+			}
+		}
+	}
 });

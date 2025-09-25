@@ -1,0 +1,22 @@
+FROM python:3.13-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl && rm -rf /var/lib/apt/lists/*
+
+# Poetry
+RUN pip install --no-cache-dir "poetry==1.8.3"
+ENV POETRY_VIRTUALENVS_IN_PROJECT=true \
+    POETRY_NO_INTERACTION=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+# copy pyproject/lock from the build context (./backend)
+COPY pyproject.toml poetry.lock* ./
+RUN poetry install --no-root --no-ansi
+
+# App source (bind-mounted in compose for dev; copy for initial layer priming)
+COPY . .
+
+EXPOSE 8000
