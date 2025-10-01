@@ -29,6 +29,7 @@ pytest-asyncio = "^1.2.0"
 ruff = "^0.13.1"
 black = "^25.9.0"
 mypy = "^1.18.2"
+alembic = "^1.16.5"
 
 [build-system]
 requires = ["poetry-core>=1.9.0"]

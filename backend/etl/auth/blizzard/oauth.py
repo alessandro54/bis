@@ -145,6 +145,10 @@ async def _fetch_and_store(region: str) -> None:
 
 
 async def _read_token(r: Redis, region: str) -> BlizzardToken | None:
+    """
+    Read the cached OAuth token for `region` from Redis.
+    Returns BlizzardToken if valid, or None if missing/invalid/expired.
+    """
     raw = await r.get(_token_key(region))
     if not raw:
         return None
