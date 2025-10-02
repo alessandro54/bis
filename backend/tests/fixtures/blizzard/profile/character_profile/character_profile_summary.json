@@ -1,0 +1,125 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn?namespace=profile-us"
+    }
+  },
+  "id": 225762911,
+  "name": "Nystinn",
+  "gender": {
+    "type": "FEMALE",
+    "name": "Female"
+  },
+  "faction": {
+    "type": "HORDE",
+    "name": "Horde"
+  },
+  "race": {
+    "key": {
+      "href": "https://us.api.blizzard.com/data/wow/playable-race/10?namespace=static-11.2.0_62213-us"
+    },
+    "name": "Blood Elf",
+    "id": 10
+  },
+  "character_class": {
+    "key": {
+      "href": "https://us.api.blizzard.com/data/wow/playable-class/4?namespace=static-11.2.0_62213-us"
+    },
+    "name": "Rogue",
+    "id": 4
+  },
+  "active_spec": {
+    "key": {
+      "href": "https://us.api.blizzard.com/data/wow/playable-specialization/260?namespace=static-11.2.0_62213-us"
+    },
+    "name": "Outlaw",
+    "id": 260
+  },
+  "realm": {
+    "key": {
+      "href": "https://us.api.blizzard.com/data/wow/realm/57?namespace=dynamic-us"
+    },
+    "name": "Illidan",
+    "id": 57,
+    "slug": "illidan"
+  },
+  "guild": {
+    "key": {
+      "href": "https://us.api.blizzard.com/data/wow/guild/illidan/deez-gang?namespace=profile-us"
+    },
+    "name": "Deez gang",
+    "id": 108296898,
+    "realm": {
+      "key": {
+        "href": "https://us.api.blizzard.com/data/wow/realm/57?namespace=dynamic-us"
+      },
+      "name": "Illidan",
+      "id": 57,
+      "slug": "illidan"
+    },
+    "faction": {
+      "type": "HORDE",
+      "name": "Horde"
+    }
+  },
+  "level": 80,
+  "experience": 0,
+  "achievement_points": 18055,
+  "achievements": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/achievements?namespace=profile-us"
+  },
+  "titles": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/titles?namespace=profile-us"
+  },
+  "pvp_summary": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/pvp-summary?namespace=profile-us"
+  },
+  "encounters": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/encounters?namespace=profile-us"
+  },
+  "media": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/character-media?namespace=profile-us"
+  },
+  "last_login_timestamp": 1758595193000,
+  "average_item_level": 697,
+  "equipped_item_level": 696,
+  "specializations": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/specializations?namespace=profile-us"
+  },
+  "statistics": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/statistics?namespace=profile-us"
+  },
+  "mythic_keystone_profile": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/mythic-keystone-profile?namespace=profile-us"
+  },
+  "equipment": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/equipment?namespace=profile-us"
+  },
+  "appearance": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/appearance?namespace=profile-us"
+  },
+  "collections": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/collections?namespace=profile-us"
+  },
+  "active_title": {
+    "key": {
+      "href": "https://us.api.blizzard.com/data/wow/title/342?namespace=static-11.2.0_62213-us"
+    },
+    "name": "Vengeance Incarnate",
+    "id": 342,
+    "display_string": "{name}, Vengeance Incarnate"
+  },
+  "reputations": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/reputations?namespace=profile-us"
+  },
+  "quests": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/quests?namespace=profile-us"
+  },
+  "achievements_statistics": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/achievements/statistics?namespace=profile-us"
+  },
+  "professions": {
+    "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/professions?namespace=profile-us"
+  },
+  "name_search": "Nystinn"
+}

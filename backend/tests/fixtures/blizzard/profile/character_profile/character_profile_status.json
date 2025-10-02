@@ -1,0 +1,9 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://us.api.blizzard.com/profile/wow/character/illidan/nystinn/status?namespace=profile-us"
+    }
+  },
+  "id": 225762911,
+  "is_valid": true
+}
