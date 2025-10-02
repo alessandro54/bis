@@ -1,0 +1,16 @@
+{
+  "_links": {
+    "self": {
+      "href": "https://us.api.blizzard.com/data/wow/pvp-season/40?namespace=dynamic-us"
+    }
+  },
+  "id": 40,
+  "leaderboards": {
+    "href": "https://us.api.blizzard.com/data/wow/pvp-season/40/pvp-leaderboard/?namespace=dynamic-us"
+  },
+  "rewards": {
+    "href": "https://us.api.blizzard.com/data/wow/pvp-season/40/pvp-reward/?namespace=dynamic-us"
+  },
+  "season_start_timestamp": 1755010800000,
+  "season_name": "Player vs. Player (The War Within Season 3)"
+}

@@ -1,7 +1,10 @@
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    model_config = ConfigDict(env_file=".env", extra="ignore")
+
     DATABASE_URL: str = ""
     REDIS_URL: str = ""
     REDIS_MAX_CONNECTIONS: int = 20
@@ -15,10 +18,5 @@ class Settings(BaseSettings):
     OAUTH_MAX_RETRIES: int = 5
     OAUTH_BACKOFF_BASE: float = 0.75
     OAUTH_HTTP_TIMEOUT: float = 20.0
-
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
-
 
 settings = Settings()
