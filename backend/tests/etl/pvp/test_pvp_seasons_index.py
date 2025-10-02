@@ -3,7 +3,7 @@ import pytest
 from types import SimpleNamespace
 from pathlib import Path
 
-from etl.pvp.seasons import fetch_seasons_index
+from etl.blizzard.game_data.pvp_season import fetch_seasons_index
 
 
 class FakeResponse:
@@ -58,7 +58,7 @@ async def test_fetch_seasons_index_success(monkeypatch):
         return FakeResponse(payload)
 
     # Patch exactly where it's imported in the module under test
-    monkeypatch.setattr("etl.pvp.seasons.blizzard_get", fake_blizzard_get)
+    monkeypatch.setattr("etl.blizzard.game_data.pvp_season.blizzard_get", fake_blizzard_get)
 
     # Act
     region = "us"
@@ -98,7 +98,7 @@ async def test_fetch_seasons_index_namespace_per_region(monkeypatch, region):
         recorded["params"] = params
         return FakeResponse(payload)
 
-    monkeypatch.setattr("etl.pvp.seasons.blizzard_get", fake_blizzard_get)
+    monkeypatch.setattr("etl.blizzard.game_data.pvp_season.blizzard_get", fake_blizzard_get)
 
     _ = await fetch_seasons_index(region, "en_US")
     assert recorded["path"] == "/data/wow/pvp-season/index"
@@ -111,7 +111,7 @@ async def test_fetch_seasons_index_http_error_bubbles(monkeypatch):
     async def fake_blizzard_get(*_args, **_kwargs):
         return FakeResponse({}, status_code=500)
 
-    monkeypatch.setattr("etl.pvp.seasons.blizzard_get", fake_blizzard_get)
+    monkeypatch.setattr("etl.blizzard.game_data.pvp_season.blizzard_get", fake_blizzard_get)
 
     with pytest.raises(RuntimeError):
         await fetch_seasons_index("us")

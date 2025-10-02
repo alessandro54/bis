@@ -1,5 +1,5 @@
 import pytest
-from etl.pvp.seasons import fetch_season_detail
+from etl.blizzard.game_data.pvp_season import fetch_season
 
 class FakeResponse:
     def __init__(self, payload: dict, status_code: int = 200):
@@ -23,9 +23,9 @@ async def test_get_pvp_season_detail_with_fixture(monkeypatch, load_fixture):
         return FakeResponse(payload)
 
     # Patch where the function imports it
-    monkeypatch.setattr("etl.pvp.seasons.blizzard_get", fake_blizzard_get)
+    monkeypatch.setattr("etl.blizzard.game_data.pvp_season.blizzard_get", fake_blizzard_get)
 
-    out = await fetch_season_detail(region="us", pvp_season_id=40, locale="en_US")
+    out = await fetch_season(region="us", pvp_season_id=40, locale="en_US")
 
     # Request correctness
     assert recorded["region"] == "us"
@@ -45,7 +45,7 @@ async def test_get_pvp_season_detail_http_error(monkeypatch):
     async def fake_blizzard_get(*_a, **_k):
         return FakeResponse({}, status_code=404)
 
-    monkeypatch.setattr("etl.pvp.seasons.blizzard_get", fake_blizzard_get)
+    monkeypatch.setattr("etl.blizzard.game_data.pvp_season.blizzard_get", fake_blizzard_get)
 
     with pytest.raises(RuntimeError):
-        await fetch_season_detail("us", 999)
+        await fetch_season("us", 999)

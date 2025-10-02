@@ -1,7 +1,7 @@
 from typing import Any
 import httpx
 
-from etl.providers.blizzard.auth.oauth import get_token
+from etl.blizzard.auth.oauth import get_token
 
 
 HOSTS: dict[str, str] = {
