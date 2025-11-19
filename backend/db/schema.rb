@@ -10,40 +10,70 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 0) do
+ActiveRecord::Schema[8.1].define(version: 2025_11_19_174447) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
-  create_table "alembic_version", primary_key: "version_num", id: { type: :string, limit: 32 }, force: :cascade do |t|
+  create_table "characters", force: :cascade do |t|
+    t.string "blizzard_id"
+    t.string "class_id"
+    t.string "class_slug"
+    t.datetime "created_at", null: false
+    t.integer "faction"
+    t.string "name"
+    t.string "race"
+    t.string "realm"
+    t.string "region"
+    t.datetime "updated_at", null: false
+    t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
+    t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
   end
 
-  create_table "characters", id: :serial, force: :cascade do |t|
-    t.integer "blizzard_id", null: false
+  create_table "pvp_leaderboard_entries", force: :cascade do |t|
+    t.bigint "character_id", null: false
     t.integer "class_id"
-    t.datetime "created_at", precision: nil, null: false
-    t.string "faction"
-    t.string "name", null: false
-    t.string "realm_slug", null: false
-    t.string "region", null: false
-    t.datetime "updated_at", precision: nil, null: false
-    t.index ["blizzard_id"], name: "ix_characters_blizzard_id"
-    t.index ["class_id"], name: "ix_characters_class_id"
-    t.index ["faction"], name: "ix_characters_faction"
-    t.index ["id"], name: "ix_characters_id"
-    t.index ["name"], name: "ix_characters_name"
-    t.index ["realm_slug"], name: "ix_characters_realm_slug"
-    t.index ["region"], name: "ix_characters_region"
-    t.unique_constraint ["blizzard_id"], name: "uq_character_blizzard_id"
-    t.unique_constraint ["region", "realm_slug", "name"], name: "uq_character_identity"
+    t.datetime "created_at", null: false
+    t.jsonb "gear_raw"
+    t.integer "item_level"
+    t.integer "losses"
+    t.bigint "pvp_leaderboard_id", null: false
+    t.integer "rank"
+    t.integer "rating"
+    t.datetime "snapshot_at"
+    t.string "spec"
+    t.integer "spec_id"
+    t.jsonb "talents_raw"
+    t.datetime "updated_at", null: false
+    t.integer "wins"
+    t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
+    t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
+    t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
   end
 
-  create_table "pvp_seasons", id: :serial, force: :cascade do |t|
-    t.boolean "is_current", null: false
-    t.json "name_json"
-    t.json "raw_json"
-    t.datetime "updated_at", precision: nil, null: false
-    t.index ["id"], name: "ix_pvp_seasons_id"
-    t.index ["is_current"], name: "ix_pvp_seasons_is_current"
-    t.index ["updated_at"], name: "ix_pvp_seasons_updated_at"
+  create_table "pvp_leaderboards", force: :cascade do |t|
+    t.string "bracket"
+    t.datetime "created_at", null: false
+    t.datetime "last_synced_at"
+    t.bigint "pvp_season_id", null: false
+    t.string "region"
+    t.datetime "updated_at", null: false
+    t.index ["pvp_season_id", "bracket"], name: "index_pvp_leaderboards_on_pvp_season_id_and_bracket", unique: true
+    t.index ["pvp_season_id"], name: "index_pvp_leaderboards_on_pvp_season_id"
   end
+
+  create_table "pvp_seasons", force: :cascade do |t|
+    t.string "blizzard_id"
+    t.datetime "created_at", null: false
+    t.string "display_name"
+    t.datetime "end_time"
+    t.boolean "is_current", default: false
+    t.datetime "start_time"
+    t.datetime "updated_at", null: false
+    t.index ["is_current"], name: "index_pvp_seasons_on_is_current"
+    t.index ["updated_at"], name: "index_pvp_seasons_on_updated_at"
+  end
+
+  add_foreign_key "pvp_leaderboard_entries", "characters"
+  add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
+  add_foreign_key "pvp_leaderboards", "pvp_seasons"
 end
