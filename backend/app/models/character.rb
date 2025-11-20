@@ -20,6 +20,9 @@
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
 #
 class Character < ApplicationRecord
+  validates :name, :realm, :region, presence: true
+  validates :blizzard_id, uniqueness: { scope: :region }
+
   enum :faction, {
     alliance: 0,
     horde: 1

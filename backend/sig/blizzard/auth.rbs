@@ -1,0 +1,38 @@
+module Blizzard
+  class Auth
+    @client_id: String
+    @client_secret: String
+
+    class Error < StandardError
+    end
+
+    OAUTH_URL: String
+    CACHE_KEY: String
+    EXPIRY_SKEW_SECONDS: Integer
+
+    type cached_token = {
+        token: String,
+        expires_at: ActiveSupport::TimeWithZone
+      }
+
+    def initialize: (?client_id: String, ?client_secret: String) -> void
+
+    def access_token: () -> String
+
+    private
+
+    def fetch_and_cache_access_token!: () -> String
+
+    def perform_oauth_request: () ->  Net::HTTPResponse
+
+    def parse_response_body: (Net::HTTPResponse response) -> Hash[String, untyped]
+
+    def extract_token_data: (Hash[String , untyped] body) -> [String, Integer]
+
+    def compute_expires_at: (Integer expires_in) -> ActiveSupport::TimeWithZone
+
+    def read_cache: () -> cached_token?
+
+    def write_cache: (String token, ActiveSupport::TimeWithZone expires_at, Integer expires_in) -> void
+  end
+end

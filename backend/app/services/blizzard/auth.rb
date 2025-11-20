@@ -1,4 +1,4 @@
-require "net/http"
+require "httpx"
 require "uri"
 require "json"
 
@@ -23,12 +23,12 @@ module Blizzard
     end
 
     def access_token
-      cached = Rails.cache.read(CACHE_KEY)
+      cached = read_cache
 
       if cached.present? &&
-         cached[:token].present? &&
-         cached[:expires_at].present? &&
-         cached[:expires_at] > Time.current
+        cached[:token].present? &&
+        cached[:expires_at].present? &&
+        cached[:expires_at] > Time.current
         return cached[:token]
       end
 
@@ -40,29 +40,26 @@ module Blizzard
       def fetch_and_cache_access_token!
         response = perform_oauth_request
         body     = parse_response_body(response)
-        token, expires_in = extract_token_data(body)
 
+        token, expires_in = extract_token_data(body)
         expires_at = compute_expires_at(expires_in)
 
         write_cache(token, expires_at, expires_in)
-
         token
       end
 
       def perform_oauth_request
-        uri = URI.parse(OAUTH_URL)
+        response = HTTPX.post(
+          OAUTH_URL,
+          form: { grant_type: "client_credentials" },
+          headers: {
+            "Authorization": "Basic #{Base64.strict_encode64("#{@client_id}:#{@client_secret}")}"
+          }
+        )
 
-        request = Net::HTTP::Post.new(uri)
-        request.basic_auth(@client_id, @client_secret)
-        request.set_form_data(grant_type: "client_credentials")
+        return response if response.status == 200
 
-        response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
-          http.request(request)
-        end
-
-        return response if response.is_a?(Net::HTTPSuccess)
-
-        raise Error, "Blizzard OAuth error: HTTP #{response.code} #{response.message}"
+        raise Error, "Blizzard OAuth error: HTTP #{response.status}"
       end
 
       def parse_response_body(response)
@@ -84,6 +81,10 @@ module Blizzard
 
       def compute_expires_at(expires_in)
         Time.current + expires_in - EXPIRY_SKEW_SECONDS
+      end
+
+      def read_cache
+        Rails.cache.read(CACHE_KEY)
       end
 
       def write_cache(token, expires_at, expires_in)

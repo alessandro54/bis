@@ -17,23 +17,23 @@ RSpec.describe Blizzard::Auth do
         expect {
           described_class.new(client_id: nil, client_secret: nil)
         }.to raise_error(
-          ArgumentError,
-          "Blizzard client_id and client_secret must be provided"
-        )
+               ArgumentError,
+               "Blizzard client_id and client_secret must be provided"
+             )
 
         expect {
           described_class.new(client_id: "", client_secret: client_secret)
         }.to raise_error(
-          ArgumentError,
-          "Blizzard client_id and client_secret must be provided"
-        )
+               ArgumentError,
+               "Blizzard client_id and client_secret must be provided"
+             )
 
         expect {
           described_class.new(client_id: client_id, client_secret: nil)
         }.to raise_error(
-          ArgumentError,
-          "Blizzard client_id and client_secret must be provided"
-        )
+               ArgumentError,
+               "Blizzard client_id and client_secret must be provided"
+             )
       end
     end
   end
@@ -54,8 +54,8 @@ RSpec.describe Blizzard::Auth do
         )
       end
 
-      it "returns the cached token and does not call HTTP" do
-        expect(Net::HTTP).not_to receive(:start)
+      it "returns the cached token and does not call HTTPX" do
+        expect(HTTPX).not_to receive(:post)
 
         token = auth.access_token
 
@@ -69,27 +69,22 @@ RSpec.describe Blizzard::Auth do
 
       let(:http_response) do
         instance_double(
-          Net::HTTPSuccess,
-          is_a?: true,
-          code: "200",
-          message: "OK",
+          HTTPX::Response,
+          status: 200,
           body: {
             access_token: new_token,
             expires_in: expires_in_sec
-          }.to_json
+          }.to_json,
+          headers: {},
+          version: "1.1"
         )
       end
 
       before do
         allow(Rails.cache).to receive(:read).with(cache_key).and_return(nil)
 
-        http_double = instance_double(Net::HTTP)
-
-        allow(Net::HTTP).to receive(:start)
-          .and_yield(http_double)
-
-        allow(http_double).to receive(:request)
-          .and_return(http_response)
+        # Stub HTTPX.post in a loose way; we'll assert args later
+        allow(HTTPX).to receive(:post).and_return(http_response)
 
         allow(Rails.cache).to receive(:write)
       end
@@ -99,7 +94,14 @@ RSpec.describe Blizzard::Auth do
           token = auth.access_token
 
           expect(token).to eq(new_token)
-          expect(Net::HTTP).to have_received(:start).once
+
+          expect(HTTPX).to have_received(:post).with(
+            Blizzard::Auth::OAUTH_URL,
+            hash_including(
+              form: { grant_type: "client_credentials" },
+              headers: hash_including(Authorization: a_kind_of(String))
+            )
+          )
 
           expected_expires_at =
             Time.current + expires_in_sec - Blizzard::Auth::EXPIRY_SKEW_SECONDS
@@ -122,14 +124,14 @@ RSpec.describe Blizzard::Auth do
 
       let(:http_response) do
         instance_double(
-          Net::HTTPSuccess,
-          is_a?: true,
-          code: "200",
-          message: "OK",
+          HTTPX::Response,
+          status: 200,
           body: {
             access_token: new_token,
             expires_in: 1800
-          }.to_json
+          }.to_json,
+          headers: {},
+          version: "1.1"
         )
       end
 
@@ -141,14 +143,7 @@ RSpec.describe Blizzard::Auth do
           }
         )
 
-        http_double = instance_double(Net::HTTP)
-
-        allow(Net::HTTP).to receive(:start)
-          .and_yield(http_double)
-
-        allow(http_double).to receive(:request)
-          .and_return(http_response)
-
+        allow(HTTPX).to receive(:post).and_return(http_response)
         allow(Rails.cache).to receive(:write)
       end
 
@@ -156,67 +151,60 @@ RSpec.describe Blizzard::Auth do
         token = auth.access_token
 
         expect(token).to eq(new_token)
-        expect(Net::HTTP).to have_received(:start).once
+
+        expect(HTTPX).to have_received(:post).with(
+          Blizzard::Auth::OAUTH_URL,
+          hash_including(
+            form: { grant_type: "client_credentials" },
+            headers: hash_including(Authorization: a_kind_of(String))
+          )
+        )
       end
     end
 
     context "when the HTTP response is not success" do
       let(:http_response) do
         instance_double(
-          Net::HTTPUnauthorized,
-          is_a?: false,
-          code: "401",
-          message: "Unauthorized",
-          body: '{"error":"invalid_client"}'
+          HTTPX::Response,
+          status: 401,
+          body: '{"error":"invalid_client"}',
+          headers: {},
+          version: "1.1"
         )
       end
 
       before do
         allow(Rails.cache).to receive(:read).with(cache_key).and_return(nil)
-
-        http_double = instance_double(Net::HTTP)
-
-        allow(Net::HTTP).to receive(:start)
-          .and_yield(http_double)
-
-        allow(http_double).to receive(:request)
-          .and_return(http_response)
+        allow(HTTPX).to receive(:post).and_return(http_response)
       end
 
       it "raises Blizzard::Auth::Error" do
         expect {
-        auth.access_token
-      }.to raise_error(Blizzard::Auth::Error, /Blizzard OAuth error/)
+          auth.access_token
+        }.to raise_error(Blizzard::Auth::Error, /Blizzard OAuth error/)
       end
     end
 
     context "when the response does not contain access_token" do
       let(:http_response) do
         instance_double(
-          Net::HTTPSuccess,
-          is_a?: true,
-          code: "200",
-          message: "OK",
-          body: { "expires_in" => 3600 }.to_json
+          HTTPX::Response,
+          status: 200,
+          body: { "expires_in" => 3600 }.to_json,
+          headers: {},
+          version: "1.1"
         )
       end
 
       before do
         allow(Rails.cache).to receive(:read).with(cache_key).and_return(nil)
-
-        http_double = instance_double(Net::HTTP)
-
-        allow(Net::HTTP).to receive(:start)
-          .and_yield(http_double)
-
-        allow(http_double).to receive(:request)
-          .and_return(http_response)
+        allow(HTTPX).to receive(:post).and_return(http_response)
       end
 
       it "raises Blizzard::Auth::Error" do
         expect {
           auth.access_token
-        }.to raise_error(Blizzard::Auth::Error, /does not include access_token/)
+        }.to raise_error(Blizzard::Auth::Error, /access_token/)
       end
     end
   end

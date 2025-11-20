@@ -29,6 +29,8 @@ gem "bootsnap", require: false                      # Boot-time caching for fast
 # Deploy this application anywhere as a Docker container [https://kamal-deploy.org]
 gem "kamal", require: false                         # Simple deployment using containers
 
+gem "httpx"
+
 # Add HTTP asset caching/compression and X-Sendfile acceleration to Puma
 gem "thruster", require: false                      # HTTP caching + compression middleware
 
@@ -48,6 +50,7 @@ end
 group :development, :test do
   # Debugging Rails applications (Ruby debugger)
 
+  gem "amazing_print", require: false
 
   # Audits gems for known security defects
   gem "bundler-audit", require: false               # Security audit of dependency tree
@@ -66,5 +69,5 @@ group :development, :test do
 end
 
 group :test do
-  gem "shoulda-matchers", "~> 6.0"                  # Useful matchers for testing models and controllers
+  gem "shoulda-matchers", "~> 7.0.1"                  # Useful matchers for testing models and controllers
 end

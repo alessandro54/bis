@@ -1,0 +1,33 @@
+module Blizzard
+  class Client
+
+    VALID_LOCALES: Hash[String, Array[String]]
+    VALID_REGIONS: Array[String]
+    DEFAULT_LOCALE: String
+    API_HOST_TEMPLATE: String
+
+    @region: String
+    @locale: String
+    @auth: Auth
+
+    @http_client: HTTPX::Session
+
+    attr_reader auth: Auth
+    attr_reader locale: String
+    attr_reader region: String
+
+    def get: (String path, namespace: String, params: Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+
+    def profile_namespace: -> String
+    def static_namespace: -> String
+    def dynamic_namespace: -> String
+
+    private
+
+    def auth_header: -> Hash[Symbol, String]
+    def build_url: (String path)-> String
+    def http_client: -> HTTPX::Session
+
+    def parse_response:(HTTPX::Session response) -> Hash[Symbol, untyped]
+  end
+end
