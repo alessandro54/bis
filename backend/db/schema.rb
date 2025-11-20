@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_11_19_174447) do
+ActiveRecord::Schema[8.1].define(version: 2025_11_19_205736) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -34,6 +34,8 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_19_174447) do
     t.integer "class_id"
     t.datetime "created_at", null: false
     t.jsonb "gear_raw"
+    t.integer "hero_talent_tree_id"
+    t.string "hero_talent_tree_name"
     t.integer "item_level"
     t.integer "losses"
     t.bigint "pvp_leaderboard_id", null: false
@@ -43,11 +45,17 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_19_174447) do
     t.string "spec"
     t.integer "spec_id"
     t.jsonb "talents_raw"
+    t.boolean "tier_4p_active", default: false
+    t.integer "tier_set_id"
+    t.string "tier_set_name"
+    t.integer "tier_set_pieces"
     t.datetime "updated_at", null: false
     t.integer "wins"
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
+    t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
+    t.index ["tier_set_id"], name: "index_pvp_leaderboard_entries_on_tier_set_id"
   end
 
   create_table "pvp_leaderboards", force: :cascade do |t|

@@ -2,28 +2,36 @@
 #
 # Table name: pvp_leaderboard_entries
 #
-#  id                 :bigint           not null, primary key
-#  gear_raw           :jsonb
-#  item_level         :integer
-#  losses             :integer
-#  rank               :integer
-#  rating             :integer
-#  snapshot_at        :datetime
-#  spec               :string
-#  talents_raw        :jsonb
-#  wins               :integer
-#  created_at         :datetime         not null
-#  updated_at         :datetime         not null
-#  character_id       :bigint           not null
-#  class_id           :integer
-#  pvp_leaderboard_id :bigint           not null
-#  spec_id            :integer
+#  id                    :bigint           not null, primary key
+#  gear_raw              :jsonb
+#  hero_talent_tree_name :string
+#  item_level            :integer
+#  losses                :integer
+#  rank                  :integer
+#  rating                :integer
+#  snapshot_at           :datetime
+#  spec                  :string
+#  talents_raw           :jsonb
+#  tier_4p_active        :boolean          default(FALSE)
+#  tier_set_name         :string
+#  tier_set_pieces       :integer
+#  wins                  :integer
+#  created_at            :datetime         not null
+#  updated_at            :datetime         not null
+#  character_id          :bigint           not null
+#  class_id              :integer
+#  hero_talent_tree_id   :integer
+#  pvp_leaderboard_id    :bigint           not null
+#  spec_id               :integer
+#  tier_set_id           :integer
 #
 # Indexes
 #
-#  index_pvp_leaderboard_entries_on_character_id        (character_id)
-#  index_pvp_leaderboard_entries_on_pvp_leaderboard_id  (pvp_leaderboard_id)
-#  index_pvp_leaderboard_entries_on_rank                (rank)
+#  index_pvp_leaderboard_entries_on_character_id         (character_id)
+#  index_pvp_leaderboard_entries_on_hero_talent_tree_id  (hero_talent_tree_id)
+#  index_pvp_leaderboard_entries_on_pvp_leaderboard_id   (pvp_leaderboard_id)
+#  index_pvp_leaderboard_entries_on_rank                 (rank)
+#  index_pvp_leaderboard_entries_on_tier_set_id          (tier_set_id)
 #
 # Foreign Keys
 #
