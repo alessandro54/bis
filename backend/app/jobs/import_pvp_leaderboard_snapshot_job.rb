@@ -227,6 +227,7 @@ class ImportPvpLeaderboardSnapshotJob < ApplicationJob
 
   def faction_enum(type)
     return nil unless type
+
     case type
     when "ALLIANCE" then 1
     when "HORDE"    then 2

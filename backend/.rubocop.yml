@@ -1,8 +1,219 @@
-# Omakase Ruby styling for Rails
-inherit_gem: { rubocop-rails-omakase: rubocop.yml }
+# ======================================================================
+#  RuboCop config – Rails 8 / Ruby 3.4.x
+#  Base: rubocop-rails-omakase + ajustes profesionales
+# ======================================================================
 
-# Overwrite or add rules to create your own house style
+inherit_gem:
+  rubocop-rails-omakase:
+    - rubocop.yml
+
+# ----------------------------------------------------------------------
+# Global
+# ----------------------------------------------------------------------
+AllCops:
+  NewCops: enable
+  TargetRubyVersion: 3.4
+  SuggestExtensions: false
+  DisplayCopNames: true
+  Exclude:
+    - "bin/**/*"
+    - "db/schema.rb"
+    - "db/migrate/**/*"
+    - "node_modules/**/*"
+    - "vendor/**/*"
+    - "tmp/**/*"
+    - "log/**/*"
+
+
+Bundler/OrderedGems:
+  Enabled: true
+
+
+# ----------------------------------------------------------------------
+# Layout / Formatting – indentación y espacios
+# ----------------------------------------------------------------------
+Layout/IndentationStyle:
+  Enabled: true
+  EnforcedStyle: spaces
+
+Layout/IndentationWidth:
+  Enabled: true
+  Width: 2
+
+Layout/IndentationConsistency:
+  Enabled: true
+
+Layout/EndAlignment:
+  Enabled: true
+  EnforcedStyleAlignWith: variable
+
+Layout/CaseIndentation:
+  Enabled: true
+  EnforcedStyle: end
+
+Layout/SpaceAroundOperators:
+  Enabled: true
+
+Layout/SpaceAfterComma:
+  Enabled: true
+
+Layout/SpaceInsideArrayLiteralBrackets:
+  Enabled: true
+
+Layout/SpaceInsideHashLiteralBraces:
+  Enabled: true
+
+Layout/TrailingWhitespace:
+  Enabled: true
+
+Layout/EmptyLinesAroundClassBody:
+  Enabled: true
+
+Layout/EmptyLinesAroundModuleBody:
+  Enabled: true
+
+Layout/EmptyLinesAroundBlockBody:
+  Enabled: true
+
+Layout/EmptyLineAfterGuardClause:
+  Enabled: true
+
+Layout/LineLength:
+  Enabled: true
+  Max: 120
+
+# ----------------------------------------------------------------------
+# Style – Ruby moderno, limpio
+# ----------------------------------------------------------------------
+Style/FrozenStringLiteralComment:
+  Enabled: false  # Ruby 3+ ya no lo necesita
+
+Style/Documentation:
+  Enabled: false  # no obliga a comentar todas las clases
+
+Style/StringLiterals:
+  Enabled: true
+  EnforcedStyle: double_quotes
+
+Style/SymbolArray:
+  Enabled: true
+
+Style/HashSyntax:
+  Enabled: true
+  EnforcedStyle: ruby19
+
+Style/Lambda:
+  Enabled: true
+  EnforcedStyle: literal
+
+Style/GuardClause:
+  Enabled: true
+
+Style/RedundantFetchBlock:
+  Enabled: true
+
+Style/RedundantSelf:
+  Enabled: true
+
+Style/RedundantReturn:
+  Enabled: true
+
+Style/NumericLiterals:
+  Enabled: true
+  MinDigits: 5
+
+Style/BlockDelimiters:
+  Enabled: false
+  EnforcedStyle: line_count_based
+
+# ----------------------------------------------------------------------
+# Metrics – razonables, no tóxicos
+# ----------------------------------------------------------------------
+Metrics/MethodLength:
+  Enabled: true
+  Max: 20
+  AllowedMethods: []
+
+Metrics/BlockLength:
+  Enabled: true
+  Max: 30
+  Exclude:
+    - "spec/**/*"
+    - "config/routes.rb"
+    - "db/migrate/**/*"
+
+Metrics/ClassLength:
+  Enabled: true
+  Max: 200
+  Exclude:
+    - "spec/**/*"
+
+Metrics/ModuleLength:
+  Enabled: true
+  Max: 200
+
+Metrics/AbcSize:
+  Enabled: true
+  Max: 20
+
+# ----------------------------------------------------------------------
+# Rails
+# (rubocop-rails-omakase ya activa muchas; aquí sólo ajustes suaves)
+# ----------------------------------------------------------------------
+Rails/SkipsModelValidations:
+  Enabled: true
+
+Rails/SaveBang:
+  Enabled: true
+
+Rails/FindEach:
+  Enabled: true
+
+Rails/Output:
+  Enabled: false  # permitir puts/pp en desarrollo
+
+Rails/TimeZone:
+  Enabled: true
+
+Rails/Date:
+  Enabled: true
+
+Rails/Delegate:
+  Enabled: true
+
+# ----------------------------------------------------------------------
+# Performance (ya viene como dependencia de omakase)
+# ----------------------------------------------------------------------
+Performance/TimesMap:
+  Enabled: true
+
+Performance/Size:
+  Enabled: true
+
+Performance/FixedSize:
+  Enabled: true
+
+Performance/CollectionLiteralInLoop:
+  Enabled: true
+
+# ----------------------------------------------------------------------
+# RSpec (si agregas `gem "rubocop-rspec"`)
+# ----------------------------------------------------------------------
+# require:
+#   - rubocop-rspec
 #
-# # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`
-# Layout/SpaceInsideArrayLiteralBrackets:
-#   Enabled: false
+# RSpec:
+#   AllCops:
+#     TargetRubyVersion: 3.4
+#
+# RSpec/ExampleLength:
+#   Enabled: true
+#   Max: 15
+#
+# RSpec/MultipleExpectations:
+#   Enabled: true
+#   Max: 5
+#
+# RSpec/NestedGroups:
+#   Enabled: true
+#   Max: 4

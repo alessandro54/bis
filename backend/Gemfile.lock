@@ -189,6 +189,7 @@ GEM
     oj (3.16.12)
       bigdecimal (>= 3.0)
       ostruct (>= 0.2)
+    openssl (3.3.2)
     ostruct (0.6.3)
     parallel (1.27.0)
     parser (3.3.10.0)
@@ -289,6 +290,9 @@ GEM
     rubocop-ast (1.48.0)
       parser (>= 3.3.7.2)
       prism (~> 1.4)
+    rubocop-factory_bot (2.28.0)
+      lint_roller (~> 1.1)
+      rubocop (~> 1.72, >= 1.72.1)
     rubocop-performance (1.26.1)
       lint_roller (~> 1.1)
       rubocop (>= 1.75.0, < 2.0)
@@ -303,6 +307,12 @@ GEM
       rubocop (>= 1.72)
       rubocop-performance (>= 1.24)
       rubocop-rails (>= 2.30)
+    rubocop-rake (0.7.1)
+      lint_roller (~> 1.1)
+      rubocop (>= 1.72.1)
+    rubocop-rspec (3.8.0)
+      lint_roller (~> 1.1)
+      rubocop (~> 1.81)
     ruby-progressbar (1.13.0)
     ruby-vips (2.2.5)
       ffi (~> 1.12)
@@ -374,11 +384,15 @@ DEPENDENCIES
   image_processing (~> 1.2)
   kamal
   oj
+  openssl
   pg (~> 1.1)
   puma (>= 5.0)
   rails (~> 8.1.1)
   rspec-rails (~> 8.0.0)
+  rubocop-factory_bot
   rubocop-rails-omakase
+  rubocop-rake
+  rubocop-rspec
   shoulda-matchers (~> 6.0)
   solid_cable
   solid_cache
