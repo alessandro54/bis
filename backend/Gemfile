@@ -70,4 +70,6 @@ end
 
 group :test do
   gem "shoulda-matchers", "~> 7.0.1"                  # Useful matchers for testing models and controllers
+
+  gem "simplecov", require: false
 end

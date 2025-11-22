@@ -1,0 +1,9 @@
+module Blizzard
+  module Api
+    module Profile
+      class CharacterEquipmentSummary
+        def self.fetch: (region: String, name: String, realm: String, ?locale: String, ?params: Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
+      end
+    end
+  end
+end

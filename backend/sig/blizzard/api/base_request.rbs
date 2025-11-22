@@ -1,0 +1,11 @@
+module Blizzard
+  module Api
+    class BaseRequest
+      @client: Client
+
+      attr_reader client: Client
+
+      def initialize: (?region: String, ?locale: String) -> void
+    end
+  end
+end

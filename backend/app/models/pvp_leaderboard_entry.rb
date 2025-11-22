@@ -41,4 +41,8 @@
 class PvpLeaderboardEntry < ApplicationRecord
   belongs_to :pvp_leaderboard
   belongs_to :character
+
+  self.filter_attributes += %i[
+    gear_raw talents_raw
+  ]
 end

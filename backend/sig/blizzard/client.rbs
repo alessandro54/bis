@@ -16,6 +16,8 @@ module Blizzard
     attr_reader locale: String
     attr_reader region: String
 
+    def initialize: (region: String, locale: String, ?auth: Auth) -> void
+
     def get: (String path, namespace: String, params: Hash[Symbol, untyped]) -> Hash[Symbol, untyped]
 
     def profile_namespace: -> String

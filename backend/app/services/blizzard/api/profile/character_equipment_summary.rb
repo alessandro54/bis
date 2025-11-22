@@ -1,13 +1,14 @@
 module Blizzard
   module Api
     module Profile
-      class CharacterEquipmentSummary < BaseRequest
+      class CharacterEquipmentSummary < Blizzard::Api::BaseRequest
         def self.fetch(region:, name:, realm:, locale: "en_US", params: {})
-          new(region:, locale:).fetch(realm:, name:, params: params)
-        end
+          client = client(region:, locale:)
 
-        def fetch(realm:, name:, params: {})
-          client.get("/profile/wow/character/#{realm}/#{name}/equipment",
+          realm_slug = CGI.escape(realm.downcase)
+          name_slug = CGI.escape(name.downcase)
+
+          client.get("/profile/wow/character/#{realm_slug}/#{name_slug}/equipment",
                      namespace: client.profile_namespace,
                      params: params)
         end

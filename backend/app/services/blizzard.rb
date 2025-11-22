@@ -3,7 +3,9 @@ module Blizzard
   class << self
     def client(region: "us", locale: "en_US")
       @clients ||= {}
-      key = [ region, locale ]
+
+      key = { region:, locale: }.freeze
+
       @clients[key] ||= Client.new(region:, locale:)
     end
 

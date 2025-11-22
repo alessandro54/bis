@@ -17,4 +17,9 @@
 #  index_pvp_seasons_on_updated_at  (updated_at)
 #
 class PvpSeason < ApplicationRecord
+  has_many :pvp_leaderboards, dependent: :destroy
+
+  validates :display_name, presence: true
+  validates :blizzard_id, presence: true, uniqueness: true
+  validates :blizzard_id, numericality: { only_integer: true }
 end

@@ -18,9 +18,6 @@ module Blizzard
     }.stringify_keys!.freeze
     DEFAULT_LOCALE = "en_US".freeze
 
-    # ---------------------------------------------------------------------------
-    # Initialization
-    # ---------------------------------------------------------------------------
     def initialize(region: "us", locale: DEFAULT_LOCALE, auth: Blizzard::Auth.new)
       raise ArgumentError, "Unsupported Blizzard API region: #{region}" unless VALID_REGIONS.include?(region)
 
@@ -35,9 +32,6 @@ module Blizzard
       @auth = auth
     end
 
-    # ---------------------------------------------------------------------------
-    # Public API
-    # ---------------------------------------------------------------------------
     def get(path, namespace:, params: {})
       url = build_url(path)
 
@@ -53,16 +47,12 @@ module Blizzard
       parse_response(response)
     end
 
-    # Namespaces -----------------------------------------------------------------
     def profile_namespace = "profile-#{region}"
     def dynamic_namespace = "dynamic-#{region}"
     def static_namespace = "static-#{region}"
 
     private
 
-      # ---------------------------------------------------------------------------
-      # HTTP client (memoized)
-      # ---------------------------------------------------------------------------
       def http_client
         @http_client ||= HTTPX.with(
           timeout: {
@@ -73,9 +63,6 @@ module Blizzard
         )
       end
 
-      # ---------------------------------------------------------------------------
-      # Helpers
-      # ---------------------------------------------------------------------------
       def build_url(path)
         "https://#{API_HOST_TEMPLATE % { region: region }}#{path}"
       end
@@ -84,9 +71,6 @@ module Blizzard
         { Authorization: "Bearer #{auth.access_token}" }
       end
 
-      # ---------------------------------------------------------------------------
-      # Response handling
-      # ---------------------------------------------------------------------------
       def parse_response(response)
         return JSON.parse(response.body.to_s) if response.status == 200
 

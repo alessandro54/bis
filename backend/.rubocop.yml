@@ -24,10 +24,8 @@ AllCops:
     - "tmp/**/*"
     - "log/**/*"
 
-
 Bundler/OrderedGems:
   Enabled: true
-
 
 # ----------------------------------------------------------------------
 # Layout / Formatting – indentación y espacios
