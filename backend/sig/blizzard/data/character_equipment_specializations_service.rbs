@@ -1,0 +1,16 @@
+module Blizzard
+  module Data
+    class CharacterEquipmentSpecializationsService
+      @active_hero_tree: untyped
+
+      attr_reader specializations: Array[Hash[String, untyped]]
+      attr_reader active_specialization: Hash[Symbol, String]
+
+      attr_reader talents: Hash[String, untyped]
+
+      def initialize: (Hash[String, untyped] data) -> void
+
+      def process_talents: -> Hash[String, untyped]
+    end
+  end
+end

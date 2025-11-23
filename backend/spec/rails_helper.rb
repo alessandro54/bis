@@ -1,6 +1,14 @@
 # This file is copied to spec/ when you run 'rails generate rspec:install'
 require 'spec_helper'
 require 'simplecov'
+require 'amazing_print'
+
+SimpleCov.start 'rails'
+SimpleCov.configure do
+  add_group 'Models', 'app/models'
+  add_group 'Controllers', 'app/controllers'
+  add_group 'Services', 'app/services'
+end
 
 ENV['RAILS_ENV'] ||= 'test'
 require_relative '../config/environment'
@@ -11,7 +19,7 @@ abort("The Rails environment is running in production mode!") if Rails.env.produ
 # return unless Rails.env.test?
 require 'rspec/rails'
 # Add additional requires below this line. Rails is not loaded until this point!
-SimpleCov.start 'rails'
+
 # Requires supporting ruby files with custom matchers and macros, etc, in
 # spec/support/ and its subdirectories. Files matching `spec/**/*_spec.rb` are
 # run as spec files by default. This means that files in spec/support that end
@@ -46,6 +54,7 @@ RSpec.configure do |config|
   # examples within a transaction, remove the following line or assign false
   # instead of true.
   config.use_transactional_fixtures = true
+  config.include FactoryBot::Syntax::Methods
 
   # You can uncomment this line to turn off ActiveRecord support entirely.
   # config.use_active_record = false

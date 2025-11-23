@@ -63,6 +63,7 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false       # Default Ruby/Rails linting rules (minimalistic)
   gem "rubocop-rake", require: false
   gem "rubocop-rspec", require: false
+  gem "factory_bot_rails"
 
   gem "debug", platforms: %i[mri windows], require: "debug/prelude"
   gem "rspec-rails", "~> 8.0.0"                     # RSpec testing framework for Rails
@@ -70,6 +71,6 @@ end
 
 group :test do
   gem "shoulda-matchers", "~> 7.0.1"                  # Useful matchers for testing models and controllers
-
+  gem "faker"
   gem "simplecov", require: false
 end

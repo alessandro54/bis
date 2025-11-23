@@ -1,3 +1,0 @@
-class SyncPvpCharacterJob
-  COMBAT_SLOTS: Array[String]
-end

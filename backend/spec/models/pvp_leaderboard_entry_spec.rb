@@ -36,7 +36,7 @@
 # Foreign Keys
 #
 #  fk_rails_...  (character_id => characters.id)
-#  fk_rails_...  (pvp_leaderboard_id => pvp_leaderboards.id)
+#  fk_rails_...  (pvp_leaderboard_id => pvp_leaderboards.rb.id)
 #
 require 'rails_helper'
 
