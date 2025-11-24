@@ -11,7 +11,7 @@
 #  region      :string
 #  created_at  :datetime         not null
 #  updated_at  :datetime         not null
-#  blizzard_id :string
+#  blizzard_id :bigint
 #  class_id    :string
 #
 # Indexes
@@ -23,9 +23,26 @@ require 'rails_helper'
 
 RSpec.describe Character, type: :model do
   describe "validations" do
-    it { should validate_presence_of(:name) }
-    it { should validate_presence_of(:realm) }
-    it { should validate_presence_of(:region) }
-    it { should validate_uniqueness_of(:blizzard_id).scoped_to(:region) }
+    subject { create(:character) }
+
+    it { is_expected.to validate_presence_of(:name) }
+    it { is_expected.to validate_presence_of(:realm) }
+    it { is_expected.to validate_presence_of(:region) }
+
+    it do
+      is_expected.to validate_uniqueness_of(:name)
+                       .scoped_to(%i[realm region])
+    end
+
+    it do
+      is_expected.to validate_uniqueness_of(:blizzard_id)
+                       .scoped_to(:region)
+                       .case_insensitive
+    end
+
+    it do
+      is_expected.to validate_numericality_of(:blizzard_id)
+                       .only_integer
+    end
   end
 end

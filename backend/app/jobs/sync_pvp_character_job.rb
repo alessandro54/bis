@@ -1,10 +1,7 @@
 class SyncPvpCharacterJob < ApplicationJob
   queue_as :default
 
-  COMBAT_SLOTS = %w[
-    HEAD NECK SHOULDER CHEST WAIST LEGS FEET
-    WRIST HAND FINGER TRINKET CLOAK WEAPON OFF_HAND
-  ].freeze
+  EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
 
   def perform(region:, realm:, name:, entry_id:, locale: "en_US")
     entry = PvpLeaderboardEntry.find(entry_id)
@@ -42,14 +39,15 @@ class SyncPvpCharacterJob < ApplicationJob
       equipped_items = Array(equipment_json["equipped_items"])
 
       valid_items = equipped_items.select do |item|
-        slot_type = item.dig("inventory_type", "type") || item.dig("slot", "type")
+        slot_type = item.dig("slot", "type")
         ilvl = item.dig("level", "value")
-        COMBAT_SLOTS.include?(slot_type) && ilvl.to_i > 0
+
+        !EXCLUDED_SLOTS.include?(slot_type) && ilvl.to_i > 0
       end
 
-      ilvls = valid_items.map { |i| i.dig("level", "value").to_i }
-      update_data[:item_level] = ilvls.any? ? (ilvls.sum.to_f / ilvls.size).round : nil
-      update_data[:gear_raw] = equipped_items
+      item_levels = valid_items.map { |i| i.dig("level", "value").to_i }
+      update_data[:item_level] = item_levels.any? ? (item_levels.sum.to_f / item_levels.size).round : nil
+      update_data[:gear_raw] = valid_items
 
       apply_tier_set(update_data, equipped_items)
       apply_talents(update_data, character, talents_json)

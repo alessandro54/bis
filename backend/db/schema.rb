@@ -10,12 +10,12 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_11_19_205736) do
+ActiveRecord::Schema[8.1].define(version: 2025_11_24_204215) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "characters", force: :cascade do |t|
-    t.string "blizzard_id"
+    t.bigint "blizzard_id"
     t.string "class_id"
     t.string "class_slug"
     t.datetime "created_at", null: false
@@ -27,6 +27,31 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_19_205736) do
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
+  end
+
+  create_table "item_translations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "description"
+    t.bigint "item_id", null: false
+    t.string "locale"
+    t.string "name"
+    t.datetime "updated_at", null: false
+    t.index ["item_id", "locale"], name: "index_item_translations_on_item_id_and_locale", unique: true
+    t.index ["item_id"], name: "index_item_translations_on_item_id"
+  end
+
+  create_table "items", force: :cascade do |t|
+    t.bigint "blizzard_id", null: false
+    t.bigint "blizzard_media_id"
+    t.datetime "created_at", null: false
+    t.string "icon_url"
+    t.string "inventory_type"
+    t.string "item_class"
+    t.integer "item_level"
+    t.string "item_subclass"
+    t.integer "quality"
+    t.datetime "updated_at", null: false
+    t.index ["blizzard_id"], name: "index_items_on_blizzard_id", unique: true
   end
 
   create_table "pvp_leaderboard_entries", force: :cascade do |t|
@@ -81,6 +106,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_19_205736) do
     t.index ["updated_at"], name: "index_pvp_seasons_on_updated_at"
   end
 
+  add_foreign_key "item_translations", "items"
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"

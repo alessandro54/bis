@@ -32,11 +32,11 @@ RSpec.describe SyncPvpCharacterJob do
       job
       entry.reload
 
-      expect(entry.item_level).to be_present
-      expect(entry.gear_raw).to be_present
+      expect(entry.item_level).to eq(688)
+      expect(entry.gear_raw.length).to eq(16)
       expect(entry.talents_raw).to be_present
-      expect(entry.spec).to be_present
-      expect(entry.spec_id).to be_present
+      expect(entry.spec).to eq("holy")
+      expect(entry.spec_id).to eq(65)
     end
   end
 
@@ -46,7 +46,6 @@ RSpec.describe SyncPvpCharacterJob do
         .to receive(:fetch)
               .and_raise(Blizzard::Client::Error.new("HTTP 404"))
 
-      # Specializations should NOT even be called
       expect(Blizzard::Api::Profile::CharacterSpecializationSummary)
         .not_to receive(:fetch)
     end

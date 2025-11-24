@@ -11,7 +11,7 @@
 #  region      :string
 #  created_at  :datetime         not null
 #  updated_at  :datetime         not null
-#  blizzard_id :string
+#  blizzard_id :bigint
 #  class_id    :string
 #
 # Indexes
@@ -21,7 +21,11 @@
 #
 class Character < ApplicationRecord
   validates :name, :realm, :region, presence: true
-  validates :blizzard_id, uniqueness: { scope: :region }
+  validates :name, uniqueness: { scope: %i[realm region] }
+
+  validates :blizzard_id,
+            uniqueness: { scope: :region },
+            numericality: { only_integer: true }
 
   enum :faction, {
     alliance: 0,

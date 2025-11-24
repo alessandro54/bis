@@ -1,6 +1,6 @@
 # == Schema Information
 #
-# Table name: pvp_leaderboards.rb
+# Table name: pvp_leaderboards
 #
 #  id             :bigint           not null, primary key
 #  bracket        :string
