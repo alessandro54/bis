@@ -3,28 +3,30 @@
 # Table name: pvp_leaderboard_entries
 # Database name: primary
 #
-#  id                    :bigint           not null, primary key
-#  hero_talent_tree_name :string
-#  item_level            :integer
-#  losses                :integer
-#  rank                  :integer
-#  rating                :integer
-#  raw_equipment         :jsonb
-#  raw_specialization    :jsonb
-#  snapshot_at           :datetime
-#  spec                  :string
-#  tier_4p_active        :boolean          default(FALSE)
-#  tier_set_name         :string
-#  tier_set_pieces       :integer
-#  wins                  :integer
-#  created_at            :datetime         not null
-#  updated_at            :datetime         not null
-#  character_id          :bigint           not null
-#  class_id              :integer
-#  hero_talent_tree_id   :integer
-#  pvp_leaderboard_id    :bigint           not null
-#  spec_id               :integer
-#  tier_set_id           :integer
+#  id                          :bigint           not null, primary key
+#  equipment_processed_at      :datetime
+#  hero_talent_tree_name       :string
+#  item_level                  :integer
+#  losses                      :integer
+#  rank                        :integer
+#  rating                      :integer
+#  raw_equipment               :jsonb
+#  raw_specialization          :jsonb
+#  snapshot_at                 :datetime
+#  spec                        :string
+#  specialization_processed_at :datetime
+#  tier_4p_active              :boolean          default(FALSE)
+#  tier_set_name               :string
+#  tier_set_pieces             :integer
+#  wins                        :integer
+#  created_at                  :datetime         not null
+#  updated_at                  :datetime         not null
+#  character_id                :bigint           not null
+#  class_id                    :integer
+#  hero_talent_tree_id         :integer
+#  pvp_leaderboard_id          :bigint           not null
+#  spec_id                     :integer
+#  tier_set_id                 :integer
 #
 # Indexes
 #

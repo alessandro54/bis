@@ -2,7 +2,9 @@
 require "rails_helper"
 
 RSpec.describe SyncPvpCharacterJob do
-  let(:entry)     { create(:pvp_leaderboard_entry) }
+  include ActiveJob::TestHelper
+
+  let(:entry)     { create("pvp_leaderboard_entry") }
   let(:character) { entry.character }
 
   let(:region)    { "us" }
@@ -10,33 +12,65 @@ RSpec.describe SyncPvpCharacterJob do
   let(:name)      { "manongauz" }
   let(:locale)    { "en_US" }
 
-  subject(:job) do
+  subject(:perform_job) do
     described_class.perform_now(
-      region:, realm:, name:, entry_id: entry.id, locale:
+      region:   region,
+      realm:    realm,
+      name:     name,
+      entry_id: entry.id,
+      locale:   locale
     )
   end
 
   context "when the character exists (valid profile)" do
-    let(:equipment_json) { JSON.parse(File.read("spec/fixtures/files/manongauz_equipment.json")) }
-    let(:talents_json)   { JSON.parse(File.read("spec/fixtures/files/manongauz_specializations.json")) }
+    let(:equipment_json) do
+      JSON.parse(
+        File.read("spec/fixtures/files/manongauz_equipment.json")
+      )
+    end
+
+    let(:talents_json) do
+      JSON.parse(
+        File.read("spec/fixtures/files/manongauz_specializations.json")
+      )
+    end
 
     before do
       allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
-        .to receive(:fetch).and_return(equipment_json)
+        .to receive(:fetch)
+              .and_return(equipment_json)
 
       allow(Blizzard::Api::Profile::CharacterSpecializationSummary)
-        .to receive(:fetch).and_return(talents_json)
+        .to receive(:fetch)
+              .and_return(talents_json)
+
+      clear_enqueued_jobs
     end
 
-    it "updates the leaderboard entry with ilvl, talents and tier set" do
-      job
+    it "updates the entry with raw equipment and specialization data" do
+      perform_job
       entry.reload
 
-      expect(entry.item_level).to eq(688)
-      expect(entry.gear_raw.length).to eq(16)
-      expect(entry.talents_raw).to be_present
-      expect(entry.spec).to eq("holy")
-      expect(entry.spec_id).to eq(65)
+      expect(entry.raw_equipment).to eq(equipment_json)
+      expect(entry.raw_specialization).to eq(talents_json)
+    end
+
+    it "enqueues the equipment processing job" do
+      expect do
+        perform_job
+      end.to have_enqueued_job(Pvp::ProcessLeaderboardEntryEquipmentJob).with(
+        entry_id: entry.id,
+        locale:   locale
+      )
+    end
+
+    it "enqueues the specialization processing job" do
+      expect do
+        perform_job
+      end.to have_enqueued_job(Pvp::ProcessLeaderboardEntrySpecializationJob).with(
+        entry_id: entry.id,
+        locale:   locale
+      )
     end
   end
 
@@ -46,12 +80,20 @@ RSpec.describe SyncPvpCharacterJob do
         .to receive(:fetch)
               .and_raise(Blizzard::Client::Error.new("HTTP 404"))
 
-      expect(Blizzard::Api::Profile::CharacterSpecializationSummary)
-        .not_to receive(:fetch)
+      clear_enqueued_jobs
     end
 
     it "does not update the entry" do
-      expect { job }.not_to change { entry.reload.updated_at }
+      expect do
+        perform_job
+      end.not_to change { entry.reload.updated_at }
+    end
+
+    it "does not enqueue processing jobs" do
+      perform_job
+
+      expect(Pvp::ProcessLeaderboardEntryEquipmentJob).not_to have_been_enqueued
+      expect(Pvp::ProcessLeaderboardEntrySpecializationJob).not_to have_been_enqueued
     end
   end
 end

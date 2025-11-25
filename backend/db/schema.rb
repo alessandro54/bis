@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_11_25_030533) do
+ActiveRecord::Schema[8.1].define(version: 2025_11_25_044053) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -47,6 +47,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_030533) do
     t.bigint "character_id", null: false
     t.integer "class_id"
     t.datetime "created_at", null: false
+    t.datetime "equipment_processed_at"
     t.integer "hero_talent_tree_id"
     t.string "hero_talent_tree_name"
     t.integer "item_level"
@@ -59,6 +60,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_030533) do
     t.datetime "snapshot_at"
     t.string "spec"
     t.integer "spec_id"
+    t.datetime "specialization_processed_at"
     t.boolean "tier_4p_active", default: false
     t.integer "tier_set_id"
     t.string "tier_set_name"
