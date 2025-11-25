@@ -1,7 +1,7 @@
 # spec/jobs/sync_pvp_character_job_spec.rb
 require "rails_helper"
 
-RSpec.describe SyncPvpCharacterJob do
+RSpec.describe SyncPvpCharacterJob, type: :job do
   include ActiveJob::TestHelper
 
   let(:entry)     { create("pvp_leaderboard_entry") }

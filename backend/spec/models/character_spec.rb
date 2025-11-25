@@ -3,17 +3,22 @@
 # Table name: characters
 # Database name: primary
 #
-#  id          :bigint           not null, primary key
-#  class_slug  :string
-#  faction     :integer
-#  name        :string
-#  race        :string
-#  realm       :string
-#  region      :string
-#  created_at  :datetime         not null
-#  updated_at  :datetime         not null
-#  blizzard_id :bigint
-#  class_id    :string
+#  id           :bigint           not null, primary key
+#  avatar_url   :string
+#  class_slug   :string
+#  faction      :integer
+#  inset_url    :string
+#  is_private   :boolean          default(FALSE)
+#  main_raw_url :string
+#  name         :string
+#  race         :string
+#  realm        :string
+#  region       :string
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
+#  blizzard_id  :bigint
+#  class_id     :string
+#  race_id      :integer
 #
 # Indexes
 #

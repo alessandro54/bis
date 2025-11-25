@@ -10,18 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_11_25_044053) do
+ActiveRecord::Schema[8.1].define(version: 2025_11_25_060044) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "characters", force: :cascade do |t|
+    t.string "avatar_url"
     t.bigint "blizzard_id"
     t.string "class_id"
     t.string "class_slug"
     t.datetime "created_at", null: false
     t.integer "faction"
+    t.string "inset_url"
+    t.boolean "is_private", default: false
+    t.string "main_raw_url"
     t.string "name"
     t.string "race"
+    t.integer "race_id"
     t.string "realm"
     t.string "region"
     t.datetime "updated_at", null: false
@@ -45,7 +50,6 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_044053) do
 
   create_table "pvp_leaderboard_entries", force: :cascade do |t|
     t.bigint "character_id", null: false
-    t.integer "class_id"
     t.datetime "created_at", null: false
     t.datetime "equipment_processed_at"
     t.integer "hero_talent_tree_id"
@@ -58,7 +62,6 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_044053) do
     t.jsonb "raw_equipment"
     t.jsonb "raw_specialization"
     t.datetime "snapshot_at"
-    t.string "spec"
     t.integer "spec_id"
     t.datetime "specialization_processed_at"
     t.boolean "tier_4p_active", default: false

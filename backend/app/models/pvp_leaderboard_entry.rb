@@ -13,7 +13,6 @@
 #  raw_equipment               :jsonb
 #  raw_specialization          :jsonb
 #  snapshot_at                 :datetime
-#  spec                        :string
 #  specialization_processed_at :datetime
 #  tier_4p_active              :boolean          default(FALSE)
 #  tier_set_name               :string
@@ -22,7 +21,6 @@
 #  created_at                  :datetime         not null
 #  updated_at                  :datetime         not null
 #  character_id                :bigint           not null
-#  class_id                    :integer
 #  hero_talent_tree_id         :integer
 #  pvp_leaderboard_id          :bigint           not null
 #  spec_id                     :integer

@@ -3,17 +3,22 @@
 # Table name: characters
 # Database name: primary
 #
-#  id          :bigint           not null, primary key
-#  class_slug  :string
-#  faction     :integer
-#  name        :string
-#  race        :string
-#  realm       :string
-#  region      :string
-#  created_at  :datetime         not null
-#  updated_at  :datetime         not null
-#  blizzard_id :bigint
-#  class_id    :string
+#  id           :bigint           not null, primary key
+#  avatar_url   :string
+#  class_slug   :string
+#  faction      :integer
+#  inset_url    :string
+#  is_private   :boolean          default(FALSE)
+#  main_raw_url :string
+#  name         :string
+#  race         :string
+#  realm        :string
+#  region       :string
+#  created_at   :datetime         not null
+#  updated_at   :datetime         not null
+#  blizzard_id  :bigint
+#  class_id     :string
+#  race_id      :integer
 #
 # Indexes
 #
@@ -21,6 +26,8 @@
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
 #
 class Character < ApplicationRecord
+  after_create_commit :enqueue_sync_meta_job
+
   validates :name, :realm, :region, presence: true
   validates :name, uniqueness: { scope: %i[realm region] }
 
@@ -32,4 +39,16 @@ class Character < ApplicationRecord
     alliance: 0,
     horde:    1
   }
+
+  def enqueue_sync_meta_job
+    Characters::SyncCharacterJob.perform_later(
+      region:,
+      realm:,
+      name:
+    )
+  end
+
+  def display_name
+    "#{name.capitalize}-#{realm.capitalize}"
+  end
 end
