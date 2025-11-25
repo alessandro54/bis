@@ -1,6 +1,7 @@
 # == Schema Information
 #
 # Table name: pvp_leaderboards
+# Database name: primary
 #
 #  id             :bigint           not null, primary key
 #  bracket        :string

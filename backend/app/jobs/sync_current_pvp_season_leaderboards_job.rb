@@ -10,7 +10,7 @@ class SyncCurrentPvpSeasonLeaderboardsJob < ApplicationJob
       SyncPvpLeaderboardJob.perform_later(
         region:,
         season:,
-        bracket: bracket,
+        bracket:,
         locale:
       )
     end

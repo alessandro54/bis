@@ -13,4 +13,6 @@ Rails.application.routes.draw do
       resources :characters, only: [ :index ]
     end
   end
+
+  mount MissionControl::Jobs::Engine, at: "/jobs"
 end

@@ -1,6 +1,7 @@
 # == Schema Information
 #
 # Table name: characters
+# Database name: primary
 #
 #  id          :bigint           not null, primary key
 #  class_slug  :string
@@ -24,11 +25,11 @@ class Character < ApplicationRecord
   validates :name, uniqueness: { scope: %i[realm region] }
 
   validates :blizzard_id,
-            uniqueness: { scope: :region },
+            uniqueness:   { scope: :region },
             numericality: { only_integer: true }
 
   enum :faction, {
     alliance: 0,
-    horde: 1
+    horde:    1
   }
 end

@@ -9,7 +9,7 @@ class SyncPvpLeaderboardJob < ApplicationJob
       locale:
     )
 
-    entries = res.fetch("entries", []).first(50)
+    entries = res.fetch("entries", []).first(10)
     snapshot_time = Time.current
 
     entries_for_jobs = []
@@ -17,7 +17,7 @@ class SyncPvpLeaderboardJob < ApplicationJob
     ActiveRecord::Base.transaction do
       leaderboard = PvpLeaderboard.find_or_create_by!(
         pvp_season_id: season.id,
-        bracket: bracket,
+        bracket:       bracket,
         region:,
       )
 
@@ -29,10 +29,10 @@ class SyncPvpLeaderboardJob < ApplicationJob
 
     entries_for_jobs.each do |entry|
       SyncPvpCharacterJob.perform_later(
-        region: region,
-        locale: locale,
-        realm: entry.character.realm,
-        name: entry.character.name,
+        region:   region,
+        locale:   locale,
+        realm:    entry.character.realm,
+        name:     entry.character.name,
         entry_id: entry.id
       )
     end
@@ -44,7 +44,7 @@ class SyncPvpLeaderboardJob < ApplicationJob
 
     character = Character.find_or_initialize_by(
       blizzard_id: character_data["id"].to_s,
-      region: region
+      region:      region
     )
 
     character.name  = character_data["name"]
@@ -57,25 +57,25 @@ class SyncPvpLeaderboardJob < ApplicationJob
     character.save! if character.changed?
 
     entry = PvpLeaderboardEntry.create!(
-      pvp_leaderboard: leaderboard,
-      character: character,
-      rank: entry_json["rank"],
-      rating: entry_json["rating"],
-      wins: stats["won"],
-      losses: stats["lost"],
-      snapshot_at: snapshot_time,
-      class_id: character.class_id,
-      spec_id: nil,
-      spec: nil,
-      item_level: nil,
-      gear_raw: nil,
-      talents_raw: nil,
-      hero_talent_tree_id: nil,
+      pvp_leaderboard:       leaderboard,
+      character:             character,
+      rank:                  entry_json["rank"],
+      rating:                entry_json["rating"],
+      wins:                  stats["won"],
+      losses:                stats["lost"],
+      snapshot_at:           snapshot_time,
+      class_id:              character.class_id,
+      spec_id:               nil,
+      spec:                  nil,
+      item_level:            nil,
+      raw_equipment:         nil,
+      raw_specialization:    nil,
+      hero_talent_tree_id:   nil,
       hero_talent_tree_name: nil,
-      tier_set_id: nil,
-      tier_set_name: nil,
-      tier_set_pieces: nil,
-      tier_4p_active: false
+      tier_set_id:           nil,
+      tier_set_name:         nil,
+      tier_set_pieces:       nil,
+      tier_4p_active:        false
     )
 
     [ character, entry ]

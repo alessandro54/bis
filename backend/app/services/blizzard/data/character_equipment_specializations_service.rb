@@ -36,7 +36,7 @@ module Blizzard
           pvp_talents = active_spec["pvp_talent_slots"]
 
           talent_trees.merge(
-            "pvp_talents": pvp_talents,
+            "pvp_talents":         pvp_talents,
             "talent_loadout_code": loadout["talent_loadout_code"] || ""
           ).stringify_keys!
         end
@@ -65,7 +65,7 @@ module Blizzard
             next unless info
 
             {
-              id: info["id"],
+              id:   info["id"],
               name: info["name"],
               rank: talent["rank"]
             }

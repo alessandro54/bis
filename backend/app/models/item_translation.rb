@@ -21,4 +21,5 @@
 #
 class ItemTranslation < ApplicationRecord
   belongs_to :item
+  validates :locale, presence: true
 end

@@ -21,7 +21,7 @@ class SyncPvpCharacterJob < ApplicationJob
     end
     return unless talents_json
 
-    enrich_entry_from_api(entry, character, equipment_json, talents_json)
+    enrich_entry_from_api(entry, character, equipment_json, talents_json, locale:)
   end
 
   private
@@ -33,23 +33,19 @@ class SyncPvpCharacterJob < ApplicationJob
       nil
     end
 
-    def enrich_entry_from_api(entry, character, equipment_json, talents_json)
+    def enrich_entry_from_api(entry, character, equipment_json, talents_json, locale:)
       update_data = {}
 
-      equipped_items = Array(equipment_json["equipped_items"])
+      entry.update!(
+        raw_equipment:      equipment_json,
+        raw_specialization: talents_json,
+      )
 
-      valid_items = equipped_items.select do |item|
-        slot_type = item.dig("slot", "type")
-        ilvl = item.dig("level", "value")
+      Pvp::LeaderboardEntryProcessEquipmentJob.perform_later(
+        entry_id: entry.id,
+        locale:   locale
+      )
 
-        !EXCLUDED_SLOTS.include?(slot_type) && ilvl.to_i > 0
-      end
-
-      item_levels = valid_items.map { |i| i.dig("level", "value").to_i }
-      update_data[:item_level] = item_levels.any? ? (item_levels.sum.to_f / item_levels.size).round : nil
-      update_data[:gear_raw] = valid_items
-
-      apply_tier_set(update_data, equipped_items)
       apply_talents(update_data, character, talents_json)
 
       return if update_data.empty?
@@ -57,20 +53,8 @@ class SyncPvpCharacterJob < ApplicationJob
       Rails.logger.silence { entry.update!(update_data) }
     end
 
-    def apply_tier_set(update_data, items)
-      block = items.map { |i| i["set"] }.compact.first
-      return unless block
-
-      update_data[:tier_set_id]      = block.dig("item_set", "id")
-      update_data[:tier_set_name]    = block.dig("item_set", "name")
-      update_data[:tier_set_pieces]  = (block["items"] || []).count { |x| x["is_equipped"] }
-
-      effects = block["effects"] || []
-      update_data[:tier_4p_active] = effects.any? { |eff| eff["required_count"] == 4 && eff["is_active"] }
-    end
-
-    def apply_talents(update_data, character, talents_json)
-      spec_service = Blizzard::Data::CharacterEquipmentSpecializationsService.new(talents_json)
+    def apply_talents(update_data, character, talents)
+      spec_service = Blizzard::Data::CharacterEquipmentSpecializationsService.new(talents)
       return unless spec_service.has_data?
 
       update_data[:spec] = spec_service.active_specialization["name"].downcase
@@ -81,7 +65,7 @@ class SyncPvpCharacterJob < ApplicationJob
 
       character.update!(class_slug: spec_service.class_slug) if spec_service.class_slug.present?
 
-      update_data[:talents_raw] = spec_service.talents
+      update_data[:raw_specialization] = spec_service.talents
     end
 
     def handle_blizzard_error(e)

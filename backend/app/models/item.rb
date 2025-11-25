@@ -1,6 +1,7 @@
 # == Schema Information
 #
 # Table name: items
+# Database name: primary
 #
 #  id                :bigint           not null, primary key
 #  icon_url          :string
@@ -19,7 +20,11 @@
 #  index_items_on_blizzard_id  (blizzard_id) UNIQUE
 #
 class Item < ApplicationRecord
+  include Translatable
+
   has_many :item_translations, dependent: :destroy
 
   validates :blizzard_id, presence: true, uniqueness: true
+
+  accepts_nested_attributes_for :translations
 end

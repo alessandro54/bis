@@ -34,6 +34,16 @@ Layout/IndentationStyle:
   Enabled: true
   EnforcedStyle: spaces
 
+Layout/HashAlignment:
+  Enabled: true
+  EnforcedColonStyle: table
+
+Layout/FirstParameterIndentation:
+  Enabled: true
+
+Layout/ExtraSpacing:
+  Enabled: true
+
 Layout/IndentationWidth:
   Enabled: true
   Width: 2

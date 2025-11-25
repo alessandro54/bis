@@ -37,7 +37,7 @@ module Blizzard
 
       query = {
         namespace: namespace,
-        locale: locale
+        locale:    locale
       }.merge(params)
 
       headers = auth_header
@@ -56,7 +56,7 @@ module Blizzard
       def http_client
         @http_client ||= HTTPX.with(
           timeout: {
-            connect_timeout: 5,
+            connect_timeout:   5,
             operation_timeout: 10
           }
           # debug: $stdout   # enable if needed

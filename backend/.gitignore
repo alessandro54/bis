@@ -40,3 +40,5 @@
 .vscode
 
 /coverage
+
+/public

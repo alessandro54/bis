@@ -8,7 +8,7 @@ module Blizzard
 
             client.get("/data/wow/pvp-season/#{pvp_season_id}/pvp-leaderboard/#{bracket}",
                        namespace: client.dynamic_namespace,
-                       params: params)
+                       params:    params)
           end
         end
       end

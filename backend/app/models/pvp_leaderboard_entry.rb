@@ -1,17 +1,18 @@
 # == Schema Information
 #
 # Table name: pvp_leaderboard_entries
+# Database name: primary
 #
 #  id                    :bigint           not null, primary key
-#  gear_raw              :jsonb
 #  hero_talent_tree_name :string
 #  item_level            :integer
 #  losses                :integer
 #  rank                  :integer
 #  rating                :integer
+#  raw_equipment         :jsonb
+#  raw_specialization    :jsonb
 #  snapshot_at           :datetime
 #  spec                  :string
-#  talents_raw           :jsonb
 #  tier_4p_active        :boolean          default(FALSE)
 #  tier_set_name         :string
 #  tier_set_pieces       :integer
@@ -39,10 +40,12 @@
 #  fk_rails_...  (pvp_leaderboard_id => pvp_leaderboards.id)
 #
 class PvpLeaderboardEntry < ApplicationRecord
+  include Translatable
+
   belongs_to :pvp_leaderboard
   belongs_to :character
 
   self.filter_attributes += %i[
-    gear_raw talents_raw
+    raw_equipment raw_specialization
   ]
 end

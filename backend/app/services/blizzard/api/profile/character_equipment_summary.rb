@@ -10,7 +10,7 @@ module Blizzard
 
           client.get("/profile/wow/character/#{realm_slug}/#{name_slug}/equipment",
                      namespace: client.profile_namespace,
-                     params: params)
+                     params:    params)
         end
       end
     end

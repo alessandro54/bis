@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_11_24_204215) do
+ActiveRecord::Schema[8.1].define(version: 2025_11_25_030533) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -27,17 +27,6 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_24_204215) do
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
-  end
-
-  create_table "item_translations", force: :cascade do |t|
-    t.datetime "created_at", null: false
-    t.string "description"
-    t.bigint "item_id", null: false
-    t.string "locale"
-    t.string "name"
-    t.datetime "updated_at", null: false
-    t.index ["item_id", "locale"], name: "index_item_translations_on_item_id_and_locale", unique: true
-    t.index ["item_id"], name: "index_item_translations_on_item_id"
   end
 
   create_table "items", force: :cascade do |t|
@@ -58,7 +47,6 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_24_204215) do
     t.bigint "character_id", null: false
     t.integer "class_id"
     t.datetime "created_at", null: false
-    t.jsonb "gear_raw"
     t.integer "hero_talent_tree_id"
     t.string "hero_talent_tree_name"
     t.integer "item_level"
@@ -66,10 +54,11 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_24_204215) do
     t.bigint "pvp_leaderboard_id", null: false
     t.integer "rank"
     t.integer "rating"
+    t.jsonb "raw_equipment"
+    t.jsonb "raw_specialization"
     t.datetime "snapshot_at"
     t.string "spec"
     t.integer "spec_id"
-    t.jsonb "talents_raw"
     t.boolean "tier_4p_active", default: false
     t.integer "tier_set_id"
     t.string "tier_set_name"
@@ -106,7 +95,21 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_24_204215) do
     t.index ["updated_at"], name: "index_pvp_seasons_on_updated_at"
   end
 
-  add_foreign_key "item_translations", "items"
+  create_table "translations", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "key", null: false
+    t.string "locale", null: false
+    t.jsonb "meta", default: {}, null: false
+    t.bigint "translatable_id", null: false
+    t.string "translatable_type", null: false
+    t.datetime "updated_at", null: false
+    t.text "value", null: false
+    t.index ["key"], name: "index_translations_on_key"
+    t.index ["locale"], name: "index_translations_on_locale"
+    t.index ["translatable_type", "translatable_id", "locale", "key"], name: "index_translations_on_translatable_and_locale_and_key", unique: true
+    t.index ["translatable_type", "translatable_id"], name: "index_translations_on_translatable"
+  end
+
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"

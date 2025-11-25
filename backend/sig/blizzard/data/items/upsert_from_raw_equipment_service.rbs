@@ -1,0 +1,33 @@
+module Blizzard
+  module Data
+    module Items
+      class UpsertFromRawEquipmentService
+        EXCLUDED_SLOTS: Array[String]
+
+        @items: Array[Hash[String, untyped]]
+        @locale: String
+
+        type tier_set = {
+            tier_set_id: Integer,
+            tier_set_name: String,
+            tier_set_pieces: Array[Hash[String, untyped]],
+            tier_4p_active: bool
+        }
+
+        def call: -> Array[Hash[String, untyped]]
+
+        def self.call: (raw_equipment: Hash[String, untyped], ?locale: String) -> Array[Hash[String, untyped]]
+
+        def initialize: (raw_equipment: Hash[String, untyped], ?locale: String) -> void
+
+        def valid_items: (Hash[String, untyped] raw_equipment) -> Array[Hash[String, untyped]]
+
+        def valid_item?: (Hash[String, untyped] raw_item) -> bool
+
+        def item_level: -> Integer
+
+        def tier_set: -> tier_set
+      end
+    end
+  end
+end

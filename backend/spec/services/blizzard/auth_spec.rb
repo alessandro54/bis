@@ -48,7 +48,7 @@ RSpec.describe Blizzard::Auth do
       before do
         allow(Rails.cache).to receive(:read).with(cache_key).and_return(
           {
-            token: cached_token,
+            token:      cached_token,
             expires_at: future_time
           }
         )
@@ -70,10 +70,10 @@ RSpec.describe Blizzard::Auth do
       let(:http_response) do
         instance_double(
           HTTPX::Response,
-          status: 200,
-          body: {
+          status:  200,
+          body:    {
             access_token: new_token,
-            expires_in: expires_in_sec
+            expires_in:   expires_in_sec
           }.to_json,
           headers: {},
           version: "1.1"
@@ -98,7 +98,7 @@ RSpec.describe Blizzard::Auth do
           expect(HTTPX).to have_received(:post).with(
             Blizzard::Auth::OAUTH_URL,
             hash_including(
-              form: { grant_type: "client_credentials" },
+              form:    { grant_type: "client_credentials" },
               headers: hash_including(Authorization: a_kind_of(String))
             )
           )
@@ -109,7 +109,7 @@ RSpec.describe Blizzard::Auth do
           expect(Rails.cache).to have_received(:write).with(
             cache_key,
             hash_including(
-              token: new_token,
+              token:      new_token,
               expires_at: expected_expires_at
             ),
             expires_in: expires_in_sec
@@ -125,10 +125,10 @@ RSpec.describe Blizzard::Auth do
       let(:http_response) do
         instance_double(
           HTTPX::Response,
-          status: 200,
-          body: {
+          status:  200,
+          body:    {
             access_token: new_token,
-            expires_in: 1800
+            expires_in:   1800
           }.to_json,
           headers: {},
           version: "1.1"
@@ -138,7 +138,7 @@ RSpec.describe Blizzard::Auth do
       before do
         allow(Rails.cache).to receive(:read).with(cache_key).and_return(
           {
-            token: expired_token,
+            token:      expired_token,
             expires_at: 5.minutes.ago
           }
         )
@@ -155,7 +155,7 @@ RSpec.describe Blizzard::Auth do
         expect(HTTPX).to have_received(:post).with(
           Blizzard::Auth::OAUTH_URL,
           hash_including(
-            form: { grant_type: "client_credentials" },
+            form:    { grant_type: "client_credentials" },
             headers: hash_including(Authorization: a_kind_of(String))
           )
         )
@@ -166,8 +166,8 @@ RSpec.describe Blizzard::Auth do
       let(:http_response) do
         instance_double(
           HTTPX::Response,
-          status: 401,
-          body: '{"error":"invalid_client"}',
+          status:  401,
+          body:    '{"error":"invalid_client"}',
           headers: {},
           version: "1.1"
         )
@@ -189,8 +189,8 @@ RSpec.describe Blizzard::Auth do
       let(:http_response) do
         instance_double(
           HTTPX::Response,
-          status: 200,
-          body: { "expires_in" => 3600 }.to_json,
+          status:  200,
+          body:    { "expires_in" => 3600 }.to_json,
           headers: {},
           version: "1.1"
         )

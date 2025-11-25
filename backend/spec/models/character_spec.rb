@@ -1,6 +1,7 @@
 # == Schema Information
 #
 # Table name: characters
+# Database name: primary
 #
 #  id          :bigint           not null, primary key
 #  class_slug  :string

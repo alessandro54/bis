@@ -1,6 +1,7 @@
 # == Schema Information
 #
 # Table name: characters
+# Database name: primary
 #
 #  id          :bigint           not null, primary key
 #  class_slug  :string
@@ -27,6 +28,6 @@ FactoryBot.define do
     race       { Faker::Games::WorldOfWarcraft.race.downcase }
     class_slug { Faker::Games::WorldOfWarcraft.class_name.downcase }
     blizzard_id { Faker::Number.number(digits: 8).to_s }
-    faction    { [ 0, 1 ].sample }
+    faction { [ 0, 1 ].sample }
   end
 end

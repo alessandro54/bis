@@ -51,7 +51,7 @@ module Blizzard
       def perform_oauth_request
         response = HTTPX.post(
           OAUTH_URL,
-          form: { grant_type: "client_credentials" },
+          form:    { grant_type: "client_credentials" },
           headers: {
             "Authorization": "Basic #{Base64.strict_encode64("#{@client_id}:#{@client_secret}")}"
           }

@@ -33,8 +33,8 @@ RSpec.describe SyncPvpCharacterJob do
       entry.reload
 
       expect(entry.item_level).to be_present
-      expect(entry.gear_raw).to be_present
-      expect(entry.talents_raw).to be_present
+      expect(entry.raw_equipment).to be_present
+      expect(entry.raw_specialization).to be_present
       expect(entry.spec).to be_present
       expect(entry.spec_id).to be_present
     end

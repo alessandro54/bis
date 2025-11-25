@@ -46,18 +46,18 @@ RSpec.describe Blizzard::Client do
       response_double = instance_double(
         "HTTPX::Response",
         status: 200,
-        body: double("body", to_s: response_body)
+        body:   double("body", to_s: response_body)
       )
 
       expected_url = "https://us.api.blizzard.com#{path}"
       expected_query = {
         namespace: namespace,
-        locale: locale
+        locale:    locale
       }.merge(extra_params)
 
       expect(http_double).to receive(:get).with(
         expected_url,
-        params: expected_query,
+        params:  expected_query,
         headers: { Authorization: "Bearer fake-token" }
       ).and_return(response_double)
 
@@ -70,7 +70,7 @@ RSpec.describe Blizzard::Client do
       response_double = instance_double(
         "HTTPX::Response",
         status: 404,
-        body: double("body", to_s: "Not Found")
+        body:   double("body", to_s: "Not Found")
       )
 
       allow(http_double).to receive(:get).and_return(response_double)
@@ -87,7 +87,7 @@ RSpec.describe Blizzard::Client do
       response_double = instance_double(
         "HTTPX::Response",
         status: 200,
-        body: double("body", to_s: "this is not json")
+        body:   double("body", to_s: "this is not json")
       )
 
       allow(http_double).to receive(:get).and_return(response_double)
