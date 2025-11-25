@@ -51,4 +51,12 @@ RSpec.describe Character, type: :model do
                        .only_integer
     end
   end
+
+  describe "#display_name" do
+    subject { create(:character, name: "Foo", realm: "Bar", region: "eu") }
+
+    it "returns the character's name and realm" do
+        expect(subject.display_name).to eq("Foo-Bar")
+      end
+  end
 end

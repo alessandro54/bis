@@ -53,8 +53,7 @@ FactoryBot.define do
 
     item_level { Faker::Number.between(from: 450, to: 700) }
 
-    class_id { Faker::Number.between(from: 1, to: 13) }
-    spec_id  { Faker::Number.between(from: 1, to: 50) }
+    spec_id { Faker::Number.between(from: 1, to: 50) }
 
     hero_talent_tree_id   { Faker::Number.between(from: 1, to: 20) }
     hero_talent_tree_name { Faker::Games::DnD.klass.downcase }

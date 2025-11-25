@@ -120,9 +120,9 @@ RSpec.describe Pvp::ProcessLeaderboardEntrySpecializationJob, type: :job do
       entry.reload
 
       expect(entry.specialization_processed_at).to eq(now)
-      expect(entry.spec).to eq("holy")
       expect(entry.spec_id).to eq(65)
       expect(entry.hero_talent_tree_name).to eq("lightsmith")
+      expect(entry.character.class_slug).to eq("paladin")
       expect(entry.hero_talent_tree_id).to eq(380)
       expect(entry.raw_specialization).to eq(talents_payload)
     end

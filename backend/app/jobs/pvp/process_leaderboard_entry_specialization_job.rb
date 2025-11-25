@@ -14,7 +14,6 @@ module Pvp
       Rails.logger.silence do
         entry.update!(
           specialization_processed_at: Time.zone.now,
-          spec:                        spec_service.active_specialization["name"].downcase,
           spec_id:                     spec_service.active_specialization["id"],
           hero_talent_tree_name:       spec_service.active_hero_tree["name"].downcase,
           hero_talent_tree_id:         spec_service.active_hero_tree["id"],

@@ -18,6 +18,8 @@ class SyncPvpCharacterJob < ApplicationJob
     end
     return unless talents_json
 
+    return if entry.character.is_private
+
     Rails.logger.silence do
       entry.update!(
         raw_equipment:      equipment_json,
