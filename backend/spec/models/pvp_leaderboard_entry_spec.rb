@@ -7,7 +7,7 @@
 #  equipment_processed_at      :datetime
 #  hero_talent_tree_name       :string
 #  item_level                  :integer
-#  losses                      :integer
+#  losses                      :integer          default(0)
 #  rank                        :integer
 #  rating                      :integer
 #  raw_equipment               :jsonb
@@ -17,7 +17,7 @@
 #  tier_4p_active              :boolean          default(FALSE)
 #  tier_set_name               :string
 #  tier_set_pieces             :integer
-#  wins                        :integer
+#  wins                        :integer          default(0)
 #  created_at                  :datetime         not null
 #  updated_at                  :datetime         not null
 #  character_id                :bigint           not null

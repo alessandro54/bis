@@ -1,8 +1,11 @@
 class SyncPvpCharacterJob < ApplicationJob
-  queue_as :default
+  self.enqueue_after_transaction_commit = :always
+  queue_as :character_sync
 
   def perform(region:, realm:, name:, entry_id:, locale: "en_US")
-    entry = PvpLeaderboardEntry.find(entry_id)
+    entry = PvpLeaderboardEntry.find_by(id: entry_id)
+
+    return unless entry
 
     equipment_json = safe_fetch do
       Blizzard::Api::Profile::CharacterEquipmentSummary.fetch(

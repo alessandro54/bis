@@ -8,7 +8,7 @@
 #  equipment_processed_at      :datetime
 #  hero_talent_tree_name       :string
 #  item_level                  :integer
-#  losses                      :integer
+#  losses                      :integer          default(0)
 #  rank                        :integer
 #  rating                      :integer
 #  raw_equipment               :jsonb
@@ -18,7 +18,7 @@
 #  tier_4p_active              :boolean          default(FALSE)
 #  tier_set_name               :string
 #  tier_set_pieces             :integer
-#  wins                        :integer
+#  wins                        :integer          default(0)
 #  created_at                  :datetime         not null
 #  updated_at                  :datetime         not null
 #  character_id                :bigint           not null
@@ -65,7 +65,7 @@ FactoryBot.define do
 
     trait :with_gear do
       index = (1..3).to_a.sample
-      gear_raw do
+      raw_equipment do
         JSON.parse(
           File.read(
             Rails.root.join("spec/fixtures/pvp_leaderboard_entries/gear_raw_#{index}.json")
@@ -73,7 +73,7 @@ FactoryBot.define do
         )
       end
 
-      talents_raw do
+      raw_specialization do
         JSON.parse(
           File.read(
             Rails.root.join("spec/fixtures/pvp_leaderboard_entries/talents_raw_#{index}.json")

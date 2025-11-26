@@ -1,6 +1,6 @@
 module Pvp
   class ProcessLeaderboardEntrySpecializationJob < ApplicationJob
-    queue_as :default
+    queue_as :pvp_processing
 
     def perform(entry_id:, locale: "en_US")
       entry = ::PvpLeaderboardEntry.find(entry_id)

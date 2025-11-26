@@ -9,32 +9,29 @@ class SyncPvpLeaderboardJob < ApplicationJob
       locale:
     )
 
-    entries = res.fetch("entries", []).first(10)
+    entries = res.fetch("entries", []).first(200)
     snapshot_time = Time.current
 
-    entries_for_jobs = []
+    with_deadlock_retry do
+      ActiveRecord::Base.transaction do
+        leaderboard = PvpLeaderboard.find_or_create_by!(
+          pvp_season_id: season.id,
+          bracket:       bracket,
+          region:,
+          )
 
-    ActiveRecord::Base.transaction do
-      leaderboard = PvpLeaderboard.find_or_create_by!(
-        pvp_season_id: season.id,
-        bracket:       bracket,
-        region:,
-      )
+        entries.each do |entry_json|
+          entry = import_entry(entry_json, leaderboard, region, snapshot_time)
 
-      entries.each do |entry_json|
-        _character, entry = import_entry(entry_json, leaderboard, region, snapshot_time)
-        entries_for_jobs << entry
+          SyncPvpCharacterJob.perform_later(
+            region:   region,
+            locale:   locale,
+            realm:    entry.character.realm,
+            name:     entry.character.name,
+            entry_id: entry.id
+          )
+        end
       end
-    end
-
-    entries_for_jobs.each do |entry|
-      SyncPvpCharacterJob.perform_later(
-        region:   region,
-        locale:   locale,
-        realm:    entry.character.realm,
-        name:     entry.character.name,
-        entry_id: entry.id
-      )
     end
   end
 
@@ -42,21 +39,30 @@ class SyncPvpLeaderboardJob < ApplicationJob
     character_data = entry_json.fetch("character")
     stats          = entry_json.fetch("season_match_statistics")
 
-    character = Character.find_or_initialize_by(
+    character_attrs = {
       blizzard_id: character_data["id"].to_s,
-      region:      region
+      region:      region,
+      name:        character_data["name"],
+      realm:       character_data.dig("realm", "slug")
+    }
+
+    if Character.new.respond_to?(:faction=)
+      character_attrs[:faction] = faction_enum(entry_json.dig("faction", "type"))
+    end
+
+    Character.upsert(
+      character_attrs,
+      unique_by: %i[blizzard_id region]
     )
 
-    character.name  = character_data["name"]
-    character.realm = character_data.dig("realm", "slug")
-
-    if character.respond_to?(:faction=)
-      character.faction = faction_enum(entry_json.dig("faction", "type"))
-    end
+    character = Character.find_by!(
+      blizzard_id: character_data["id"].to_s,
+      region:
+    )
 
     character.save! if character.changed?
 
-    entry = PvpLeaderboardEntry.create!(
+    PvpLeaderboardEntry.create!(
       pvp_leaderboard:       leaderboard,
       character:             character,
       rank:                  entry_json["rank"],
@@ -75,8 +81,6 @@ class SyncPvpLeaderboardJob < ApplicationJob
       tier_set_pieces:       nil,
       tier_4p_active:        false
     )
-
-    [ character, entry ]
   end
 
   private
@@ -88,6 +92,20 @@ class SyncPvpLeaderboardJob < ApplicationJob
       when "ALLIANCE" then 0
       when "HORDE"    then 1
       else nil
+      end
+    end
+
+    def with_deadlock_retry(max_retries: 3)
+      retries = 0
+
+      begin
+        yield
+      rescue ActiveRecord::Deadlocked
+        retries += 1
+        raise if retries > max_retries
+
+        sleep(rand * 0.1)
+        retry
       end
     end
 end

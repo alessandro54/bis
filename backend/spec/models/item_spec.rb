@@ -7,8 +7,8 @@
 #  icon_url          :string
 #  inventory_type    :string
 #  item_class        :string
-#  item_level        :integer
 #  item_subclass     :string
+#  meta_synced_at    :datetime
 #  quality           :integer
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null

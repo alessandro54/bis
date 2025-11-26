@@ -7,8 +7,8 @@
 #  icon_url          :string
 #  inventory_type    :string
 #  item_class        :string
-#  item_level        :integer
 #  item_subclass     :string
+#  meta_synced_at    :datetime
 #  quality           :integer
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
@@ -21,7 +21,7 @@
 #
 FactoryBot.define do
   factory :item do
-    blizzard_id { "" }
+    blizzard_id { Faker::Number.number(digits: 8).to_s }
     item_class { "MyString" }
     item_subclass { "MyString" }
     inventory_type { 1 }

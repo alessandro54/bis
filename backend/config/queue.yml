@@ -2,9 +2,20 @@ default: &default
   dispatchers:
     - polling_interval: 1
       batch_size: 500
+
   workers:
-    - queues: "*"
-      threads: <%= Rails.env.development? ? 10 : 3 %>
+    - queues: [pvp_sync]
+      threads: 2
+      processes: 1
+      polling_interval: 0.5
+
+    - queues: [character_sync]
+      threads: <%= Rails.env.development? ? 3 : 2 %>
+      processes: 1
+      polling_interval: 0.5
+
+    - queues: [default, pvp_processing]
+      threads: 3
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
       polling_interval: 0.1
 

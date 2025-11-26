@@ -64,7 +64,6 @@ module Blizzard
               inventory_type:    raw_item.dig("inventory_type", "type")&.downcase,
               item_class:        raw_item.dig("item_class", "name")&.downcase,
               item_subclass:     raw_item.dig("item_subclass", "name")&.downcase,
-              item_level:        raw_item.dig("level", "value"),
               blizzard_media_id: raw_item.dig("media", "id"),
               quality:           raw_item.dig("quality", "type")&.downcase
             )

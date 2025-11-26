@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_11_25_060044) do
+ActiveRecord::Schema[8.1].define(version: 2025_11_25_191747) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -24,6 +24,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_060044) do
     t.string "inset_url"
     t.boolean "is_private", default: false
     t.string "main_raw_url"
+    t.datetime "meta_synced_at"
     t.string "name"
     t.string "race"
     t.integer "race_id"
@@ -41,8 +42,8 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_060044) do
     t.string "icon_url"
     t.string "inventory_type"
     t.string "item_class"
-    t.integer "item_level"
     t.string "item_subclass"
+    t.datetime "meta_synced_at"
     t.integer "quality"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id"], name: "index_items_on_blizzard_id", unique: true
@@ -55,7 +56,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_060044) do
     t.integer "hero_talent_tree_id"
     t.string "hero_talent_tree_name"
     t.integer "item_level"
-    t.integer "losses"
+    t.integer "losses", default: 0
     t.bigint "pvp_leaderboard_id", null: false
     t.integer "rank"
     t.integer "rating"
@@ -69,12 +70,26 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_060044) do
     t.string "tier_set_name"
     t.integer "tier_set_pieces"
     t.datetime "updated_at", null: false
-    t.integer "wins"
+    t.integer "wins", default: 0
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
     t.index ["tier_set_id"], name: "index_pvp_leaderboard_entries_on_tier_set_id"
+  end
+
+  create_table "pvp_leaderboard_entry_items", force: :cascade do |t|
+    t.string "context"
+    t.datetime "created_at", null: false
+    t.bigint "item_id", null: false
+    t.integer "item_level"
+    t.bigint "pvp_leaderboard_entry_id", null: false
+    t.jsonb "raw"
+    t.string "slot"
+    t.datetime "updated_at", null: false
+    t.index ["item_id"], name: "index_pvp_leaderboard_entry_items_on_item_id"
+    t.index ["pvp_leaderboard_entry_id", "slot"], name: "index_entry_items_on_entry_and_slot", unique: true
+    t.index ["pvp_leaderboard_entry_id"], name: "index_pvp_leaderboard_entry_items_on_pvp_leaderboard_entry_id"
   end
 
   create_table "pvp_leaderboards", force: :cascade do |t|
@@ -117,5 +132,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_11_25_060044) do
 
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
+  add_foreign_key "pvp_leaderboard_entry_items", "items"
+  add_foreign_key "pvp_leaderboard_entry_items", "pvp_leaderboard_entries"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"
 end

@@ -1,29 +1,36 @@
 module Characters
   class SyncCharacterJob < ApplicationJob
-    queue_as :default
+    queue_as :character_sync
 
     def perform(region:, realm:, name:)
       character = Character.find_by(region:, realm:, name:)
       return unless character
+
+      return if character.meta_synced?
 
       profile = fetch_profile(region: region, realm: realm, name: name)
       return unless profile
 
       assets = fetch_assets(region: region, realm: realm, name: name)
 
-      character.update!(
-        race:         profile.dig("race", "name")&.downcase,
-        class_id:     profile.dig("character_class", "id"),
-        avatar_url:   asset_value(assets, "avatar"),
-        inset_url:    asset_value(assets, "inset"),
-        main_raw_url: asset_value(assets, "main-raw")
-      )
+      update_character(character, profile, assets)
     rescue Blizzard::Client::Error => e
       handle_blizzard_error(e, character)
     end
 
     private
 
+      def update_character(character, profile, assets)
+        character.update!(
+          race:           profile.dig("race", "name")&.downcase,
+          race_id:        profile.dig("race", "id"),
+          class_id:       profile.dig("character_class", "id"),
+          avatar_url:     asset_value(assets, "avatar"),
+          inset_url:      asset_value(assets, "inset"),
+          main_raw_url:   asset_value(assets, "main-raw"),
+          meta_synced_at: Time.zone.now
+        )
+      end
       def fetch_profile(region:, realm:, name:)
         profile = Blizzard::Api::Profile::CharacterProfileSummary.fetch(
           region: region,
