@@ -39,7 +39,7 @@ module Pvp
         blizzard_item_id = equipped.dig("item", "id")
         slot_type        = equipped.dig("slot", "type")
         item_level       = equipped.dig("level", "value")
-        context          = equipped["context"] # if present in your JSON
+        context          = equipped["context"]
 
         next unless blizzard_item_id && slot_type
 

@@ -68,11 +68,13 @@ RSpec.describe Pvp::ProcessLeaderboardEntryEquipmentJob, type: :job do
     end
 
     let(:processed_equipment) do
-      {
-        "equipped_items" => [
-          { "id" => 1, "ilvl" => 540 }
-        ]
-      }
+      [
+        {
+          "item" => { "id" => 1 },
+          "slot" => { "type" => "HEAD" },
+          "level" => { "value" => 540 }
+        }
+      ]
     end
 
     let(:tier_set_data) do

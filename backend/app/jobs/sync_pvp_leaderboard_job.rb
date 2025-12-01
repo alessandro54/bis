@@ -9,7 +9,7 @@ class SyncPvpLeaderboardJob < ApplicationJob
       locale:
     )
 
-    entries = res.fetch("entries", []).first(200)
+    entries = res.fetch("entries", [])
     snapshot_time = Time.current
 
     with_deadlock_retry do

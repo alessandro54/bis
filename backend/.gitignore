@@ -42,3 +42,5 @@
 /coverage
 
 /public
+
+/spec/examples.txt

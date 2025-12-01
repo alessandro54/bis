@@ -6,7 +6,7 @@ class SyncCurrentPvpSeasonLeaderboardsJob < ApplicationJob
 
     return unless season
 
-    %w[2v2 3v3].each do |bracket|
+    %w[3v3].each do |bracket|
       SyncPvpLeaderboardJob.perform_later(
         region:,
         season:,

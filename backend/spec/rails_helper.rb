@@ -24,7 +24,7 @@ require 'rspec/rails'
 # Requires supporting ruby files with custom matchers and macros, etc, in
 # spec/support/ and its subdirectories. Files matching `spec/**/*_spec.rb` are
 # run as spec files by default. This means that files in spec/support that end
-# in _spec.rb will both be required and run as specs, causing the specs to be
+# in _spec.rb will both be required and run as specs.rb, causing the specs.rb to be
 # run twice. It is recommended that you do not name files matching this glob to
 # end with _spec.rb. You can configure this pattern with the --pattern
 # option on the command line or in ~/.rspec, .rspec or `.rspec-local`.
@@ -75,7 +75,7 @@ RSpec.configure do |config|
   # config.use_active_record = false
 
   # RSpec Rails uses metadata to mix in different behaviours to your tests,
-  # for example enabling you to call `get` and `post` in request specs. e.g.:
+  # for example enabling you to call `get` and `post` in request specs.rb. e.g.:
   #
   #     RSpec.describe UsersController, type: :request do
   #       # ...
@@ -95,6 +95,7 @@ RSpec.configure do |config|
   config.filter_rails_from_backtrace!
   # arbitrary gems may also be filtered via:
   # config.filter_gems_from_backtrace("gem name")
+  config.example_status_persistence_file_path = "spec/examples.txt"
 end
 
 Shoulda::Matchers.configure do |config|
