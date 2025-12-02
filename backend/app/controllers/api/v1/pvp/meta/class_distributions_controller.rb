@@ -14,14 +14,12 @@ module Api
               season:  season,
               bracket: bracket,
               region:  region,
-              limit:   limit
             ).call
 
             render json: {
               season_id:     season.blizzard_id,
               bracket:       bracket,
               region:        region,
-              limit:         limit,
               total_entries: distribution.sum { |row| row[:count] },
               classes:       distribution
             }

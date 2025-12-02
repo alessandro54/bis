@@ -10,19 +10,20 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_11_25_191747) do
+ActiveRecord::Schema[8.1].define(version: 2025_12_02_035559) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
   create_table "characters", force: :cascade do |t|
     t.string "avatar_url"
     t.bigint "blizzard_id"
-    t.string "class_id"
+    t.bigint "class_id"
     t.string "class_slug"
     t.datetime "created_at", null: false
     t.integer "faction"
     t.string "inset_url"
     t.boolean "is_private", default: false
+    t.datetime "last_equipment_snapshot_at"
     t.string "main_raw_url"
     t.datetime "meta_synced_at"
     t.string "name"

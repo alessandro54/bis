@@ -10,8 +10,6 @@ module Pvp
 
       def call
         counts = base_scope
-                   .where.not("pvp_leaderboard_entries.spec_id": nil,
-                              "characters.class_id":             nil)
                    .reorder(nil)
                    .group(
                      "pvp_leaderboard_entries.spec_id",
@@ -43,7 +41,7 @@ module Pvp
 
         rows.map do |row|
           row.merge(
-            percentage: total.positive? ? (row[:count].to_f / total).round(4) : 0.0
+            percentage: total.positive? ? ((row[:count].to_f / total) * 100).round(2) : 0.0
           )
         end.sort_by { |row| [ -row[:count], -row[:mean_rating].to_f ] }
       end
@@ -62,8 +60,12 @@ module Pvp
                 region:        region
               }
             )
-            .order(:rank)
-            .limit(limit)
+            .where("pvp_leaderboard_entries.snapshot_at > ?", 1.day.ago)
+            .where("pvp_leaderboard_entries.rating >= ?", 2400)
+            .where.not("pvp_leaderboard_entries.spec_id": nil,
+                       "characters.class_id":             nil)
+            .select("DISTINCT ON (character_id) pvp_leaderboard_entries.*")
+            .order("character_id, snapshot_at DESC")
         end
     end
   end
