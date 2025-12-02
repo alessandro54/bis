@@ -1,11 +1,10 @@
 module Pvp
   module Meta
     class ClassDistributionService
-      def initialize(season:, bracket:, region:, limit: 200)
+      def initialize(season:, bracket:, region:)
         @season = season
         @bracket = bracket
         @region = region
-        @limit = limit
       end
 
       def call
@@ -48,7 +47,7 @@ module Pvp
 
       private
 
-        attr_reader :season, :bracket, :region, :limit
+        attr_reader :season, :bracket, :region
 
         def base_scope
           PvpLeaderboardEntry
@@ -61,7 +60,6 @@ module Pvp
               }
             )
             .where("pvp_leaderboard_entries.snapshot_at > ?", 1.day.ago)
-            .where("pvp_leaderboard_entries.rating >= ?", 2400)
             .where.not("pvp_leaderboard_entries.spec_id": nil,
                        "characters.class_id":             nil)
             .select("DISTINCT ON (character_id) pvp_leaderboard_entries.*")

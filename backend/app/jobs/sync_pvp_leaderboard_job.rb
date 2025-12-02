@@ -12,25 +12,34 @@ class SyncPvpLeaderboardJob < ApplicationJob
     entries = res.fetch("entries", [])
     snapshot_time = Time.current
 
+    bracket_config = Pvp::BracketConfig.for(bracket)
+    rating_min = bracket_config&.dig(:rating_min)
+    job_queue = bracket_config&.dig(:job_queue) || :character_sync
+
+    if rating_min
+      entries = entries.select { |entry| entry["rating"].to_i >= rating_min }
+    end
+
     with_deadlock_retry do
       ActiveRecord::Base.transaction do
         leaderboard = PvpLeaderboard.find_or_create_by!(
           pvp_season_id: season.id,
           bracket:       bracket,
-          region:,
+          region:        region,
           )
 
         entries.each do |entry_json|
-          entry = import_entry(entry_json, leaderboard, region, snapshot_time)
+          character, _entry = import_entry(entry_json, leaderboard, region, snapshot_time)
 
-          SyncPvpCharacterJob.perform_later(
-            region:   region,
-            locale:   locale,
-            realm:    entry.character.realm,
-            name:     entry.character.name,
-            entry_id: entry.id
-          )
+          SyncPvpCharacterJob
+            .set(queue: job_queue)
+            .perform_later(
+              character_id: character.id,
+              locale:       locale
+            )
         end
+
+        leaderboard.update!(last_synced_at: snapshot_time)
       end
     end
   end
@@ -62,25 +71,17 @@ class SyncPvpLeaderboardJob < ApplicationJob
 
     character.save! if character.changed?
 
-    PvpLeaderboardEntry.create!(
-      pvp_leaderboard:       leaderboard,
-      character:             character,
-      rank:                  entry_json["rank"],
-      rating:                entry_json["rating"],
-      wins:                  stats["won"],
-      losses:                stats["lost"],
-      snapshot_at:           snapshot_time,
-      spec_id:               nil,
-      item_level:            nil,
-      raw_equipment:         nil,
-      raw_specialization:    nil,
-      hero_talent_tree_id:   nil,
-      hero_talent_tree_name: nil,
-      tier_set_id:           nil,
-      tier_set_name:         nil,
-      tier_set_pieces:       nil,
-      tier_4p_active:        false
+    entry = PvpLeaderboardEntry.create!(
+      pvp_leaderboard: leaderboard,
+      character:       character,
+      rank:            entry_json["rank"],
+      rating:          entry_json["rating"],
+      wins:            stats["won"],
+      losses:          stats["lost"],
+      snapshot_at:     snapshot_time,
     )
+
+    [ character, entry ]
   end
 
   private

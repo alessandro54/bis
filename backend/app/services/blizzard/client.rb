@@ -72,11 +72,19 @@ module Blizzard
       end
 
       def parse_response(response)
-        return JSON.parse(response.body.to_s) if response.status == 200
+        if response.is_a?(HTTPX::ErrorResponse)
+          raise Error, "Network/Transport error: #{response.error}"
+        end
 
-        raise Error, "Blizzard API error: HTTP #{response.status}, body=#{response.body}"
+        if response.status == 200
+          return JSON.parse(response.body.to_s)
+        end
+
+        raise Error,
+              "Blizzard API error: HTTP #{response.status}, body=#{response.body}"
       rescue JSON::ParserError => e
-        raise Error, "Blizzard API error: invalid JSON: #{e.message}\n#{response.body}"
+        raise Error,
+              "Blizzard API error: invalid JSON: #{e.message}\n#{response.body}"
       end
   end
 end

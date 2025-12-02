@@ -2,7 +2,7 @@ module Pvp
   module Characters
     class LastEquipmentSnapshotFinderService
       def self.call(character_id:, ttl_hours: 24)
-        new(character_id:, ttl_hours: ttl_hours).call
+        new(character_id:, ttl_hours: ttl_hours).entry
       end
 
       def initialize(character_id:, ttl_hours: 24)
@@ -10,7 +10,7 @@ module Pvp
         @ttl_hours = ttl_hours
       end
 
-      def call
+      def entry
         PvpLeaderboardEntry
           .where(character_id:)
           .where.not(equipment_processed_at:      nil,

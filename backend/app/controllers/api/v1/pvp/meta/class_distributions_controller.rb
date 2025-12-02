@@ -8,7 +8,6 @@ module Api
             season  = PvpSeason.find_by!(blizzard_id: params.fetch(:season_id).to_i)
             bracket = params.fetch(:bracket)
             region  = params.fetch(:region, "us")
-            limit   = params.fetch(:limit, 200).to_i
 
             distribution = ::Pvp::Meta::ClassDistributionService.new(
               season:  season,

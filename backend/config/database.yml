@@ -24,11 +24,12 @@ development:
   primary:
     <<: *default
     database: wow_bis_development
+    max_connections: 50
   queue:
     <<: *default
     database: wow_bis_development_queue
     migrations_paths: db/queue_migrate
-    max_connections: 15
+    max_connections: 50
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
