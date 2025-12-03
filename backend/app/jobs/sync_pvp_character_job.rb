@@ -80,12 +80,7 @@ class SyncPvpCharacterJob < ApplicationJob
             raw_specialization: talents_json
           )
 
-          Pvp::ProcessLeaderboardEntryEquipmentJob.perform_later(
-            entry_id: entry.id,
-            locale:   locale
-          )
-
-          Pvp::ProcessLeaderboardEntrySpecializationJob.perform_later(
+          Pvp::ProcessLeaderboardEntryJob.perform_later(
             entry_id: entry.id,
             locale:   locale
           )

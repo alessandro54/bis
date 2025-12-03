@@ -15,20 +15,19 @@ RSpec.describe SyncPvpCharacterJob, type: :job do
 
   let(:locale) { "en_US" }
 
-  # Creamos dos entries en distintos brackets para el mismo character
   let!(:entry_2v2) do
     create(
       :pvp_leaderboard_entry,
-      character: character,
-      pvp_leaderboard: create(
+      character:                   character,
+      pvp_leaderboard:             create(
         :pvp_leaderboard,
         pvp_season: create(:pvp_season),
         bracket:    "2v2",
         region:     character.region
       ),
-      raw_equipment:          nil,
-      raw_specialization:     nil,
-      equipment_processed_at: nil,
+      raw_equipment:               nil,
+      raw_specialization:          nil,
+      equipment_processed_at:      nil,
       specialization_processed_at: nil
     )
   end
@@ -36,16 +35,16 @@ RSpec.describe SyncPvpCharacterJob, type: :job do
   let!(:entry_3v3) do
     create(
       :pvp_leaderboard_entry,
-      character: character,
-      pvp_leaderboard: create(
+      character:                   character,
+      pvp_leaderboard:             create(
         :pvp_leaderboard,
         pvp_season: create(:pvp_season),
         bracket:    "3v3",
         region:     character.region
       ),
-      raw_equipment:          nil,
-      raw_specialization:     nil,
-      equipment_processed_at: nil,
+      raw_equipment:               nil,
+      raw_specialization:          nil,
+      equipment_processed_at:      nil,
       specialization_processed_at: nil
     )
   end
@@ -77,16 +76,13 @@ RSpec.describe SyncPvpCharacterJob, type: :job do
     let(:ttl_hours) { 24 }
 
     before do
-      # Forzamos a que no haya snapshot reutilizable
+      # Force no reusable snapshot
       allow(Pvp::Characters::LastEquipmentSnapshotFinderService)
         .to receive(:call)
               .with(character_id: character.id, ttl_hours: ttl_hours)
               .and_return(nil)
 
-      stub_const(
-        "SyncPvpCharacterJob::TTL_HOURS",
-        ttl_hours
-      )
+      stub_const("SyncPvpCharacterJob::TTL_HOURS", ttl_hours)
 
       allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
         .to receive(:fetch)
@@ -109,30 +105,16 @@ RSpec.describe SyncPvpCharacterJob, type: :job do
       expect(entry_3v3.raw_specialization).to eq(talents_json)
     end
 
-    it "enqueues equipment processing jobs for each latest entry" do
+    it "enqueues a unified processing job for each latest entry" do
       expect do
         perform_job
-      end.to have_enqueued_job(Pvp::ProcessLeaderboardEntryEquipmentJob).exactly(2).times
+      end.to have_enqueued_job(Pvp::ProcessLeaderboardEntryJob).exactly(2).times
 
-      expect(Pvp::ProcessLeaderboardEntryEquipmentJob)
+      expect(Pvp::ProcessLeaderboardEntryJob)
         .to have_been_enqueued
               .with(entry_id: entry_2v2.id, locale: locale)
 
-      expect(Pvp::ProcessLeaderboardEntryEquipmentJob)
-        .to have_been_enqueued
-              .with(entry_id: entry_3v3.id, locale: locale)
-    end
-
-    it "enqueues specialization processing jobs for each latest entry" do
-      expect do
-        perform_job
-      end.to have_enqueued_job(Pvp::ProcessLeaderboardEntrySpecializationJob).exactly(2).times
-
-      expect(Pvp::ProcessLeaderboardEntrySpecializationJob)
-        .to have_been_enqueued
-              .with(entry_id: entry_2v2.id, locale: locale)
-
-      expect(Pvp::ProcessLeaderboardEntrySpecializationJob)
+      expect(Pvp::ProcessLeaderboardEntryJob)
         .to have_been_enqueued
               .with(entry_id: entry_3v3.id, locale: locale)
     end
@@ -147,10 +129,7 @@ RSpec.describe SyncPvpCharacterJob, type: :job do
               .with(character_id: character.id, ttl_hours: ttl_hours)
               .and_return(nil)
 
-      stub_const(
-        "SyncPvpCharacterJob::TTL_HOURS",
-        ttl_hours
-      )
+      stub_const("SyncPvpCharacterJob::TTL_HOURS", ttl_hours)
 
       allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
         .to receive(:fetch)
@@ -171,8 +150,7 @@ RSpec.describe SyncPvpCharacterJob, type: :job do
     it "does not enqueue processing jobs" do
       perform_job
 
-      expect(Pvp::ProcessLeaderboardEntryEquipmentJob).not_to have_been_enqueued
-      expect(Pvp::ProcessLeaderboardEntrySpecializationJob).not_to have_been_enqueued
+      expect(Pvp::ProcessLeaderboardEntryJob).not_to have_been_enqueued
     end
   end
 end
