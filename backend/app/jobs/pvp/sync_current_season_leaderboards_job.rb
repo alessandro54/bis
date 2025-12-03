@@ -1,8 +1,8 @@
-# app/jobs/sync_current_pvp_season_leaderboards_job.rb
-class SyncCurrentPvpSeasonLeaderboardsJob < ApplicationJob
-  queue_as :default
+module Pvp
+  class SyncCurrentSeasonLeaderboardsJob < ApplicationJob
+    queue_as :default
 
-  BRACKETS = %w[
+    BRACKETS = %w[
     2v2
     3v3
     rbg
@@ -90,17 +90,18 @@ class SyncCurrentPvpSeasonLeaderboardsJob < ApplicationJob
     blitz-warrior-protection
   ].freeze
 
-  def perform(region: "us", locale: "en_US")
-    season = PvpSeason.find_by(blizzard_id: 40)
-    return unless season
+    def perform(region: "us", locale: "en_US")
+      season = PvpSeason.find_by(blizzard_id: 40)
+      return unless season
 
-    BRACKETS.each do |bracket|
-      SyncPvpLeaderboardJob.perform_later(
-        region:  region,
-        season:  season,
-        bracket: bracket,
-        locale:  locale
-      )
+      BRACKETS.each do |bracket|
+        SyncLeaderboardJob.perform_later(
+          region:  region,
+          season:  season,
+          bracket: bracket,
+          locale:  locale
+        )
+      end
     end
   end
 end
