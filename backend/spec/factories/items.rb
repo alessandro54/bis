@@ -25,7 +25,6 @@ FactoryBot.define do
     item_class { "MyString" }
     item_subclass { "MyString" }
     inventory_type { 1 }
-    item_level { 1 }
     quality { 1 }
   end
 end

@@ -10,7 +10,7 @@ module Pvp
         locale:
       )
 
-      entries = res.fetch("entries", [])
+      entries = res.fetch("entries", []).first(100)
       snapshot_time = Time.current
 
       bracket_config = Pvp::BracketConfig.for(bracket)
@@ -32,7 +32,7 @@ module Pvp
           entries.each do |entry_json|
             character, _entry = import_entry(entry_json, leaderboard, region, snapshot_time)
 
-            SyncPvpCharacterJob
+            SyncCharacterJob
               .set(queue: job_queue)
               .perform_later(
                 character_id: character.id,
@@ -87,28 +87,28 @@ module Pvp
 
     private
 
-    def faction_enum(type)
-      return nil unless type
+      def faction_enum(type)
+        return nil unless type
 
-      case type
-      when "ALLIANCE" then 0
-      when "HORDE"    then 1
-      else nil
+        case type
+        when "ALLIANCE" then 0
+        when "HORDE"    then 1
+        else nil
+        end
       end
-    end
 
-    def with_deadlock_retry(max_retries: 3)
-      retries = 0
+      def with_deadlock_retry(max_retries: 3)
+        retries = 0
 
-      begin
-        yield
-      rescue ActiveRecord::Deadlocked
-        retries += 1
-        raise if retries > max_retries
+        begin
+          yield
+        rescue ActiveRecord::Deadlocked
+          retries += 1
+          raise if retries > max_retries
 
-        sleep(rand * 0.1)
-        retry
+          sleep(rand * 0.1)
+          retry
+        end
       end
-    end
   end
 end

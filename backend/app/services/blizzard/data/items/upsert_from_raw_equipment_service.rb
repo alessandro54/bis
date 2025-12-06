@@ -45,7 +45,7 @@ module Blizzard
             tier_set_id:     block.dig("item_set", "id"),
             tier_set_name:   block.dig("item_set", "name"),
             tier_set_pieces: (block["items"] || []).count { |x| x["is_equipped"] },
-            tier_4p_active:  effects.any? { |eff| eff["required_count"] == 4 && eff["is_active"] },
+            tier_4p_active:  effects.any? { |eff| eff["required_count"] == 4 && eff["is_active"] }
           }
         end
 

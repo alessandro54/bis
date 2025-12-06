@@ -28,8 +28,6 @@
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
 #
 class Character < ApplicationRecord
-  after_create_commit :enqueue_sync_meta_job
-
   validates :name, :realm, :region, presence: true
   validates :name, uniqueness: { scope: %i[realm region] }
 

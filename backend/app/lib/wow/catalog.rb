@@ -7,7 +7,7 @@ module Wow
 
       65 => { spec_slug: "holy_paladin",       class_id: 2,  class_slug: "paladin",      role: :healer },
       66 => { spec_slug: "protection_paladin", class_id: 2,  class_slug: "paladin",      role: :tank },
-      70 => { spec_slug: "retribution_paladin",class_id: 2,  class_slug: "paladin",      role: :dps },
+      70 => { spec_slug: "retribution_paladin", class_id: 2, class_slug: "paladin", role: :dps },
 
       71 => { spec_slug: "arms_warrior",       class_id: 1,  class_slug: "warrior",      role: :dps },
       72 => { spec_slug: "fury_warrior",       class_id: 1,  class_slug: "warrior",      role: :dps },
@@ -46,8 +46,8 @@ module Wow
       269 => { spec_slug: "windwalker_monk",   class_id: 10, class_slug: "monk",         role: :dps },
       270 => { spec_slug: "mistweaver_monk",   class_id: 10, class_slug: "monk",         role: :healer },
 
-      577 => { spec_slug: "havoc_demon_hunter",    class_id: 12, class_slug: "demon_hunter", role: :dps },
-      581 => { spec_slug: "vengeance_demon_hunter",class_id: 12, class_slug: "demon_hunter", role: :tank },
+      577 => { spec_slug: "havoc_demon_hunter", class_id: 12, class_slug: "demon_hunter", role: :dps },
+      581 => { spec_slug: "vengeance_demon_hunter", class_id: 12, class_slug: "demon_hunter", role: :tank },
 
       1467 => { spec_slug: "devastation_evoker",  class_id: 13, class_slug: "evoker",    role: :dps },
       1468 => { spec_slug: "preservation_evoker", class_id: 13, class_slug: "evoker",    role: :healer },
@@ -56,7 +56,7 @@ module Wow
 
     CLASS_INDEX = SPECS.values
                        .uniq { |data| data[:class_id] }
-                       .map { |data| [data[:class_id], data[:class_slug]] }
+                       .map { |data| [ data[:class_id], data[:class_slug] ] }
                        .to_h
                        .freeze
 

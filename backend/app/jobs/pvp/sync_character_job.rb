@@ -1,5 +1,5 @@
 module Pvp
-  class SyncPvpCharacterJob < ApplicationJob
+  class SyncCharacterJob < ApplicationJob
     self.enqueue_after_transaction_commit = :always
     queue_as :character_sync
 
