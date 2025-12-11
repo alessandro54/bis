@@ -1,0 +1,30 @@
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backend (Ruby/Rails assumed)
+backend/log/*
+backend/tmp/*
+backend/.bundle/
+backend/vendor/bundle/
+backend/coverage/
+backend/.byebug_history
+backend/.env
+backend/.env.local
+
+# Frontend (JavaScript/Node assumed)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
