@@ -66,8 +66,12 @@ module Blizzard
 
           attr_reader :items, :locale
 
+          def extract_blizzard_id(raw_item)
+            raw_item.dig("item", "id")
+          end
+
           def build_item_record(raw_item)
-            blizzard_id = raw_item.dig("item", "id")
+            blizzard_id = extract_blizzard_id(raw_item)
             return nil unless blizzard_id
 
             {
@@ -84,19 +88,20 @@ module Blizzard
 
           def upsert_translations
             # Batch fetch items that need translations
-            blizzard_ids = items.filter_map { |raw_item| raw_item.dig("item", "id") }
-            items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).pluck(:blizzard_id, :id).to_h
+            blizzard_ids = items.filter_map { |raw_item| extract_blizzard_id(raw_item) }
+            return if blizzard_ids.empty?
+
+            items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).index_by(&:blizzard_id)
 
             items.each do |raw_item|
-              blizzard_id = raw_item.dig("item", "id")
+              blizzard_id = extract_blizzard_id(raw_item)
               name = raw_item.dig("name")
-              
-              next unless blizzard_id && name.present?
-              
-              item_id = items_by_blizzard_id[blizzard_id]
-              next unless item_id
 
-              item = Item.find(item_id)
+              next unless blizzard_id && name.present?
+
+              item = items_by_blizzard_id[blizzard_id]
+              next unless item
+
               item.set_translation("name", locale, name)
             end
           end
