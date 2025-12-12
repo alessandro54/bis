@@ -1,6 +1,7 @@
 class AddPerformanceIndexesToTables < ActiveRecord::Migration[8.1]
   def change
-    # Add composite index for character_id + snapshot_at for faster lookups in LastEquipmentSnapshotFinderService
+    # Add composite index for character_id + snapshot_at for faster lookups
+    # Used by: LastEquipmentSnapshotFinderService, ClassDistributionService (DISTINCT ON queries)
     add_index :pvp_leaderboard_entries, [:character_id, :snapshot_at],
               name: "index_pvp_entries_on_character_and_snapshot"
 
