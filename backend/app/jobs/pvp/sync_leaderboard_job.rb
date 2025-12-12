@@ -2,6 +2,11 @@ module Pvp
   class SyncLeaderboardJob < ApplicationJob
     queue_as :default
 
+    # Retry on API errors with exponential backoff (network issues, rate limits, etc.)
+    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
+      Rails.logger.warn("[SyncLeaderboardJob] API error, will retry: #{error.message}")
+    end
+
     def perform(region: "us", season:, bracket:, locale: "en_US")
       res = Blizzard::Api::GameData::PvpSeason::Leaderboard.fetch(
         pvp_season_id: season.blizzard_id,
@@ -45,19 +50,18 @@ module Pvp
           character_attrs
         end
 
-        # Bulk upsert all characters at once
-        Character.upsert_all(
+        # Bulk upsert all characters at once and get their IDs back
+        upsert_result = Character.upsert_all(
           character_records,
           unique_by: %i[blizzard_id region],
-          returning: false
+          returning: %i[blizzard_id id]
         )
+
+        # Build character_id mapping from upsert result
+        character_ids = upsert_result.rows.to_h
 
         # Bulk create leaderboard entries
         ActiveRecord::Base.transaction do
-          character_ids = Character.where(
-            blizzard_id: character_records.map { |c| c[:blizzard_id] },
-            region: region
-          ).pluck(:blizzard_id, :id).to_h
 
           entry_records = entries.map do |entry_json|
             character_data = entry_json.fetch("character")

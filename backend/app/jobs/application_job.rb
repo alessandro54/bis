@@ -12,11 +12,7 @@ class ApplicationJob < ActiveJob::Base
   # This prevents unnecessary retries for non-existent records
   discard_on ActiveRecord::RecordNotFound
 
-  # Retry network/API errors with exponential backoff
-  # This handles transient API failures without overloading the API
-  retry_on StandardError, wait: :exponentially_longer, attempts: 3 do |job, error|
-    # Log the error for debugging and monitoring
-    Rails.logger.error("[#{job.class.name}] Retry attempt #{job.executions} failed: #{error.message}")
-  end
+  # Note: Network/API errors should be handled in individual jobs with specific error classes
+  # Avoid retry_on StandardError as it's too broad and may retry programming errors
 end
 # :nocov:

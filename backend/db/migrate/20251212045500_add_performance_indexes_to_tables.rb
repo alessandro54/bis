@@ -5,9 +5,10 @@ class AddPerformanceIndexesToTables < ActiveRecord::Migration[8.1]
               name: "index_pvp_entries_on_character_and_snapshot"
 
     # Add composite index for equipment_processed_at queries in snapshot finder
+    # This index covers the WHERE condition in LastEquipmentSnapshotFinderService
     add_index :pvp_leaderboard_entries, [:character_id, :equipment_processed_at],
               name: "index_pvp_entries_on_character_and_equipment_processed",
-              where: "equipment_processed_at IS NOT NULL AND specialization_processed_at IS NOT NULL"
+              where: "equipment_processed_at IS NOT NULL"
 
     # Add index on is_private to quickly filter out private characters
     add_index :characters, :is_private,
