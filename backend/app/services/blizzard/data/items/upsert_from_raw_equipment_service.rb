@@ -12,15 +12,19 @@ module Blizzard
             build_item_record(raw_item)
           end
 
+          return if item_records.empty?
+
           # Upsert items in bulk
           Item.upsert_all(
             item_records,
             unique_by: :blizzard_id,
             returning: false
-          ) if item_records.any?
+          )
 
           # Handle translations separately (translations are localized and may vary)
-          upsert_translations
+          # Reuse blizzard_ids from item_records to avoid re-extraction
+          blizzard_ids = item_records.map { |record| record[:blizzard_id] }
+          upsert_translations(blizzard_ids)
         end
 
         def self.call(raw_equipment:, locale: "en_US")
@@ -80,15 +84,12 @@ module Blizzard
               item_class:        raw_item.dig("item_class", "name")&.downcase,
               item_subclass:     raw_item.dig("item_subclass", "name")&.downcase,
               blizzard_media_id: raw_item.dig("media", "id"),
-              quality:           raw_item.dig("quality", "type")&.downcase,
-              created_at:        Time.current,
-              updated_at:        Time.current
+              quality:           raw_item.dig("quality", "type")&.downcase
             }
           end
 
-          def upsert_translations
+          def upsert_translations(blizzard_ids)
             # Batch fetch items that need translations
-            blizzard_ids = items.filter_map { |raw_item| extract_blizzard_id(raw_item) }
             return if blizzard_ids.empty?
 
             items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).index_by(&:blizzard_id)
