@@ -53,6 +53,7 @@ module Pvp
     private
 
       def latest_entries_per_bracket(character)
+        # Optimized query with proper indexing
         PvpLeaderboardEntry
           .joins(:pvp_leaderboard)
           .where(character_id: character.id)

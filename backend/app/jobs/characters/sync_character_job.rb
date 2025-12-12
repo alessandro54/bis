@@ -5,7 +5,7 @@ module Characters
     def perform(region:, realm:, name:)
       character = Character.find_by(region:, realm:, name:)
       return unless character
-
+      return if character.is_private  # Skip private characters early
       return if character.meta_synced?
 
       profile = fetch_profile(region: region, realm: realm, name: name)
