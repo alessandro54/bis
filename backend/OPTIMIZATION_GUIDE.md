@@ -29,16 +29,19 @@ Added composite indexes for frequently queried columns:
 **Changed Files**:
 - `app/jobs/pvp/sync_leaderboard_job.rb`
 - `app/services/pvp/entries/process_equipment_service.rb`
+- `app/services/blizzard/data/items/upsert_from_raw_equipment_service.rb`
 
 **Changes**:
 - Replaced individual `upsert` calls with `upsert_all` for characters
 - Replaced individual `create` calls with `insert_all` for leaderboard entries
 - Replaced individual `create` calls with `insert_all` for entry items
+- Replaced individual item `find_or_initialize_by` + `save!` with bulk `upsert_all`
 - Changed `destroy_all` to `delete_all` to skip unnecessary callbacks
 
 **Impact**: 
 - 10-20x faster for processing 100 leaderboard entries
 - Reduces database round-trips from 100+ to ~3 per job
+- Item processing now batched (15-20 items → 1 upsert)
 - Reduces transaction duration significantly
 
 ### 3. Query Optimization
