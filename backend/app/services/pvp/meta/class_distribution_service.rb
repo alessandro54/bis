@@ -50,6 +50,8 @@ module Pvp
         attr_reader :season, :bracket, :region
 
         def base_scope
+          # Get the freshest (most recent) entry for each character in the leaderboard
+          # DISTINCT ON ensures we only get one entry per character (the latest by snapshot_at)
           PvpLeaderboardEntry
             .joins(:character, :pvp_leaderboard)
             .where(
@@ -59,7 +61,6 @@ module Pvp
                 region:        region
               }
             )
-            .where("pvp_leaderboard_entries.snapshot_at > ?", 1.day.ago)
             .where.not("pvp_leaderboard_entries.spec_id": nil,
                        "characters.class_id":             nil)
             .select("DISTINCT ON (character_id) pvp_leaderboard_entries.*")

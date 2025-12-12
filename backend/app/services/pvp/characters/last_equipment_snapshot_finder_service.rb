@@ -11,6 +11,7 @@ module Pvp
       end
 
       def entry
+        # Optimized query with proper indexing - uses composite index on character_id + equipment_processed_at
         PvpLeaderboardEntry
           .where(character_id:)
           .where.not(equipment_processed_at:      nil,
@@ -19,6 +20,7 @@ module Pvp
                      raw_specialization:          nil)
           .where("equipment_processed_at > ?", ttl_hours.hours.ago)
           .order(equipment_processed_at: :desc)
+          .limit(1)
           .first
       end
 

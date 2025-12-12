@@ -2,6 +2,11 @@ module Pvp
   class SyncLeaderboardJob < ApplicationJob
     queue_as :default
 
+    # Retry on API errors with exponential backoff (network issues, rate limits, etc.)
+    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
+      Rails.logger.warn("[SyncLeaderboardJob] API error, will retry: #{error.message}")
+    end
+
     def perform(region: "us", season:, bracket:, locale: "en_US")
       res = Blizzard::Api::GameData::PvpSeason::Leaderboard.fetch(
         pvp_season_id: season.blizzard_id,
@@ -22,67 +27,79 @@ module Pvp
       end
 
       with_deadlock_retry do
+        leaderboard = PvpLeaderboard.find_or_create_by!(
+          pvp_season_id: season.id,
+          bracket:       bracket,
+          region:        region,
+        )
+
+        # Prepare bulk character data for upsert
+        character_records = entries.map do |entry_json|
+          character_data = entry_json.fetch("character")
+          character_attrs = {
+            blizzard_id: character_data["id"].to_s,
+            region:      region,
+            name:        character_data["name"],
+            realm:       character_data.dig("realm", "slug")
+          }
+
+          if Character.new.respond_to?(:faction=)
+            character_attrs[:faction] = faction_enum(entry_json.dig("faction", "type"))
+          end
+
+          character_attrs
+        end
+
+        # Deduplicate character_records by (blizzard_id, region) to avoid cardinality violations
+        # Same character can appear multiple times in leaderboard entries
+        unique_character_records = character_records.uniq { |c| [c[:blizzard_id], c[:region]] }
+
+        # Bulk upsert all characters at once and get their IDs back
+        upsert_result = Character.upsert_all(
+          unique_character_records,
+          unique_by: %i[blizzard_id region],
+          returning: %i[blizzard_id id]
+        )
+
+        # Build character_id mapping from upsert result
+        # Convert blizzard_id to string for consistent lookup
+        character_ids = upsert_result.rows.to_h { |row| [row[0].to_s, row[1]] }
+
+        # Bulk create leaderboard entries
         ActiveRecord::Base.transaction do
-          leaderboard = PvpLeaderboard.find_or_create_by!(
-            pvp_season_id: season.id,
-            bracket:       bracket,
-            region:        region,
-            )
 
-          entries.each do |entry_json|
-            character, _entry = import_entry(entry_json, leaderboard, region, snapshot_time)
+          entry_records = entries.map do |entry_json|
+            character_data = entry_json.fetch("character")
+            stats = entry_json.fetch("season_match_statistics")
 
+            {
+              pvp_leaderboard_id: leaderboard.id,
+              character_id: character_ids[character_data["id"].to_s],
+              rank: entry_json["rank"],
+              rating: entry_json["rating"],
+              wins: stats["won"],
+              losses: stats["lost"],
+              snapshot_at: snapshot_time,
+              created_at: Time.current,
+              updated_at: Time.current
+            }
+          end
+
+          PvpLeaderboardEntry.insert_all!(entry_records)
+
+          # Enqueue character sync jobs for all characters
+          character_ids.values.each do |character_id|
             SyncCharacterJob
               .set(queue: job_queue)
               .perform_later(
-                character_id: character.id,
-                locale:       locale
+                character_id: character_id,
+                locale: locale
               )
           end
 
           leaderboard.update!(last_synced_at: snapshot_time)
         end
       end
-    end
-
-    def import_entry(entry_json, leaderboard, region, snapshot_time)
-      character_data = entry_json.fetch("character")
-      stats          = entry_json.fetch("season_match_statistics")
-
-      character_attrs = {
-        blizzard_id: character_data["id"].to_s,
-        region:      region,
-        name:        character_data["name"],
-        realm:       character_data.dig("realm", "slug")
-      }
-
-      if Character.new.respond_to?(:faction=)
-        character_attrs[:faction] = faction_enum(entry_json.dig("faction", "type"))
-      end
-
-      Character.upsert(
-        character_attrs,
-        unique_by: %i[blizzard_id region]
-      )
-
-      character = Character.find_by!(
-        blizzard_id: character_data["id"].to_s,
-        region:
-      )
-
-      character.save! if character.changed?
-
-      entry = PvpLeaderboardEntry.create!(
-        pvp_leaderboard: leaderboard,
-        character:       character,
-        rank:            entry_json["rank"],
-        rating:          entry_json["rating"],
-        wins:            stats["won"],
-        losses:          stats["lost"],
-        snapshot_at:     snapshot_time,
-        )
-
-      [ character, entry ]
     end
 
     private

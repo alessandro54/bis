@@ -5,9 +5,26 @@ module Blizzard
         EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
 
         def call
-          items.each do |raw_item|
-            upsert_item(raw_item)
+          return if items.empty?
+
+          # Bulk upsert all items at once for better performance
+          item_records = items.filter_map do |raw_item|
+            build_item_record(raw_item)
           end
+
+          return if item_records.empty?
+
+          # Upsert items in bulk
+          Item.upsert_all(
+            item_records,
+            unique_by: :blizzard_id,
+            returning: false
+          )
+
+          # Handle translations separately (translations are localized and may vary)
+          # Reuse blizzard_ids from item_records to avoid re-extraction
+          blizzard_ids = item_records.map { |record| record[:blizzard_id] }
+          upsert_translations(blizzard_ids)
         end
 
         def self.call(raw_equipment:, locale: "en_US")
@@ -53,26 +70,41 @@ module Blizzard
 
           attr_reader :items, :locale
 
-          def upsert_item(raw_item)
-            blizzard_id = raw_item.dig("item", "id")
+          def extract_blizzard_id(raw_item)
+            raw_item.dig("item", "id")
+          end
 
-            return unless blizzard_id
+          def build_item_record(raw_item)
+            blizzard_id = extract_blizzard_id(raw_item)
+            return nil unless blizzard_id
 
-            item = Item.find_or_initialize_by(blizzard_id:)
-
-            item.assign_attributes(
+            {
+              blizzard_id:       blizzard_id,
               inventory_type:    raw_item.dig("inventory_type", "type")&.downcase,
               item_class:        raw_item.dig("item_class", "name")&.downcase,
               item_subclass:     raw_item.dig("item_subclass", "name")&.downcase,
               blizzard_media_id: raw_item.dig("media", "id"),
               quality:           raw_item.dig("quality", "type")&.downcase
-            )
+            }
+          end
 
-            item.save!
+          def upsert_translations(blizzard_ids)
+            # Batch fetch items that need translations
+            return if blizzard_ids.empty?
 
-            name = raw_item.dig("name")
+            items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).index_by(&:blizzard_id)
 
-            item.set_translation("name", locale, name) if name.present?
+            items.each do |raw_item|
+              blizzard_id = extract_blizzard_id(raw_item)
+              name = raw_item.dig("name")
+
+              next unless blizzard_id && name.present?
+
+              item = items_by_blizzard_id[blizzard_id]
+              next unless item
+
+              item.set_translation("name", locale, name)
+            end
           end
       end
     end
