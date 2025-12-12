@@ -58,7 +58,8 @@ module Pvp
         )
 
         # Build character_id mapping from upsert result
-        character_ids = upsert_result.rows.to_h
+        # Convert blizzard_id to string for consistent lookup
+        character_ids = upsert_result.rows.to_h { |row| [row[0].to_s, row[1]] }
 
         # Bulk create leaderboard entries
         ActiveRecord::Base.transaction do
