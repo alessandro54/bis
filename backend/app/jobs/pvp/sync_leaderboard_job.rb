@@ -50,9 +50,13 @@ module Pvp
           character_attrs
         end
 
+        # Deduplicate character_records by (blizzard_id, region) to avoid cardinality violations
+        # Same character can appear multiple times in leaderboard entries
+        unique_character_records = character_records.uniq { |c| [c[:blizzard_id], c[:region]] }
+
         # Bulk upsert all characters at once and get their IDs back
         upsert_result = Character.upsert_all(
-          character_records,
+          unique_character_records,
           unique_by: %i[blizzard_id region],
           returning: %i[blizzard_id id]
         )
