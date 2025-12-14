@@ -28,11 +28,14 @@
 #
 # Indexes
 #
-#  index_pvp_leaderboard_entries_on_character_id         (character_id)
-#  index_pvp_leaderboard_entries_on_hero_talent_tree_id  (hero_talent_tree_id)
-#  index_pvp_leaderboard_entries_on_pvp_leaderboard_id   (pvp_leaderboard_id)
-#  index_pvp_leaderboard_entries_on_rank                 (rank)
-#  index_pvp_leaderboard_entries_on_tier_set_id          (tier_set_id)
+#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
+#  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
+#  index_pvp_entries_on_snapshot_at                        (snapshot_at)
+#  index_pvp_leaderboard_entries_on_character_id           (character_id)
+#  index_pvp_leaderboard_entries_on_hero_talent_tree_id    (hero_talent_tree_id)
+#  index_pvp_leaderboard_entries_on_pvp_leaderboard_id     (pvp_leaderboard_id)
+#  index_pvp_leaderboard_entries_on_rank                   (rank)
+#  index_pvp_leaderboard_entries_on_tier_set_id            (tier_set_id)
 #
 # Foreign Keys
 #
@@ -44,6 +47,15 @@ class PvpLeaderboardEntry < ApplicationRecord
 
   belongs_to :pvp_leaderboard
   belongs_to :character
+
+  scope :latest_snapshot_for_bracket, lambda { |bracket|
+    current_season_id = PvpSeason.where(is_current: true).select(:id).limit(1)
+
+    joins(pvp_leaderboard: :pvp_season)
+      .where(pvp_leaderboards: { bracket: bracket })
+      .where(pvp_seasons: { id: current_season_id })
+      .where("pvp_leaderboard_entries.snapshot_at = pvp_leaderboards.last_synced_at")
+  }
 
   has_many :pvp_leaderboard_entry_items, dependent: :destroy
   has_many :items, through: :pvp_leaderboard_entry_items

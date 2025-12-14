@@ -3,34 +3,20 @@ source "https://rubygems.org"
 # Main Rails framework (API, ActiveRecord, ActionPack)
 gem "rails", "~> 8.1.1"
 
-# PostgreSQL adapter for ActiveRecord
-gem "pg", "~> 1.6"
-
-# Production web server
-gem "puma", "~> 7.1"
-
-# Timezone data for Windows/JRuby
-gem "tzinfo-data", platforms: %i[windows jruby]
-
-# PostgreSQL-backed ActionCable, Rails.cache, background jobs
-gem "solid_cable"          # ActionCable over PostgreSQL
-gem "solid_cache"          # Rails.cache backed by PostgreSQL
-gem "solid_queue"          # Background jobs backed by PostgreSQL
-
 # Boot-time caching for faster startup
 gem "bootsnap", "~> 1.19", require: false
-
-# Simple deployment using containers
-gem "kamal", "~> 2.9", require: false
 
 # HTTP client
 gem "httpx", "~> 1.6"
 
-# HTTP caching + compression middleware
-gem "thruster", "~> 0.1", require: false
-
 # Image transformations (Active Storage)
 gem "image_processing", "~> 1.14"
+
+# Simple deployment using containers
+gem "kamal", "~> 2.9", require: false
+
+# Mission Control UI for jobs
+gem "mission_control-jobs", "~> 1.1"
 
 # Fast, optimized JSON parser/serializer
 gem "oj", "~> 3.16"
@@ -38,11 +24,25 @@ gem "oj", "~> 3.16"
 # Explicit OpenSSL dependency (fix macOS SSL issues)
 gem "openssl"
 
-# Mission Control UI for jobs
-gem "mission_control-jobs", "~> 1.1"
+# PostgreSQL adapter for ActiveRecord
+gem "pg", "~> 1.6"
+
+# Production web server
+gem "puma", "~> 7.1"
 
 # Asset pipeline replacement for Rails 7+/8
 gem "propshaft", "~> 1.3"
+
+# PostgreSQL-backed ActionCable, Rails.cache, background jobs
+gem "solid_cable"          # ActionCable over PostgreSQL
+gem "solid_cache"          # Rails.cache backed by PostgreSQL
+gem "solid_queue"          # Background jobs backed by PostgreSQL
+
+# HTTP caching + compression middleware
+gem "thruster", "~> 0.1", require: false
+
+# Timezone data for Windows/JRuby
+gem "tzinfo-data", platforms: %i[windows jruby]
 
 group :development do
   # Auto-add schema annotations to models
@@ -53,20 +53,11 @@ group :development, :test do
   # Pretty-print Ruby objects
   gem "amazing_print", "~> 2.0", require: false
 
-  # Security audit of dependency tree
-  gem "bundler-audit", require: false
-
   # Security scanner for Rails apps
   gem "brakeman", require: false
 
-  # Factories for tests
-  gem "factory_bot_rails", "~> 6.5"
-
-  # RuboCop integrations
-  gem "rubocop-factory_bot", require: false
-  gem "rubocop-rails-omakase", "~> 1.1", require: false
-  gem "rubocop-rake", require: false
-  gem "rubocop-rspec", require: false
+  # Security audit of dependency tree
+  gem "bundler-audit", require: false
 
   # Ruby debugger
   gem "debug",
@@ -74,8 +65,19 @@ group :development, :test do
       platforms: %i[mri windows],
       require:   "debug/prelude"
 
+  gem 'dotenv'
+
+  # Factories for tests
+  gem "factory_bot_rails", "~> 6.5"
+
   # RSpec testing framework for Rails
   gem "rspec-rails", "~> 8.0"
+
+  # RuboCop integrations
+  gem "rubocop-factory_bot", require: false
+  gem "rubocop-rails-omakase", "~> 1.1", require: false
+  gem "rubocop-rake", require: false
+  gem "rubocop-rspec", require: false
 end
 
 group :test do

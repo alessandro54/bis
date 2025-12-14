@@ -2,7 +2,6 @@ module Pvp
   class SyncLeaderboardJob < ApplicationJob
     queue_as :default
 
-    # Retry on API errors with exponential backoff (network issues, rate limits, etc.)
     retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
       Rails.logger.warn("[SyncLeaderboardJob] API error, will retry: #{error.message}")
     end
@@ -15,15 +14,14 @@ module Pvp
         locale:
       )
 
-      entries = res.fetch("entries", []).first(100)
-      snapshot_time = Time.current
+      entries = res.fetch("entries", [])
 
       bracket_config = Pvp::BracketConfig.for(bracket)
       rating_min = bracket_config&.dig(:rating_min)
       job_queue = bracket_config&.dig(:job_queue) || :character_sync
 
       if rating_min
-        entries = entries.select { |entry| entry["rating"].to_i >= rating_min }
+        entries.select! { |entry| entry["rating"].to_i >= rating_min }
       end
 
       with_deadlock_retry do
@@ -33,71 +31,76 @@ module Pvp
           region:        region,
         )
 
-        # Prepare bulk character data for upsert
-        character_records = entries.map do |entry_json|
-          character_data = entry_json.fetch("character")
-          character_attrs = {
-            blizzard_id: character_data["id"].to_s,
-            region:      region,
-            name:        character_data["name"],
-            realm:       character_data.dig("realm", "slug")
-          }
+        leaderboard.with_lock do
+          snapshot_time = Time.current
+          now = snapshot_time
 
-          if Character.new.respond_to?(:faction=)
-            character_attrs[:faction] = faction_enum(entry_json.dig("faction", "type"))
-          end
-
-          character_attrs
-        end
-
-        # Deduplicate character_records by (blizzard_id, region) to avoid cardinality violations
-        # Same character can appear multiple times in leaderboard entries
-        unique_character_records = character_records.uniq { |c| [c[:blizzard_id], c[:region]] }
-
-        # Bulk upsert all characters at once and get their IDs back
-        upsert_result = Character.upsert_all(
-          unique_character_records,
-          unique_by: %i[blizzard_id region],
-          returning: %i[blizzard_id id]
-        )
-
-        # Build character_id mapping from upsert result
-        # Convert blizzard_id to string for consistent lookup
-        character_ids = upsert_result.rows.to_h { |row| [row[0].to_s, row[1]] }
-
-        # Bulk create leaderboard entries
-        ActiveRecord::Base.transaction do
-
-          entry_records = entries.map do |entry_json|
+          # Prepare bulk character data for upsert
+          character_records = entries.map do |entry_json|
             character_data = entry_json.fetch("character")
-            stats = entry_json.fetch("season_match_statistics")
-
-            {
-              pvp_leaderboard_id: leaderboard.id,
-              character_id: character_ids[character_data["id"].to_s],
-              rank: entry_json["rank"],
-              rating: entry_json["rating"],
-              wins: stats["won"],
-              losses: stats["lost"],
-              snapshot_at: snapshot_time,
-              created_at: Time.current,
-              updated_at: Time.current
+            character_attrs = {
+              blizzard_id: character_data["id"].to_s,
+              region:      region,
+              name:        character_data["name"],
+              realm:       character_data.dig("realm", "slug")
             }
+
+            if Character.new.respond_to?(:faction=)
+              character_attrs[:faction] = faction_enum(entry_json.dig("faction", "type"))
+            end
+
+            character_attrs
           end
 
-          PvpLeaderboardEntry.insert_all!(entry_records)
+          # Deduplicate character_records by (blizzard_id, region) to avoid cardinality violations
+          # Same character can appear multiple times in leaderboard entries
+          unique_character_records = character_records.uniq { |c| [c[:blizzard_id], c[:region]] }
 
-          # Enqueue character sync jobs for all characters
-          character_ids.values.each do |character_id|
-            SyncCharacterJob
-              .set(queue: job_queue)
-              .perform_later(
-                character_id: character_id,
-                locale: locale
-              )
+          # Bulk upsert all characters at once and get their IDs back
+          upsert_result = Character.upsert_all(
+            unique_character_records,
+            unique_by: %i[blizzard_id region],
+            returning: %i[blizzard_id id]
+          )
+
+          # Build character_id mapping from upsert result
+          # Convert blizzard_id to string for consistent lookup
+          character_ids = upsert_result.rows.to_h { |row| [row[0].to_s, row[1]] }
+
+          # Bulk create leaderboard entries
+          ActiveRecord::Base.transaction do
+
+            entry_records = entries.map do |entry_json|
+              character_data = entry_json.fetch("character")
+              stats = entry_json.fetch("season_match_statistics")
+
+              {
+                pvp_leaderboard_id: leaderboard.id,
+                character_id: character_ids[character_data["id"].to_s],
+                rank: entry_json["rank"],
+                rating: entry_json["rating"],
+                wins: stats["won"],
+                losses: stats["lost"],
+                snapshot_at: snapshot_time,
+                created_at: now,
+                updated_at: now
+              }
+            end
+
+            PvpLeaderboardEntry.insert_all!(entry_records)
+
+            # Enqueue character sync jobs in batches to reduce queue write overhead
+            character_ids.values.each_slice(200) do |character_id_batch|
+              Pvp::SyncCharacterBatchJob
+                .set(queue: job_queue)
+                .perform_later(
+                  character_ids: character_id_batch,
+                  locale: locale
+                )
+            end
+
+            leaderboard.update!(last_synced_at: snapshot_time)
           end
-
-          leaderboard.update!(last_synced_at: snapshot_time)
         end
       end
     end

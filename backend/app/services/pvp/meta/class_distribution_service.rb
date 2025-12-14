@@ -51,7 +51,6 @@ module Pvp
 
         def base_scope
           # Get the freshest (most recent) entry for each character in the leaderboard
-          # DISTINCT ON ensures we only get one entry per character (the latest by snapshot_at)
           PvpLeaderboardEntry
             .joins(:character, :pvp_leaderboard)
             .where(
