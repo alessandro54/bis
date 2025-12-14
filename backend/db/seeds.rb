@@ -9,4 +9,7 @@
 #   end
 
 
-PvpSeason.create!(blizzard_id: 40, display_name: "Season 40")
+PvpSeason.find_or_create_by!(blizzard_id: 40) do |season|
+  season.display_name = "Season 40"
+  season.is_current = true
+end

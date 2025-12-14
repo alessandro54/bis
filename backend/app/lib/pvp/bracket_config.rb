@@ -21,8 +21,6 @@ module Pvp
       }
     }.freeze
 
-    # Overrides específicos por bracket, por si quieres tunear cosas concretas
-    # (puedes dejarlo vacío al inicio)
     EXPLICIT = {
       # "2v2"                    => { rating_min: 2050, job_queue: :pvp_sync_2v2_fast },
       # "shuffle-overall"        => { rating_min: 2450, job_queue: :pvp_sync_shuffle },

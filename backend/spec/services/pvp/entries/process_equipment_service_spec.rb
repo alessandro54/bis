@@ -151,11 +151,11 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
       it "returns a failure and rolls back changes" do
         # stub para romper dentro de la transacción
         allow(entry.pvp_leaderboard_entry_items)
-          .to receive(:destroy_all)
+          .to receive(:delete_all)
                 .and_call_original
 
-        allow(entry.pvp_leaderboard_entry_items)
-          .to receive(:create!)
+        allow(PvpLeaderboardEntryItem)
+          .to receive(:insert_all!)
                 .and_raise(StandardError.new("DB error"))
 
         res = result

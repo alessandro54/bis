@@ -428,6 +428,7 @@ DEPENDENCIES
   bundler-audit
   database_cleaner-active_record (~> 2.2)
   debug (~> 1.11)
+  dotenv
   factory_bot_rails (~> 6.5)
   faker (~> 3.5)
   httpx (~> 1.6)

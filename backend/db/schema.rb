@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_12_02_035559) do
+ActiveRecord::Schema[8.1].define(version: 2025_12_13_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -33,6 +33,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_02_035559) do
     t.string "region"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
+    t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
   end
 
@@ -72,10 +73,13 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_02_035559) do
     t.integer "tier_set_pieces"
     t.datetime "updated_at", null: false
     t.integer "wins", default: 0
+    t.index ["character_id", "equipment_processed_at"], name: "index_pvp_entries_on_character_and_equipment_processed", where: "(equipment_processed_at IS NOT NULL)"
+    t.index ["character_id", "snapshot_at"], name: "index_pvp_entries_on_character_and_snapshot"
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
+    t.index ["snapshot_at"], name: "index_pvp_entries_on_snapshot_at"
     t.index ["tier_set_id"], name: "index_pvp_leaderboard_entries_on_tier_set_id"
   end
 
@@ -105,13 +109,14 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_02_035559) do
   end
 
   create_table "pvp_seasons", force: :cascade do |t|
-    t.string "blizzard_id"
+    t.integer "blizzard_id"
     t.datetime "created_at", null: false
     t.string "display_name"
     t.datetime "end_time"
     t.boolean "is_current", default: false
     t.datetime "start_time"
     t.datetime "updated_at", null: false
+    t.index ["blizzard_id"], name: "index_pvp_seasons_on_blizzard_id", unique: true
     t.index ["is_current"], name: "index_pvp_seasons_on_is_current"
     t.index ["updated_at"], name: "index_pvp_seasons_on_updated_at"
   end

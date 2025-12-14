@@ -2,10 +2,15 @@ module Characters
   class SyncCharacterJob < ApplicationJob
     queue_as :character_sync
 
+    # Retry on API errors with exponential backoff (network issues, rate limits, etc.)
+    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
+      Rails.logger.warn("[Characters::SyncCharacterJob] API error, will retry: #{error.message}")
+    end
+
     def perform(region:, realm:, name:)
       character = Character.find_by(region:, realm:, name:)
       return unless character
-
+      return if character.is_private  # Skip private characters early
       return if character.meta_synced?
 
       profile = fetch_profile(region: region, realm: realm, name: name)

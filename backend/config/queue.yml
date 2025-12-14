@@ -4,18 +4,21 @@ default: &default
       batch_size: 500
 
   workers:
+    # Dedicated workers for character sync jobs with higher concurrency
     - queues: [pvp_sync_2v2, pvp_sync_3v3, pvp_sync_rbg, pvp_sync_shuffle]
-      threads: 2
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 3) %>
       processes: 1
       polling_interval: 0.1
 
+    # Processing workers with optimized thread count
     - queues: [pvp_processing]
-      threads: <%= ENV.fetch("RAILS_ENV") == 'development' ? 32 : 5 %>
+      threads: <%= ENV.fetch("RAILS_ENV") == 'development' ? 32 : ENV.fetch("PVP_PROCESSING_THREADS", 8) %>
       processes: 1
       polling_interval: 0.05
 
+    # Default queue with configurable concurrency
     - queues: "*"
-      threads: 3
+      threads: <%= ENV.fetch("DEFAULT_THREADS", 3) %>
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
       polling_interval: 0.1
 

@@ -3,6 +3,11 @@ module Pvp
     self.enqueue_after_transaction_commit = :always
     queue_as :character_sync
 
+    # Retry on API errors with exponential backoff (network issues, rate limits, etc.)
+    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
+      Rails.logger.warn("[SyncCharacterJob] API error, will retry: #{error.message}")
+    end
+
     TTL_HOURS = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
 
     def perform(character_id:, locale: "en_US")
@@ -53,6 +58,7 @@ module Pvp
     private
 
       def latest_entries_per_bracket(character)
+        # Optimized query with proper indexing
         PvpLeaderboardEntry
           .joins(:pvp_leaderboard)
           .where(character_id: character.id)
