@@ -10,12 +10,13 @@
 #  start_time   :datetime
 #  created_at   :datetime         not null
 #  updated_at   :datetime         not null
-#  blizzard_id  :string
+#  blizzard_id  :integer
 #
 # Indexes
 #
-#  index_pvp_seasons_on_is_current  (is_current)
-#  index_pvp_seasons_on_updated_at  (updated_at)
+#  index_pvp_seasons_on_blizzard_id  (blizzard_id) UNIQUE
+#  index_pvp_seasons_on_is_current   (is_current)
+#  index_pvp_seasons_on_updated_at   (updated_at)
 #
 FactoryBot.define do
   factory :pvp_season do

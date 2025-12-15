@@ -8,22 +8,22 @@ module Blizzard
           return if items.empty?
 
           # Bulk upsert all items at once for better performance
-          item_records = items.filter_map do |raw_item|
-            build_item_record(raw_item)
-          end
+          item_records = items.filter_map { |raw_item| build_item_record(raw_item) }
 
           return if item_records.empty?
 
+          unique_item_records = item_records.uniq { |record| record[:blizzard_id] }
+
           # Upsert items in bulk
           Item.upsert_all(
-            item_records,
+            unique_item_records,
             unique_by: :blizzard_id,
             returning: false
           )
 
           # Handle translations separately (translations are localized and may vary)
           # Reuse blizzard_ids from item_records to avoid re-extraction
-          blizzard_ids = item_records.map { |record| record[:blizzard_id] }
+          blizzard_ids = unique_item_records.map { |record| record[:blizzard_id] }
           upsert_translations(blizzard_ids)
         end
 

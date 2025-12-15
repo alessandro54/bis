@@ -11,9 +11,11 @@ module Pvp
 
       return if result.success?
 
-      Rails.logger.error(
-        "[ProcessLeaderboardEntryJob] Failed for entry #{entry_id}: #{result.error}"
-      )
+      error_message = "[ProcessLeaderboardEntryJob] Failed for entry #{entry_id}: #{result.error}"
+      Rails.logger.error(error_message)
+
+      raise(result.error) if result.error.is_a?(Exception)
+      raise(StandardError, error_message)
     end
   end
 end

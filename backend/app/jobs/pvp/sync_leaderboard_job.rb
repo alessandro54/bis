@@ -14,7 +14,7 @@ module Pvp
         locale:
       )
 
-      entries = res.fetch("entries", [])
+      entries = res.fetch("entries", []).first(10)
 
       bracket_config = Pvp::BracketConfig.for(bracket)
       rating_min = bracket_config&.dig(:rating_min)
