@@ -1,49 +1,10 @@
-# spec/jobs/pvp/sync_character_job_spec.rb
 require "rails_helper"
 
 RSpec.describe Pvp::SyncCharacterJob, type: :job do
   include ActiveJob::TestHelper
 
-  let(:character) do
-    create(
-      :character,
-      region: "us",
-      realm:  "illidan",
-      name:   "manongauz"
-    )
-  end
-
-  let(:locale) { "en_US" }
-
-  let!(:entry_2v2) do
-    create(
-      :pvp_leaderboard_entry,
-      character:          character,
-      pvp_leaderboard:    create(
-        :pvp_leaderboard,
-        pvp_season: create(:pvp_season),
-        bracket:    "2v2",
-        region:     character.region
-      ),
-      raw_equipment:      nil,
-      raw_specialization: nil
-    )
-  end
-
-  let!(:entry_3v3) do
-    create(
-      :pvp_leaderboard_entry,
-      character:          character,
-      pvp_leaderboard:    create(
-        :pvp_leaderboard,
-        pvp_season: create(:pvp_season),
-        bracket:    "3v3",
-        region:     character.region
-      ),
-      raw_equipment:      nil,
-      raw_specialization: nil
-    )
-  end
+  let(:character) { create(:character) }
+  let(:locale) { "pt_BR" }
 
   subject(:perform_job) do
     described_class.perform_now(
@@ -52,108 +13,50 @@ RSpec.describe Pvp::SyncCharacterJob, type: :job do
     )
   end
 
-  before { clear_enqueued_jobs }
+  let(:service_result) do
+    instance_double(
+      ServiceResult,
+      success?: success,
+      error:    service_error
+    )
+  end
 
-  context "when a reusable snapshot exists" do
-    let(:ttl_hours) { 24 }
+  before do
+    allow(Pvp::Characters::SyncCharacterService)
+      .to receive(:call)
+      .and_return(service_result)
+  end
 
-    before do
-      now = Time.zone.parse("2024-01-01 12:00:00")
+  context "when the service succeeds" do
+    let(:success) { true }
+    let(:service_error) { nil }
 
-      entry_2v2.update!(snapshot_at: now)
-      entry_3v3.update!(snapshot_at: now)
-
-      @snapshot_entry = create(
-        :pvp_leaderboard_entry,
-        character:                   character,
-        pvp_leaderboard:             create(
-          :pvp_leaderboard,
-          pvp_season: create(:pvp_season),
-          bracket:    "2v2",
-          region:     character.region
-        ),
-        snapshot_at:                 now - 2.hours,
-        raw_equipment:               { "foo" => "bar" },
-        raw_specialization:          { "spec" => "data" },
-        item_level:                  540,
-        tier_set_id:                 999,
-        tier_set_name:               "Gladiator Set",
-        tier_set_pieces:             4,
-        tier_4p_active:              true,
-        equipment_processed_at:      now - 1.hour,
-        specialization_processed_at: now - 1.hour
-      )
-
-      allow(Pvp::Characters::LastEquipmentSnapshotFinderService)
-        .to receive(:call)
-              .with(character_id: character.id, ttl_hours: ttl_hours)
-              .and_return(@snapshot_entry)
-
-      stub_const("Pvp::SyncCharacterJob::TTL_HOURS", ttl_hours)
-    end
-
-    it "reuses the snapshot for the latest entries and does not call Blizzard" do
+    it "delegates all work to the service" do
       perform_job
 
-      entry_2v2.reload
-      entry_3v3.reload
-
-      expect(entry_2v2.raw_equipment).to eq(@snapshot_entry.raw_equipment)
-      expect(entry_3v3.raw_equipment).to eq(@snapshot_entry.raw_equipment)
-
-      expect(entry_2v2.raw_specialization).to eq(@snapshot_entry.raw_specialization)
-      expect(entry_3v3.raw_specialization).to eq(@snapshot_entry.raw_specialization)
-
-      expect(entry_2v2.item_level).to eq(@snapshot_entry.item_level)
-      expect(entry_3v3.item_level).to eq(@snapshot_entry.item_level)
-    end
-
-    it "does NOT enqueue processing jobs when snapshot is fully processed" do
-      expect { perform_job }.not_to have_enqueued_job(Pvp::ProcessLeaderboardEntryJob)
+      expect(Pvp::Characters::SyncCharacterService).to have_received(:call).with(
+        character: character,
+        locale:    locale
+      )
     end
   end
 
-  context "when Blizzard returns new data" do
-    let(:equipment_json) do
-      JSON.parse(File.read("spec/fixtures/files/manongauz_equipment.json"))
+  context "when the service returns an exception" do
+    let(:success) { false }
+    let(:service_error) { StandardError.new("boom") }
+
+    it "raises the same exception so the job is marked as failed" do
+      expect { perform_job }.to raise_error(service_error.class, "boom")
     end
+  end
 
-    let(:talents_json) do
-      JSON.parse(File.read("spec/fixtures/files/manongauz_specializations.json"))
-    end
+  context "when the service returns a non-exception error" do
+    let(:success) { false }
+    let(:service_error) { "something went wrong" }
 
-    let(:ttl_hours) { 24 }
-
-    before do
-      allow(Pvp::Characters::LastEquipmentSnapshotFinderService)
-        .to receive(:call)
-              .with(character_id: character.id, ttl_hours: ttl_hours)
-              .and_return(nil)
-
-      stub_const("Pvp::SyncCharacterJob::TTL_HOURS", ttl_hours)
-
-      allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
-        .to receive(:fetch)
-              .and_return(equipment_json)
-
-      allow(Blizzard::Api::Profile::CharacterSpecializationSummary)
-        .to receive(:fetch)
-              .and_return(talents_json)
-    end
-
-    it "updates all latest entries with fresh raw data" do
-      perform_job
-
-      entry_2v2.reload
-      entry_3v3.reload
-
-      expect(entry_2v2.raw_equipment).to eq(equipment_json)
-      expect(entry_3v3.raw_equipment).to eq(equipment_json)
-    end
-
-    it "enqueues a unified processing job for each latest entry" do
+    it "wraps the error in a StandardError" do
       expect { perform_job }
-        .to have_enqueued_job(Pvp::ProcessLeaderboardEntryJob).exactly(2).times
+        .to raise_error(StandardError, "[SyncCharacterJob] Failed for character #{character.id}: #{service_error}")
     end
   end
 end

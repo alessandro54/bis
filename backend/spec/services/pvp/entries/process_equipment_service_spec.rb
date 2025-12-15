@@ -3,8 +3,18 @@ require "rails_helper"
 
 RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
   let(:locale) { "en_US" }
-  let(:entry)  {
- create(:pvp_leaderboard_entry, raw_equipment: raw_equipment, equipment_processed_at: equipment_processed_at) }
+  let(:entry) do
+    create(
+      :pvp_leaderboard_entry,
+      raw_equipment:          raw_equipment,
+      equipment_processed_at: equipment_processed_at,
+      item_level:             nil,
+      tier_set_id:            nil,
+      tier_set_name:          nil,
+      tier_set_pieces:        nil,
+      tier_4p_active:         nil
+    )
+  end
 
   let(:equipment_processed_at) { nil }
 
@@ -120,6 +130,28 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
         expect(entry.tier_set_name).to eq("Gladiator Set")
         expect(entry.tier_set_pieces).to eq(4)
         expect(entry.tier_4p_active).to eq(true)
+      end
+
+      context "when the upsert service provides nil item level and tier set data" do
+        let(:service_instance) do
+          instance_double(
+            Blizzard::Data::Items::UpsertFromRawEquipmentService,
+            call:       processed_equipment,
+            item_level: nil,
+            tier_set:   nil
+          )
+        end
+
+        it "still updates processed_at and raw_equipment but leaves optional fields nil" do
+          result
+
+          entry.reload
+
+          expect(entry.equipment_processed_at).not_to be_nil
+          expect(entry.item_level).to be_nil
+          expect(entry.tier_set_id).to be_nil
+          expect(entry.raw_equipment).to eq(processed_equipment)
+        end
       end
 
       it "rebuilds the associated pvp_leaderboard_entry_items" do

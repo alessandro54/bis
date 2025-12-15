@@ -49,7 +49,10 @@ module Blizzard
         end
 
         def item_level
-          items.map { |i| i.dig("level", "value") }.compact.sum / items.size
+          levels = items.map { |i| i.dig("level", "value") }.compact
+          return if levels.empty?
+
+          levels.sum / levels.size
         end
 
         def tier_set

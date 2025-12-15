@@ -4,7 +4,7 @@ module Pvp
     # Defaults por familia
     FAMILY_DEFAULTS = {
       two_v_two:     {
-        rating_min: 2100,
+        rating_min: 2000,
         job_queue:  :pvp_sync_2v2
       },
       three_v_three: {
