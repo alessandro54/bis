@@ -13,7 +13,7 @@ gem "httpx", "~> 1.6"
 gem "image_processing", "~> 1.14"
 
 # Simple deployment using containers
-gem "kamal", "~> 2.9", require: false
+gem "kamal", "~> 2.10", require: false
 
 # Mission Control UI for jobs
 gem "mission_control-jobs", "~> 1.1"
