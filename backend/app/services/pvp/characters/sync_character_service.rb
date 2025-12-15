@@ -3,10 +3,11 @@ module Pvp
     class SyncCharacterService < ApplicationService
       DEFAULT_TTL_HOURS = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
 
-      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS)
+      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS, processing_queues: nil)
         @character = character
         @locale = locale
         @ttl_hours = ttl_hours
+        @processing_queues = processing_queues
       end
 
       def call
@@ -74,7 +75,7 @@ module Pvp
               )
 
               Pvp::ProcessLeaderboardEntryJob
-                .set(queue: Pvp::ProcessLeaderboardEntryJob.queue_for(entry.id))
+                .set(queue: Pvp::ProcessLeaderboardEntryJob.queue_for(entry.id, queues: @processing_queues))
                 .perform_later(entry_id: entry.id, locale: locale)
             end
           end

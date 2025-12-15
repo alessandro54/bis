@@ -19,6 +19,7 @@ module Pvp
       bracket_config = Pvp::BracketConfig.for(bracket)
       rating_min = bracket_config&.dig(:rating_min)
       job_queue = bracket_config&.dig(:job_queue) || :character_sync
+      processing_queues = bracket_config&.dig(:processing_queues)
 
       if rating_min
         entries.select! { |entry| entry["rating"].to_i >= rating_min }
@@ -95,7 +96,8 @@ module Pvp
                 .set(queue: job_queue)
                 .perform_later(
                   character_ids: character_id_batch,
-                  locale: locale
+                  locale: locale,
+                  processing_queues: processing_queues
                 )
             end
 

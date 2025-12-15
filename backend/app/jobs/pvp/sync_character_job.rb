@@ -8,10 +8,11 @@ module Pvp
       Rails.logger.warn("[SyncCharacterJob] API error, will retry: #{error.message}")
     end
 
-    def perform(character_id:, locale: "en_US")
+    def perform(character_id:, locale: "en_US", processing_queues: nil)
       result = Pvp::Characters::SyncCharacterService.call(
         character: Character.find_by(id: character_id),
-        locale:    locale
+        locale:    locale,
+        processing_queues: processing_queues
       )
 
       return if result.success?
