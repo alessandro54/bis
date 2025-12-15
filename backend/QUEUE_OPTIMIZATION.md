@@ -16,7 +16,7 @@ The queue configuration has been optimized for efficient operation on 2-core CPU
 
 ### After Optimization
 - Total threads: 8 (2 sync + 4 processing + 2 default)
-- Threads ≈ 4x CPU cores (optimal for I/O-bound workloads)
+- Threads = 4x CPU cores (optimal for mixed I/O and CPU-bound workloads)
 - Reduced polling overhead (0.5s)
 - Smaller batch sizes (100) for lower memory pressure
 
@@ -49,7 +49,7 @@ PROCESSING_POLLING_INTERVAL=0.5  # Default: 0.5s (was 0.05s)
 
 ```bash
 # Dispatcher batch size
-BATCH_SIZE=100              # Default: 100 (was 500)
+DISPATCHER_BATCH_SIZE=100   # Default: 100 (was 500)
 ```
 
 ## Rationale
@@ -104,9 +104,10 @@ PVP_SYNC_THREADS=8
 PVP_PROCESSING_THREADS=16
 ```
 
-Rule of thumb: 
-- Sync threads ≈ CPU cores
-- Processing threads ≈ 2x CPU cores
+Scaling rule: 
+- **Sync threads = CPU cores** (I/O-bound: can handle more due to waiting on API)
+- **Processing threads = 2x CPU cores** (CPU-bound: limited parallelism, needs balance)
+- Total threads = 4x CPU cores (good balance for mixed workloads)
 
 ## Monitoring
 
@@ -125,7 +126,7 @@ To revert to previous configuration:
 PVP_SYNC_THREADS=3
 PVP_PROCESSING_THREADS=8
 DEFAULT_THREADS=3
-BATCH_SIZE=500
+DISPATCHER_BATCH_SIZE=500
 SYNC_POLLING_INTERVAL=0.1
 PROCESSING_POLLING_INTERVAL=0.05
 ```

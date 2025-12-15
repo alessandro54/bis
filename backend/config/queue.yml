@@ -1,7 +1,7 @@
 default: &default
   dispatchers:
     - polling_interval: 1
-      batch_size: <%= ENV.fetch("BATCH_SIZE", 100) %>
+      batch_size: <%= ENV.fetch("DISPATCHER_BATCH_SIZE", 100) %>
 
   workers:
     # Dedicated workers for character sync jobs (I/O-bound: API calls)
