@@ -1,26 +1,28 @@
 default: &default
   dispatchers:
     - polling_interval: 1
-      batch_size: 500
+      batch_size: <%= ENV.fetch("BATCH_SIZE", 100) %>
 
   workers:
-    # Dedicated workers for character sync jobs with higher concurrency
+    # Dedicated workers for character sync jobs (I/O-bound: API calls)
+    # Optimized for 2-core CPU: reduced threads to avoid contention
     - queues: [pvp_sync_2v2, pvp_sync_3v3, pvp_sync_rbg, pvp_sync_shuffle]
-      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 3) %>
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 2) %>
       processes: 1
-      polling_interval: 0.1
+      polling_interval: <%= ENV.fetch("SYNC_POLLING_INTERVAL", 0.5) %>
 
-    # Processing workers with optimized thread count
+    # Processing workers (CPU-bound: parsing equipment data)
+    # Optimized for 2-core CPU: fewer threads to reduce context switching
     - queues: [pvp_processing_a, pvp_processing_b, pvp_processing_c, pvp_processing_d]
-      threads: <%= ENV.fetch("RAILS_ENV") == 'development' ? 32 : ENV.fetch("PVP_PROCESSING_THREADS", 8) %>
+      threads: <%= ENV.fetch("RAILS_ENV") == 'development' ? 32 : ENV.fetch("PVP_PROCESSING_THREADS", 4) %>
       processes: 1
-      polling_interval: 0.05
+      polling_interval: <%= ENV.fetch("PROCESSING_POLLING_INTERVAL", 0.5) %>
 
     # Default queue with configurable concurrency
     - queues: "*"
-      threads: <%= ENV.fetch("DEFAULT_THREADS", 3) %>
+      threads: <%= ENV.fetch("DEFAULT_THREADS", 2) %>
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
-      polling_interval: 0.1
+      polling_interval: 0.5
 
 development:
   <<: *default
