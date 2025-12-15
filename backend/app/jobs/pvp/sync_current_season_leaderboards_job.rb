@@ -4,6 +4,9 @@ module Pvp
 
     BRACKETS = %w[
                   2v2
+                  3v3
+                  shuffle-overall
+                  rbg
                ].freeze
 
     def perform(region: "us", locale: "en_US")
