@@ -73,7 +73,9 @@ module Pvp
                 raw_specialization: talents_json
               )
 
-              Pvp::ProcessLeaderboardEntryJob.perform_later(entry_id: entry.id, locale: locale)
+              Pvp::ProcessLeaderboardEntryJob
+                .set(queue: Pvp::ProcessLeaderboardEntryJob.queue_for(entry.id))
+                .perform_later(entry_id: entry.id, locale: locale)
             end
           end
         end

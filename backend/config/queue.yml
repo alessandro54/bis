@@ -11,7 +11,7 @@ default: &default
       polling_interval: 0.1
 
     # Processing workers with optimized thread count
-    - queues: [pvp_processing]
+    - queues: [pvp_processing_a, pvp_processing_b, pvp_processing_c, pvp_processing_d]
       threads: <%= ENV.fetch("RAILS_ENV") == 'development' ? 32 : ENV.fetch("PVP_PROCESSING_THREADS", 8) %>
       processes: 1
       polling_interval: 0.05

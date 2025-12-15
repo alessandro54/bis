@@ -48,12 +48,17 @@ class PvpLeaderboardEntry < ApplicationRecord
   belongs_to :pvp_leaderboard
   belongs_to :character
 
-  scope :latest_snapshot_for_bracket, lambda { |bracket|
-    current_season_id = PvpSeason.where(is_current: true).select(:id).limit(1)
+  scope :latest_snapshot_for_bracket, lambda { |bracket, season_id: nil|
+    season_filter =
+      if season_id.present?
+        season_id
+      else
+        PvpSeason.where(is_current: true).select(:id).limit(1)
+      end
 
     joins(pvp_leaderboard: :pvp_season)
       .where(pvp_leaderboards: { bracket: bracket })
-      .where(pvp_seasons: { id: current_season_id })
+      .where(pvp_seasons: { id: season_filter })
       .where("pvp_leaderboard_entries.snapshot_at = pvp_leaderboards.last_synced_at")
   }
 

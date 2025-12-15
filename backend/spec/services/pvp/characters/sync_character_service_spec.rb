@@ -176,6 +176,18 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
         expect { call_service }
           .to have_enqueued_job(Pvp::ProcessLeaderboardEntryJob).exactly(2).times
       end
+
+      it "assigns processing jobs to deterministic queues" do
+        call_service
+
+        expect(Pvp::ProcessLeaderboardEntryJob)
+          .to have_been_enqueued
+          .on_queue(Pvp::ProcessLeaderboardEntryJob.queue_for(entry_2v2.id))
+
+        expect(Pvp::ProcessLeaderboardEntryJob)
+          .to have_been_enqueued
+          .on_queue(Pvp::ProcessLeaderboardEntryJob.queue_for(entry_3v3.id))
+      end
     end
   end
 end
