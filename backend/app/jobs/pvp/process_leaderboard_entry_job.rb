@@ -2,10 +2,7 @@
 module Pvp
   class ProcessLeaderboardEntryJob < ApplicationJob
     PROCESSING_QUEUES = %i[
-      pvp_processing_a
-      pvp_processing_b
-      pvp_processing_c
-      pvp_processing_d
+      pvp_processing
     ].freeze
 
     queue_as :pvp_processing

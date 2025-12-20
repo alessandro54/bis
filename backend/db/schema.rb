@@ -51,6 +51,19 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_13_140000) do
     t.index ["blizzard_id"], name: "index_items_on_blizzard_id", unique: true
   end
 
+  create_table "job_performance_metrics", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.float "duration", null: false
+    t.string "error_class"
+    t.string "job_class", null: false
+    t.boolean "success", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_job_performance_metrics_on_created_at"
+    t.index ["job_class", "created_at"], name: "index_job_performance_metrics_on_job_class_and_created_at"
+    t.index ["job_class"], name: "index_job_performance_metrics_on_job_class"
+    t.index ["success"], name: "index_job_performance_metrics_on_success"
+  end
+
   create_table "pvp_leaderboard_entries", force: :cascade do |t|
     t.bigint "character_id", null: false
     t.datetime "created_at", null: false

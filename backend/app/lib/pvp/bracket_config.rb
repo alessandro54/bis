@@ -4,24 +4,20 @@ module Pvp
     # Defaults por familia
     FAMILY_DEFAULTS = {
       two_v_two:     {
-        rating_min:        2000,
-        job_queue:         :pvp_sync_2v2,
-        processing_queues: %i[pvp_processing_a pvp_processing_b pvp_processing_c pvp_processing_d]
+        rating_min: 2000,
+        job_queue:  :pvp_sync_2v2
       },
       three_v_three: {
-        rating_min:        2200,
-        job_queue:         :pvp_sync_3v3,
-        processing_queues: %i[pvp_processing_a pvp_processing_b pvp_processing_c pvp_processing_d]
+        rating_min: 2200,
+        job_queue:  :pvp_sync_3v3
       },
       shuffle_like:  {
-        rating_min:        2400,
-        job_queue:         :pvp_sync_shuffle,
-        processing_queues: %i[pvp_processing_a pvp_processing_b pvp_processing_c pvp_processing_d]
+        rating_min: 2400,
+        job_queue:  :pvp_sync_shuffle
       },
       rbg_like:      {
-        rating_min:        2200,
-        job_queue:         :pvp_sync_rbg,
-        processing_queues: %i[pvp_processing_a pvp_processing_b pvp_processing_c pvp_processing_d]
+        rating_min: 2200,
+        job_queue:  :pvp_sync_rbg
       }
     }.freeze
 
