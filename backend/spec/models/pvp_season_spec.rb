@@ -1,6 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe PvpSeason, type: :model do
+  include_examples "has timestamps"
+  include TestHelpers
   describe 'associations' do
     it { should have_many(:pvp_leaderboards).dependent(:destroy) }
   end
@@ -38,13 +40,13 @@ RSpec.describe PvpSeason, type: :model do
     it 'can store start_time' do
       start_time = 1.month.ago
       season.start_time = start_time
-      expect(season.start_time).to eq(start_time)
+      expect_timestamp_within_precision(season.start_time, start_time)
     end
 
     it 'can store end_time' do
       end_time = 1.month.from_now
       season.end_time = end_time
-      expect(season.end_time).to eq(end_time)
+      expect_timestamp_within_precision(season.end_time, end_time)
     end
 
     it 'can store is_current' do
@@ -72,9 +74,9 @@ RSpec.describe PvpSeason, type: :model do
     end
 
     context 'when there is no current season' do
-      let!(:season1) { create(:pvp_season, is_current: false, blizzard_id: 1) }
-      let!(:season2) { create(:pvp_season, is_current: false, blizzard_id: 2) }
-      let!(:season3) { create(:pvp_season, is_current: false, blizzard_id: 3) }
+      let!(:season1) { create_test_season(is_current: false, blizzard_id: 1) }
+      let!(:season2) { create_test_season(is_current: false, blizzard_id: 2) }
+      let!(:season3) { create_test_season(is_current: false, blizzard_id: 3) }
 
       it 'returns the season with highest blizzard_id' do
         expect(described_class.current).to eq(season3)
@@ -88,8 +90,8 @@ RSpec.describe PvpSeason, type: :model do
     end
 
     context 'when there are multiple current seasons (edge case)' do
-      let!(:current_season1) { create(:pvp_season, is_current: true, blizzard_id: 1) }
-      let!(:current_season2) { create(:pvp_season, is_current: true, blizzard_id: 2) }
+      let!(:current_season1) { create_test_season(is_current: true, blizzard_id: 1) }
+      let!(:current_season2) { create_test_season(is_current: true, blizzard_id: 2) }
 
       it 'returns the current season (first found)' do
         result = described_class.current
@@ -99,29 +101,10 @@ RSpec.describe PvpSeason, type: :model do
     end
   end
 
-  describe 'timestamps' do
-    let(:season) { create(:pvp_season) }
-
-    it 'sets created_at automatically' do
-      expect(season.created_at).to be_within(5.seconds).of(Time.current)
-    end
-
-    it 'sets updated_at automatically' do
-      expect(season.updated_at).to be_within(5.seconds).of(Time.current)
-    end
-
-    it 'updates updated_at on save' do
-      original_updated_at = season.updated_at
-      sleep(0.1)
-      season.update!(display_name: 'Updated Season')
-
-      expect(season.updated_at).to be > original_updated_at
-    end
-  end
 
   describe 'season duration' do
     let(:season) do
-      create(:pvp_season,
+      create_test_season(
         start_time: 2.months.ago,
         end_time:   1.month.from_now
       )

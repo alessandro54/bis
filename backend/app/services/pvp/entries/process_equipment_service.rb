@@ -22,15 +22,17 @@ module Pvp
         processed_equipment = equipment_service.call
 
         ActiveRecord::Base.transaction do
+          # Always update equipment_processed_at and raw_equipment
           equipment_attrs = {
             equipment_processed_at: Time.zone.now,
-            item_level:             equipment_service.item_level,
-            raw_equipment:          processed_equipment,
-            **equipment_service.tier_set
-          }.compact
+            raw_equipment:          processed_equipment
+          }
 
-          entry.update!(equipment_attrs) unless equipment_attrs.empty?
+          # Add optional fields if they exist
+          equipment_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
+          equipment_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
 
+          entry.update!(equipment_attrs)
           rebuild_entry_items(processed_equipment)
         end
 

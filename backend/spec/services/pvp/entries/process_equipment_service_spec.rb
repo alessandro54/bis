@@ -2,7 +2,8 @@
 require "rails_helper"
 
 RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
-  let(:locale) { "en_US" }
+  include ServiceSpecHelpers
+  include_examples "service result interface"
   let(:entry) do
     create(
       :pvp_leaderboard_entry,
@@ -17,55 +18,15 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
   end
 
   let(:equipment_processed_at) { nil }
-
-  let(:raw_equipment) do
-    {
-      "equipped_items" => [
-        {
-          "item" => { "id" => blizzard_item_id },
-          "slot" => { "type" => "HEAD" },
-          "level" => { "value" => 540 },
-          "context" => "some_context"
-        }
-      ]
-    }
-  end
-
-  let(:blizzard_item_id) { 123 }
-
-  let!(:item) do
-    create(:item, blizzard_id: blizzard_item_id)
-  end
-
-  let(:service_instance) do
-    instance_double(
-      Blizzard::Data::Items::UpsertFromRawEquipmentService,
-      call:       processed_equipment,
-      item_level: 540,
-      tier_set:   tier_set_data
-    )
-  end
-
-  let(:processed_equipment) { raw_equipment }
-
-  let(:tier_set_data) do
-    {
-      tier_set_id:     999,
-      tier_set_name:   "Gladiator Set",
-      tier_set_pieces: 4,
-      tier_4p_active:  true
-    }
-  end
+  let(:service_instance) { default_service_instance }
+  let!(:item) { create(:item, blizzard_id: blizzard_item_id) }
 
   subject(:result) do
     described_class.call(entry: entry, locale: locale)
   end
 
   before do
-    allow(Blizzard::Data::Items::UpsertFromRawEquipmentService)
-      .to receive(:new)
-            .with(raw_equipment: raw_equipment, locale: locale)
-            .and_return(service_instance)
+    mock_equipment_service(service_instance)
   end
 
   describe "#call" do
