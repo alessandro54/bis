@@ -12,7 +12,7 @@ const RogueConfig: WowClassConfig = {
       id: 259,
       name: "assassination",
       url: "/rogue/assassination",
-      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/ability_rogue_eviscerate.jpg",
+      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/ability_rogue_deadlybrew.jpg",
     },
     {
       id: 260,

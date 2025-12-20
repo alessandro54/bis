@@ -12,7 +12,7 @@ const DemonHunterConfig: WowClassConfig = {
       id: 577,
       name: "havoc",
       url: "/demon-hunter/havoc",
-      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/spell_demonhunter_specdps.jpg",
+      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/ability_demonhunter_specdps.jpg",
     },
     {
       id: 581,

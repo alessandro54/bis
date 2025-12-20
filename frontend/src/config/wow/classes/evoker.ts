@@ -1,7 +1,7 @@
 import { WowClassConfig } from "."
 
 const EvokerConfig: WowClassConfig = {
-  id: 12,
+  id: 13,
   name: "Evoker",
   slug: "evoker",
   iconUrl: "https://render.worldofwarcraft.com/us/icons/56/classicon_evoker.jpg",
@@ -12,7 +12,7 @@ const EvokerConfig: WowClassConfig = {
       id: 1467,
       name: "devastation",
       url: "/evoker/devastation",
-      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/spell_evoker_devastation.jpg",
+      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/classicon_evoker_devastation.jpg",
     },
     {
       id: 1468,
@@ -24,7 +24,7 @@ const EvokerConfig: WowClassConfig = {
       id: 1473,
       name: "augmentation",
       url: "/evoker/augmentation",
-      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/spell_evoker_augmentation.jpg",
+      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/classicon_evoker_augmentation.jpg",
     },
   ],
 }

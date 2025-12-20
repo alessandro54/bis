@@ -34,9 +34,9 @@ export function NavMain() {
             key={item.title}
             asChild
             className="group/collapsible"
-            defaultOpen={item.items ? false : true}
+            defaultOpen={!item.items}
             onMouseEnter={() => setSlug(item.slug)}
-            onMouseLeave={() => setSlug(undefined)}
+            onMouseLeave={() => setSlug(null)}
           >
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>

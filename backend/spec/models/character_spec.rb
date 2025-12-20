@@ -34,25 +34,12 @@ RSpec.describe Character, type: :model do
   describe "validations" do
     subject { create(:character) }
 
-    it { is_expected.to validate_presence_of(:name) }
-    it { is_expected.to validate_presence_of(:realm) }
-    it { is_expected.to validate_presence_of(:region) }
-
-    it do
-      is_expected.to validate_uniqueness_of(:name)
-                       .scoped_to(%i[realm region])
-    end
-
-    it do
-      is_expected.to validate_uniqueness_of(:blizzard_id)
-                       .scoped_to(:region)
-                       .case_insensitive
-    end
-
-    it do
-      is_expected.to validate_numericality_of(:blizzard_id)
-                       .only_integer
-    end
+    include_examples "validates presence of", :name
+    include_examples "validates presence of", :realm
+    include_examples "validates presence of", :region
+    include_examples "validates uniqueness of", :name, scoped_to: %i[realm region]
+    include_examples "validates uniqueness of", :blizzard_id, scoped_to: :region, case_insensitive: true
+    include_examples "validates numericality of", :blizzard_id, only_integer: true
   end
 
   describe "#display_name" do

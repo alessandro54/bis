@@ -25,5 +25,6 @@ FactoryBot.define do
     association :pvp_season
     region  { %w[us eu kr tw].sample }
     bracket { %w[2v2 3v3 rbg deathknight-suffle].sample }
+    last_synced_at { Time.current }
   end
 end

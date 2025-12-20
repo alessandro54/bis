@@ -10,62 +10,41 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
     )
   end
 
-  let!(:character) { create(:character) }
-  let(:character_ids) { [character.id] }
+  let!(:character1) { create(:character) }
+  let!(:character2) { create(:character) }
+  let(:character_ids) { [ character1.id, character2.id ] }
   let(:locale) { "en_US" }
 
   before do
     clear_enqueued_jobs
   end
 
-  context "when the sync service succeeds" do
-    before do
-      allow(Pvp::Characters::SyncCharacterService)
-        .to receive(:call)
-        .and_return(ServiceResult.success)
-    end
+  it "enqueues individual SyncCharacterJob for each character for parallel processing" do
+    expect { perform_job }
+      .to have_enqueued_job(Pvp::SyncCharacterJob)
+      .exactly(2).times
 
-    it "does not enqueue fallback jobs" do
-      expect { perform_job }.not_to have_enqueued_job(Pvp::SyncCharacterJob)
-    end
+    expect(Pvp::SyncCharacterJob).to have_been_enqueued.with(
+      character_id:      character1.id,
+      locale:            locale,
+      processing_queues: nil
+    )
 
-    it "invokes the service for each character id" do
-      perform_job
-
-      expect(Pvp::Characters::SyncCharacterService).to have_received(:call).with(
-        character: character,
-        locale:    locale
-      )
-    end
+    expect(Pvp::SyncCharacterJob).to have_been_enqueued.with(
+      character_id:      character2.id,
+      locale:            locale,
+      processing_queues: nil
+    )
   end
 
-  context "when the sync service reports a failure" do
-    let(:service_error) { StandardError.new("boom") }
+  context "with a single character" do
+    let(:character_ids) { [ character1.id ] }
 
-    before do
-      allow(Pvp::Characters::SyncCharacterService)
-        .to receive(:call)
-        .and_return(ServiceResult.failure(service_error))
-    end
-
-    it "enqueues an individual job for retry" do
+    it "enqueues one SyncCharacterJob" do
       expect { perform_job }
         .to have_enqueued_job(Pvp::SyncCharacterJob)
-        .with(character_id: character.id, locale: locale)
-    end
-  end
-
-  context "when the service raises an unexpected error" do
-    before do
-      allow(Pvp::Characters::SyncCharacterService)
-        .to receive(:call)
-        .and_raise(StandardError, "unexpected boom")
-    end
-
-    it "enqueues an individual job for retry" do
-      expect { perform_job }
-        .to have_enqueued_job(Pvp::SyncCharacterJob)
-        .with(character_id: character.id, locale: locale)
+        .exactly(1).times
+        .with(character_id: character1.id, locale: locale, processing_queues: nil)
     end
   end
 end

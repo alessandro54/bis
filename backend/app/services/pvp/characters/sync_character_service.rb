@@ -3,10 +3,11 @@ module Pvp
     class SyncCharacterService < ApplicationService
       DEFAULT_TTL_HOURS = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
 
-      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS)
+      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS, processing_queues: nil)
         @character = character
         @locale = locale
         @ttl_hours = ttl_hours
+        @processing_queues = processing_queues
       end
 
       def call
@@ -67,16 +68,17 @@ module Pvp
           )
 
           Rails.logger.silence do
+            entry_ids = []
             entries.each do |entry|
               entry.update!(
                 raw_equipment:      equipment_json,
                 raw_specialization: talents_json
               )
 
-              Pvp::ProcessLeaderboardEntryJob
-                .set(queue: Pvp::ProcessLeaderboardEntryJob.queue_for(entry.id))
-                .perform_later(entry_id: entry.id, locale: locale)
+              entry_ids << entry.id
             end
+
+            Pvp::ProcessLeaderboardEntryBatchJob.perform_later(entry_ids: entry_ids, locale: locale)
           end
         end
 
@@ -127,6 +129,7 @@ module Pvp
           )
         end
 
+        # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def fetch_remote_data
           equipment_json = nil
           talents_json   = nil
@@ -155,8 +158,9 @@ module Pvp
             raise thr[:error] if thr[:error]
           end
 
-          [equipment_json, talents_json]
+          [ equipment_json, talents_json ]
         end
+        # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
         def handle_blizzard_error(error)
           if error.message.include?("404")
@@ -171,7 +175,10 @@ module Pvp
             .joins(:pvp_leaderboard)
             .where(character_id: character.id)
             .select("DISTINCT ON (pvp_leaderboards.bracket) pvp_leaderboard_entries.*")
-            .order("pvp_leaderboards.bracket, pvp_leaderboard_entries.snapshot_at DESC, pvp_leaderboard_entries.id DESC")
+            .order(
+              "pvp_leaderboards.bracket, pvp_leaderboard_entries.snapshot_at DESC, " \
+              "pvp_leaderboard_entries.id DESC"
+            )
         end
 
         def logger

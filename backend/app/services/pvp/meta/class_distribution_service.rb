@@ -60,6 +60,7 @@ module Pvp
           keyword_init: true
         )
 
+        # rubocop:disable Metrics/MethodLength
         def aggregated_stats
           base_scope
             .reorder(nil)
@@ -90,21 +91,28 @@ module Pvp
               )
             end
         end
+        # rubocop:enable Metrics/MethodLength
 
+        # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def build_row(stat, global_avg_rating)
-          row_role = ::Wow::Roles.role_for(class_id: stat.class_id.to_i, spec_id: stat.spec_id)
+          spec_id = ::Wow::Catalog.normalize_spec_id(stat.spec_id)
+          row_role = ::Wow::Roles.role_for(class_id: stat.class_id.to_i, spec_id: spec_id)
+          spec_slug = ::Wow::Specs.slug_for(spec_id)
+
+          return nil unless row_role
+          return nil unless spec_slug
           return nil if role && row_role != role
 
           total_games = stat.total_wins + stat.total_losses
 
           shrunk_winrate = shrink_winrate(stat.total_wins, total_games)
           shrunk_rating  = shrink_rating(stat.p90_rating, stat.entry_count, global_avg_rating)
-          volume_raw     = Math.log10([total_games, 1].max)
+          volume_raw     = Math.log10([ total_games, 1 ].max)
 
           {
             class:          stat.class_slug,
-            spec:           ::Wow::Specs.slug_for(stat.spec_id),
-            spec_id:        stat.spec_id,
+            spec:           spec_slug,
+            spec_id:        spec_id,
             role:           row_role,
             count:          stat.entry_count,
             total_games:    total_games,
@@ -116,6 +124,7 @@ module Pvp
             volume_raw:     volume_raw
           }
         end
+        # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
         def shrink_winrate(total_wins, total_games)
           observed = total_games.positive? ? (total_wins.to_f / total_games) : WINRATE_PRIOR_WINRATE
@@ -130,6 +139,7 @@ module Pvp
           denominator.zero? ? global_avg_rating : (numerator / denominator)
         end
 
+        # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def normalize_and_score(rows)
           winrate_stats = rows.map { |r| r[:shrunk_winrate] }
           rating_stats  = rows.map { |r| r[:shrunk_rating] }
@@ -169,18 +179,19 @@ module Pvp
             hidden_score = (power_score * (1.0 - vol_factor)).round(4)
 
             row.merge(
-              winrate_score:   winrate_score,
-              rating_score:    rating_score,
-              power_score:     power_score.round(4),
-              presence_score:  presence_score.round(4),
-              volume_factor:   vol_factor.round(4),
-              meta_score:      meta_score,
-              hidden_score:    hidden_score,
-              games_share:     row[:games_share].round(6),
-              percentage:      total_entries.positive? ? ((row[:count].to_f / total_entries) * 100).round(2) : 0.0
+              winrate_score:  winrate_score,
+              rating_score:   rating_score,
+              power_score:    power_score.round(4),
+              presence_score: presence_score.round(4),
+              volume_factor:  vol_factor.round(4),
+              meta_score:     meta_score,
+              hidden_score:   hidden_score,
+              games_share:    row[:games_share].round(6),
+              percentage:     total_entries.positive? ? ((row[:count].to_f / total_entries) * 100).round(2) : 0.0
             )
           end
         end
+        # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
         def meta_weights_for(row_role)
           ROLE_META_WEIGHTS.fetch(row_role.to_sym) { ROLE_META_WEIGHTS[:dps] }
@@ -190,26 +201,27 @@ module Pvp
           min = values.min
           max = values.max
           return 0.5 if max == min
+
           (value - min) / (max - min)
         end
 
         def volume_factor_from_log_games(log_games, row_role)
           mid, k, floor = volume_params_for(row_role)
           logistic = 1.0 / (1.0 + Math.exp(-k * (log_games - mid)))
-          [floor, logistic].max
+          [ floor, logistic ].max
         end
 
         def volume_params_for(row_role)
           # Calibrated per role due to different pool sizes & volume skew.
           case row_role.to_sym
           when :healer
-            [4.30, 4.2, 0.08]
+            [ 4.30, 4.2, 0.08 ]
           when :tank
-            [4.05, 3.8, 0.10]
+            [ 4.05, 3.8, 0.10 ]
           when :dps
-            [4.18, 4.8, 0.08]
+            [ 4.18, 4.8, 0.08 ]
           else
-            [4.18, 4.8, 0.08]
+            [ 4.18, 4.8, 0.08 ]
           end
         end
 

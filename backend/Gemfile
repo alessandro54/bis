@@ -65,7 +65,7 @@ group :development, :test do
       platforms: %i[mri windows],
       require:   "debug/prelude"
 
-  gem 'dotenv'
+  gem "dotenv"
 
   # Factories for tests
   gem "factory_bot_rails", "~> 6.5"

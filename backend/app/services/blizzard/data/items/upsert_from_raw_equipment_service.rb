@@ -15,11 +15,13 @@ module Blizzard
           unique_item_records = item_records.uniq { |record| record[:blizzard_id] }
 
           # Upsert items in bulk
+          # rubocop:disable Rails/SkipsModelValidations
           Item.upsert_all(
             unique_item_records,
             unique_by: :blizzard_id,
             returning: false
           )
+          # rubocop:enable Rails/SkipsModelValidations
 
           # Handle translations separately (translations are localized and may vary)
           # Reuse blizzard_ids from item_records to avoid re-extraction

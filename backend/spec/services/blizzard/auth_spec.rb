@@ -18,21 +18,30 @@ RSpec.describe Blizzard::Auth do
           described_class.new(client_id: nil, client_secret: nil)
         }.to raise_error(
                ArgumentError,
-               "Blizzard client_id and client_secret must be provided"
+               "Blizzard client_id and client_secret must be provided. " \
+                 "Set Rails credentials (blizzard.client_id / blizzard.client_secret) " \
+                 "or ENV BLIZZARD_CLIENT_ID / BLIZZARD_CLIENT_SECRET. " \
+                 "If using credentials in a worker process, ensure RAILS_MASTER_KEY is present."
              )
 
         expect {
           described_class.new(client_id: "", client_secret: client_secret)
         }.to raise_error(
                ArgumentError,
-               "Blizzard client_id and client_secret must be provided"
+               "Blizzard client_id and client_secret must be provided. " \
+                 "Set Rails credentials (blizzard.client_id / blizzard.client_secret) " \
+                 "or ENV BLIZZARD_CLIENT_ID / BLIZZARD_CLIENT_SECRET. " \
+                 "If using credentials in a worker process, ensure RAILS_MASTER_KEY is present."
              )
 
         expect {
           described_class.new(client_id: client_id, client_secret: nil)
         }.to raise_error(
                ArgumentError,
-               "Blizzard client_id and client_secret must be provided"
+               "Blizzard client_id and client_secret must be provided. " \
+                 "Set Rails credentials (blizzard.client_id / blizzard.client_secret) " \
+                 "or ENV BLIZZARD_CLIENT_ID / BLIZZARD_CLIENT_SECRET. " \
+                 "If using credentials in a worker process, ensure RAILS_MASTER_KEY is present."
              )
       end
     end

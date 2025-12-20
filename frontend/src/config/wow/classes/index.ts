@@ -7,6 +7,10 @@ import PaladinConfig from "./paladin";
 import PriestConfig from "./priest";
 import RogueConfig from "./rogue";
 import WarriorConfig from "./warrior";
+import WarlockConfig from "@/config/wow/classes/warlock";
+import MonkConfig from "@/config/wow/classes/monk";
+import ShamanConfig from "@/config/wow/classes/shaman";
+import HunterConfig from "@/config/wow/classes/hunter";
 
 export type WowClassSlug = "death-knight" | "demon-hunter" | "druid"
   | "hunter" | "mage" | "monk" | "paladin" | "priest" | "rogue"
@@ -17,7 +21,7 @@ export type WowClassSpecSlug =
   | "havoc" | "vengeance"
   | "balance" | "feral" | "guardian" | "restoration"
   | "beast-mastery" | "marksmanship" | "survival"
-  | "arcane" | "fire" | "frost-mage"
+  | "arcane" | "fire" | "frost"
   | "windwalker" | "mistweaver" | "brewmaster"
   | "holy" | "protection" | "retribution"
   | "discipline" | "holy" | "shadow"
@@ -47,11 +51,15 @@ export type WowClassConfig = {
 
 export const WOW_CLASSES: WowClassConfig[] = [
   RogueConfig,
+  WarlockConfig,
   PaladinConfig,
   DeathKnightConfig,
   DemonHunterConfig,
   DruidConfig,
+  MonkConfig,
   MageConfig,
+  ShamanConfig,
+  HunterConfig,
   WarriorConfig,
   PriestConfig,
   EvokerConfig

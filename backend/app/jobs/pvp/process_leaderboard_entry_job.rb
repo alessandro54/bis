@@ -22,11 +22,13 @@ module Pvp
       Rails.logger.error(error_message)
 
       raise(result.error) if result.error.is_a?(Exception)
+
       raise(StandardError, error_message)
     end
 
-    def self.queue_for(entry_id)
-      PROCESSING_QUEUES[entry_id % PROCESSING_QUEUES.size]
+    def self.queue_for(entry_id, queues: nil)
+      queues ||= PROCESSING_QUEUES
+      queues[entry_id % queues.size]
     end
   end
 end

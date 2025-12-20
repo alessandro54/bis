@@ -16,6 +16,11 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
     }
   end
 
+  # Ensure character starts with a different class_slug to avoid intermittent test failures
+  before do
+    character.update!(class_slug: "warrior", class_id: 1)
+  end
+
   let(:raw_specialization)          { { "some" => "data" } }
   let(:specialization_processed_at) { nil }
 

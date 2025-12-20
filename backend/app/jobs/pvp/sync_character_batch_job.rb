@@ -3,31 +3,42 @@ module Pvp
     self.enqueue_after_transaction_commit = :always
     queue_as :character_sync
 
-    def perform(character_ids:, locale: "en_US")
-      Array(character_ids).each do |character_id|
-        result = Pvp::Characters::SyncCharacterService.call(
-          character: Character.find_by(id: character_id),
-          locale:    locale
-        )
+    def perform(character_ids:, locale: "en_US", processing_queues: nil)
+      ids = Array(character_ids).compact
+      return if ids.empty?
 
-        next if result.success?
+      parallelism = ENV.fetch("PVP_SYNC_BATCH_PARALLELISM", 2).to_i
+      parallelism = 1 if parallelism < 1
 
-        log_batch_error(character_id, result.error)
-        Pvp::SyncCharacterJob.perform_later(character_id: character_id, locale: locale)
-      rescue StandardError => e
-        log_batch_error(character_id, e)
-        Pvp::SyncCharacterJob.perform_later(character_id: character_id, locale: locale)
+      if parallelism == 1
+        ids.each do |character_id|
+          sync_one(character_id: character_id, locale: locale, processing_queues: processing_queues)
+        end
+        return
       end
+
+      work_queue = ::Queue.new
+      ids.each { |id| work_queue << id }
+
+      threads = Array.new(parallelism) do
+        Thread.new do
+          while (character_id = (work_queue.pop(true) rescue nil))
+            sync_one(character_id: character_id, locale: locale, processing_queues: processing_queues)
+          end
+        end
+      end
+
+      threads.each(&:join)
     end
 
     private
 
-      def log_batch_error(character_id, error)
-        Rails.logger.error(
-          "[SyncCharacterBatchJob] Error for character #{character_id}, will re-enqueue individual job: " \
-            "#{error.class}: #{error.message}"
+      def sync_one(character_id:, locale:, processing_queues: nil)
+        Pvp::SyncCharacterJob.perform_later(
+          character_id:      character_id,
+          locale:            locale,
+          processing_queues: processing_queues
         )
-        Rails.logger.error(error.backtrace&.first(10)&.join("\n")) if error.respond_to?(:backtrace)
       end
   end
 end

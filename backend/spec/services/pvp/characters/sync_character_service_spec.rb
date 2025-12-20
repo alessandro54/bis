@@ -174,19 +174,15 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
 
       it "enqueues processing jobs for each entry" do
         expect { call_service }
-          .to have_enqueued_job(Pvp::ProcessLeaderboardEntryJob).exactly(2).times
+          .to have_enqueued_job(Pvp::ProcessLeaderboardEntryBatchJob).exactly(1).times
       end
 
       it "assigns processing jobs to deterministic queues" do
         call_service
 
-        expect(Pvp::ProcessLeaderboardEntryJob)
+        expect(Pvp::ProcessLeaderboardEntryBatchJob)
           .to have_been_enqueued
-          .on_queue(Pvp::ProcessLeaderboardEntryJob.queue_for(entry_2v2.id))
-
-        expect(Pvp::ProcessLeaderboardEntryJob)
-          .to have_been_enqueued
-          .on_queue(Pvp::ProcessLeaderboardEntryJob.queue_for(entry_3v3.id))
+          .with(entry_ids: [ entry_2v2.id, entry_3v3.id ], locale: locale)
       end
     end
   end
