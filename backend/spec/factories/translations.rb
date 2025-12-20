@@ -22,8 +22,12 @@
 #
 FactoryBot.define do
   factory :translation do
-    locale { "MyString" }
-    name { "MyString" }
+    locale { "en_US" }
+    key { "name" }
     value { "MyText" }
+    meta { { "source" => "test" } }
+
+    # Polymorphic association - default to Item
+    association :translatable, factory: :item
   end
 end

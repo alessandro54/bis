@@ -21,8 +21,8 @@
 #
 FactoryBot.define do
   factory :item_translation do
-    item { nil }
-    locale { "MyString" }
+    item
+    locale { "en_US" }
     name { "MyString" }
     description { "MyString" }
   end

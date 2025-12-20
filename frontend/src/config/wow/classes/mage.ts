@@ -22,8 +22,8 @@ const MageConfig: WowClassConfig = {
     },
     {
       id: 64,
-      name: "frost-mage",
-      url: "/mage/frost-mage",
+      name: "frost",
+      url: "/mage/frost",
       iconUrl: "https://render.worldofwarcraft.com/us/icons/56/spell_frost_frostbolt02.jpg",
     },
   ],

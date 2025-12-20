@@ -21,11 +21,11 @@ RSpec.describe Pvp::Meta::ClassDistributionService do
         entry = create(
           :pvp_leaderboard_entry,
           pvp_leaderboard: leaderboard,
-          character: rogue,
-          spec_id: 259,
-          rating: 2400 + (i % 10),
-          wins: 80,
-          losses: 60
+          character:       rogue,
+          spec_id:         259,
+          rating:          2400 + (i % 10),
+          wins:            80,
+          losses:          60
         )
         relation = relation.or(PvpLeaderboardEntry.where(id: entry.id))
       end
@@ -35,11 +35,11 @@ RSpec.describe Pvp::Meta::ClassDistributionService do
         entry = create(
           :pvp_leaderboard_entry,
           pvp_leaderboard: leaderboard,
-          character: rogue,
-          spec_id: 260,
-          rating: 2550 + (i % 2),
-          wins: 90,
-          losses: 50
+          character:       rogue,
+          spec_id:         260,
+          rating:          2550 + (i % 2),
+          wins:            90,
+          losses:          50
         )
         relation = relation.or(PvpLeaderboardEntry.where(id: entry.id))
       end
@@ -49,11 +49,11 @@ RSpec.describe Pvp::Meta::ClassDistributionService do
         entry = create(
           :pvp_leaderboard_entry,
           pvp_leaderboard: leaderboard,
-          character: hunter,
-          spec_id: 254,
-          rating: 2300 + (i % 5),
-          wins: 70,
-          losses: 70
+          character:       hunter,
+          spec_id:         254,
+          rating:          2300 + (i % 5),
+          wins:            70,
+          losses:          70
         )
         relation = relation.or(PvpLeaderboardEntry.where(id: entry.id))
       end
@@ -95,11 +95,11 @@ RSpec.describe Pvp::Meta::ClassDistributionService do
       entry = create(
         :pvp_leaderboard_entry,
         pvp_leaderboard: leaderboard,
-        character: priest,
-        spec_id: 256, # discipline priest (healer)
-        rating: 2400,
-        wins: 80,
-        losses: 60
+        character:       priest,
+        spec_id:         256, # discipline priest (healer)
+        rating:          2400,
+        wins:            80,
+        losses:          60
       )
 
       relation = PvpLeaderboardEntry.where(id: entry.id)

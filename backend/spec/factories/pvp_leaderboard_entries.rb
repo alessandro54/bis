@@ -29,7 +29,8 @@
 #
 # Indexes
 #
-#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
+#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) \
+#    WHERE (equipment_processed_at IS NOT NULL)
 #  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
 #  index_pvp_entries_on_snapshot_at                        (snapshot_at)
 #  index_pvp_leaderboard_entries_on_character_id           (character_id)
@@ -50,8 +51,8 @@ FactoryBot.define do
 
     rank      { Faker::Number.between(from: 1, to: 3000) }
     rating    { Faker::Number.between(from: 1200, to: 3500) }
-    wins      { Faker::Number.between(from: 0, to: 500) }
-    losses    { Faker::Number.between(from: 0, to: 500) }
+    wins      { 0 }
+    losses    { 0 }
     snapshot_at { Time.current }
 
     item_level { Faker::Number.between(from: 450, to: 700) }
@@ -63,8 +64,8 @@ FactoryBot.define do
 
     tier_set_id           { Faker::Number.between(from: 1, to: 20) }
     tier_set_name         { "Set #{tier_set_id}" }
-    tier_set_pieces       { Faker::Number.between(from: 0, to: 4) }
-    tier_4p_active        { tier_set_pieces >= 4 }
+    tier_set_pieces       { 0 }
+    tier_4p_active        { false }
 
     trait :with_gear do
       index = (1..3).to_a.sample

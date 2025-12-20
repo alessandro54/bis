@@ -22,6 +22,7 @@ module Pvp
       Rails.logger.error(error_message)
 
       raise(result.error) if result.error.is_a?(Exception)
+
       raise(StandardError, error_message)
     end
 

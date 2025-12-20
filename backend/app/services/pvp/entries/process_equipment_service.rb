@@ -6,6 +6,7 @@ module Pvp
         @locale = locale
       end
 
+      # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def call
         return success(entry) if entry.equipment_processed_at.present?
 
@@ -37,11 +38,13 @@ module Pvp
       rescue => e
         failure(e)
       end
+      # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
       private
 
         attr_reader :entry, :locale
 
+        # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def rebuild_entry_items(processed_equipment)
           equipped_items =
             if processed_equipment.is_a?(Hash)
@@ -57,6 +60,7 @@ module Pvp
           item_records = []
           blizzard_item_ids = equipped_items.filter_map do |equipped|
             next unless equipped.is_a?(Hash)
+
             equipped.dig("item", "id")
           end.compact
 
@@ -80,19 +84,22 @@ module Pvp
 
             item_records << {
               pvp_leaderboard_entry_id: entry.id,
-              item_id: item_id,
-              slot: slot_type,
-              item_level: item_level,
-              context: context,
-              raw: equipped,
-              created_at: Time.current,
-              updated_at: Time.current
+              item_id:                  item_id,
+              slot:                     slot_type,
+              item_level:               item_level,
+              context:                  context,
+              raw:                      equipped,
+              created_at:               Time.current,
+              updated_at:               Time.current
             }
           end
 
           # Bulk insert all entry items
+          # rubocop:disable Rails/SkipsModelValidations
           PvpLeaderboardEntryItem.insert_all!(item_records) if item_records.any?
+          # rubocop:enable Rails/SkipsModelValidations
         end
+      # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
     end
   end
 end

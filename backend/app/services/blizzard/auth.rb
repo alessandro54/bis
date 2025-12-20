@@ -11,15 +11,19 @@ module Blizzard
     EXPIRY_SKEW_SECONDS = 60
 
     def initialize(
-      client_id: Rails.application.credentials.dig(:blizzard, :client_id),
-      client_secret: Rails.application.credentials.dig(:blizzard, :client_secret)
+      client_id: Rails.application.credentials.dig(:blizzard, :client_id) || ENV["BLIZZARD_CLIENT_ID"],
+      client_secret: Rails.application.credentials.dig(:blizzard, :client_secret) || ENV["BLIZZARD_CLIENT_SECRET"]
     )
       @client_id = client_id
       @client_secret = client_secret
 
       return unless @client_id.blank? || @client_secret.blank?
 
-      raise ArgumentError, "Blizzard client_id and client_secret must be provided"
+      raise ArgumentError,
+            "Blizzard client_id and client_secret must be provided. " \
+            "Set Rails credentials (blizzard.client_id / blizzard.client_secret) " \
+            "or ENV BLIZZARD_CLIENT_ID / BLIZZARD_CLIENT_SECRET. " \
+            "If using credentials in a worker process, ensure RAILS_MASTER_KEY is present."
     end
 
     def access_token
@@ -84,11 +88,18 @@ module Blizzard
       end
 
       def read_cache
-        Rails.cache.read(CACHE_KEY)
+        Rails.cache&.read(CACHE_KEY)
       end
 
       def write_cache(token, expires_at, expires_in)
-        Rails.cache.write(
+        cache = Rails.cache
+
+        unless cache
+          Rails.logger.warn("[Blizzard::Auth] Rails.cache is nil; skipping access token caching")
+          return
+        end
+
+        cache.write(
           CACHE_KEY,
           { token: token, expires_at: expires_at },
           expires_in: expires_in

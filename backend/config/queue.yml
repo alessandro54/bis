@@ -14,7 +14,7 @@ default: &default
     # Processing workers (CPU-bound: parsing equipment data)
     # Optimized for 2-core CPU: fewer threads to reduce context switching
     - queues: [pvp_processing_a, pvp_processing_b, pvp_processing_c, pvp_processing_d]
-      threads: <%= ENV.fetch("RAILS_ENV") == 'development' ? 32 : ENV.fetch("PVP_PROCESSING_THREADS", 4) %>
+      threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 4) %>
       processes: 1
       polling_interval: <%= ENV.fetch("PROCESSING_POLLING_INTERVAL", 0.5) %>
 

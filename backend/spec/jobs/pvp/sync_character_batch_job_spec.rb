@@ -12,7 +12,7 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
   let!(:character1) { create(:character) }
   let!(:character2) { create(:character) }
-  let(:character_ids) { [character1.id, character2.id] }
+  let(:character_ids) { [ character1.id, character2.id ] }
   let(:locale) { "en_US" }
 
   before do
@@ -25,24 +25,26 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
       .exactly(2).times
 
     expect(Pvp::SyncCharacterJob).to have_been_enqueued.with(
-      character_id: character1.id,
-      locale: locale
+      character_id:      character1.id,
+      locale:            locale,
+      processing_queues: nil
     )
 
     expect(Pvp::SyncCharacterJob).to have_been_enqueued.with(
-      character_id: character2.id,
-      locale: locale
+      character_id:      character2.id,
+      locale:            locale,
+      processing_queues: nil
     )
   end
 
   context "with a single character" do
-    let(:character_ids) { [character1.id] }
+    let(:character_ids) { [ character1.id ] }
 
     it "enqueues one SyncCharacterJob" do
       expect { perform_job }
         .to have_enqueued_job(Pvp::SyncCharacterJob)
-        .exactly(1).time
-        .with(character_id: character1.id, locale: locale)
+        .exactly(1).times
+        .with(character_id: character1.id, locale: locale, processing_queues: nil)
     end
   end
 end
