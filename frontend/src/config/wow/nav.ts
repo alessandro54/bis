@@ -1,10 +1,10 @@
-import { WOW_CLASSES, WowClassConfig } from "./classes";
+import { WOW_CLASSES, WowClassConfig, WowClassSlug } from "./classes";
 
 export type NavMainItem = {
   id: number;
   title: string;
   url: string;
-  slug: string;
+  slug: WowClassSlug;
   iconUrl: string;
   items: {
     id: number;
