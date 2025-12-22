@@ -107,7 +107,7 @@ jobs:
           bundle exec rspec --format progress --color
 
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v5
         with:
           directory: backend/coverage
           flags: backend
