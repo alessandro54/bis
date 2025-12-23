@@ -3,11 +3,10 @@ module Pvp
     class SyncCharacterService < ApplicationService
       DEFAULT_TTL_HOURS = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
 
-      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS, processing_queues: nil)
+      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS)
         @character = character
         @locale = locale
         @ttl_hours = ttl_hours
-        @processing_queues = processing_queues
       end
 
       def call

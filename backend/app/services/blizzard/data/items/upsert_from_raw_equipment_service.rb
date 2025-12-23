@@ -26,6 +26,7 @@ module Blizzard
           # Handle translations separately (translations are localized and may vary)
           # Reuse blizzard_ids from item_records to avoid re-extraction
           blizzard_ids = unique_item_records.map { |record| record[:blizzard_id] }
+
           upsert_translations(blizzard_ids)
         end
 
@@ -108,7 +109,7 @@ module Blizzard
               item = items_by_blizzard_id[blizzard_id]
               next unless item
 
-              item.set_translation("name", locale, name)
+              item.set_translation("name", locale, name, meta: { source: "blizzard", raw: raw_item })
             end
           end
       end

@@ -3,7 +3,7 @@ module Pvp
     self.enqueue_after_transaction_commit = :always
     queue_as :character_sync
 
-    def perform(character_ids:, locale: "en_US", processing_queues: nil)
+    def perform(character_ids:, locale: "en_US")
       ids = Array(character_ids).compact
       return if ids.empty?
 
@@ -12,7 +12,7 @@ module Pvp
 
       if parallelism == 1
         ids.each do |character_id|
-          sync_one(character_id: character_id, locale: locale, processing_queues: processing_queues)
+          sync_one(character_id: character_id, locale: locale)
         end
         return
       end
@@ -20,10 +20,14 @@ module Pvp
       work_queue = ::Queue.new
       ids.each { |id| work_queue << id }
 
-      threads = Array.new(parallelism) do
+      threads = Array.new(parallelism) do |i|
         Thread.new do
           while (character_id = (work_queue.pop(true) rescue nil))
-            sync_one(character_id: character_id, locale: locale, processing_queues: processing_queues)
+            sync_one(
+              character_id: character_id,
+              locale: locale,
+              queue: :"character_sync_#{i % 4}" # Distributes across 4 queues
+            )
           end
         end
       end
@@ -33,11 +37,10 @@ module Pvp
 
     private
 
-      def sync_one(character_id:, locale:, processing_queues: nil)
-        Pvp::SyncCharacterJob.perform_later(
-          character_id:      character_id,
-          locale:            locale,
-          processing_queues: processing_queues
+      def sync_one(character_id:, locale:, queue: :character_sync)
+        Pvp::SyncCharacterJob.set(queue: queue).perform_later(
+          character_id: character_id,
+          locale: locale
         )
       end
   end

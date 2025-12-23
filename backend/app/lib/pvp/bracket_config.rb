@@ -1,27 +1,21 @@
-# app/lib/pvp/bracket_config.rb
 module Pvp
   module BracketConfig
-    # Defaults por familia
     FAMILY_DEFAULTS = {
       two_v_two:     {
         rating_min:        2000,
         job_queue:         :pvp_sync_2v2,
-        processing_queues: %i[pvp_processing_a pvp_processing_b pvp_processing_c pvp_processing_d]
       },
       three_v_three: {
         rating_min:        2200,
         job_queue:         :pvp_sync_3v3,
-        processing_queues: %i[pvp_processing_a pvp_processing_b pvp_processing_c pvp_processing_d]
       },
       shuffle_like:  {
         rating_min:        2400,
         job_queue:         :pvp_sync_shuffle,
-        processing_queues: %i[pvp_processing_a pvp_processing_b pvp_processing_c pvp_processing_d]
       },
       rbg_like:      {
         rating_min:        2200,
-        job_queue:         :pvp_sync_rbg,
-        processing_queues: %i[pvp_processing_a pvp_processing_b pvp_processing_c pvp_processing_d]
+        job_queue:         :pvp_sync_rbg
       }
     }.freeze
 
@@ -35,25 +29,18 @@ module Pvp
     module_function
 
     def for(bracket)
-      # 1) override explícito si existe
       return EXPLICIT[bracket] if EXPLICIT.key?(bracket)
 
-      # 2) asignar familia según el nombre de la *queue* (bracket Blizzard)
       family_key =
         case bracket
         when "2v2"
           :two_v_two
         when "3v3"
           :three_v_three
-
-          # Shuffle-like
         when "shuffle-overall", /\Ashuffle-/
           :shuffle_like
-
-          # RBG + Blitz-like
         when "rbg", "blitz-overall", /\Ablitz-/
           :rbg_like
-
         else
           nil
         end

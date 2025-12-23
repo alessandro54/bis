@@ -10,9 +10,8 @@ module Pvp
 
     def perform(character_id:, locale: "en_US", processing_queues: nil)
       result = Pvp::Characters::SyncCharacterService.call(
-        character:         Character.find_by(id: character_id),
-        locale:            locale,
-        processing_queues: processing_queues
+        character: Character.find_by(id: character_id),
+        locale:    locale
       )
 
       return if result.success?
