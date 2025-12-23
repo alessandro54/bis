@@ -29,8 +29,7 @@
 #
 # Indexes
 #
-#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at)
-#    WHERE (equipment_processed_at IS NOT NULL)
+#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
 #  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
 #  index_pvp_entries_on_snapshot_at                        (snapshot_at)
 #  index_pvp_leaderboard_entries_on_character_id           (character_id)
