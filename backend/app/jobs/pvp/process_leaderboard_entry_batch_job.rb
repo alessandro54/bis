@@ -20,8 +20,10 @@ module Pvp
 
       threads = Array.new(parallelism) do
         Thread.new do
-          while (entry_id = (work_queue.pop(true) rescue nil))
-            process_one(entry_id: entry_id, locale: locale)
+          ActiveRecord::Base.connection_pool.with_connection do
+            while (entry_id = (work_queue.pop(true) rescue nil))
+              process_one(entry_id: entry_id, locale: locale)
+            end
           end
         end
       end

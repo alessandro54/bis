@@ -9,12 +9,17 @@ module Pvp
       return unless season
 
       BRACKETS.each do |bracket|
-        SyncLeaderboardJob.perform_later(
-          region:  region,
-          season:  season,
-          bracket: bracket,
-          locale:  locale
-        )
+        bracket_config = Pvp::BracketConfig.for(bracket)
+        queue = bracket_config&.dig(:job_queue) || :default
+
+        SyncLeaderboardJob
+          .set(queue: queue)
+          .perform_later(
+            region:  region,
+            season:  season,
+            bracket: bracket,
+            locale:  locale
+          )
       end
     end
   end
