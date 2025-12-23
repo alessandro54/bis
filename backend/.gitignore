@@ -45,3 +45,5 @@
 /public
 
 /spec/examples.txt
+
+rspec_failures.txt

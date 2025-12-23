@@ -4,6 +4,12 @@ default: &default
       batch_size: <%= ENV.fetch("DISPATCHER_BATCH_SIZE", 100) %>
 
   workers:
+    # Multiple dedicated workers for character_sync queues (4x parallelization)
+    - queues: [character_sync_a, character_sync_b, character_sync_c, character_sync_d]
+      threads: <%= ENV.fetch("CHARACTER_SYNC_THREADS", 4) %>
+      processes: 1
+      polling_interval: <%= ENV.fetch("CHARACTER_SYNC_POLLING_INTERVAL", 0.2) %>
+
     # Dedicated workers for character sync jobs (I/O-bound: API calls)
     # Optimized for 2-core CPU: reduced threads to avoid contention
     - queues: [pvp_sync_2v2, pvp_sync_3v3, pvp_sync_rbg, pvp_sync_shuffle]
@@ -13,7 +19,7 @@ default: &default
 
     # Processing workers (CPU-bound: parsing equipment data)
     # Optimized for 2-core CPU: fewer threads to reduce context switching
-    - queues: [pvp_processing_a, pvp_processing_b, pvp_processing_c, pvp_processing_d]
+    - queues: [pvp_processing]
       threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 4) %>
       processes: 1
       polling_interval: <%= ENV.fetch("PROCESSING_POLLING_INTERVAL", 0.5) %>
