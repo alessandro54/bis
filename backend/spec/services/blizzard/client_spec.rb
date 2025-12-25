@@ -37,8 +37,18 @@ RSpec.describe Blizzard::Client do
     let(:extra_params) { { "page" => 2 } }
 
     before do
-      # Stub de HTTPX.with para que devuelva nuestro double
-      allow(HTTPX).to receive(:with).and_return(http_double)
+      # Clear thread-local cache
+      Thread.current[:blizzard_http_client] = nil
+
+      # Stub HTTPX plugin chain to return our double
+      plugin_chain = double("HTTPX::PluginChain")
+      allow(HTTPX).to receive(:plugin).with(:persistent).and_return(plugin_chain)
+      allow(plugin_chain).to receive(:plugin).and_return(plugin_chain)
+      allow(plugin_chain).to receive(:with).and_return(http_double)
+    end
+
+    after do
+      Thread.current[:blizzard_http_client] = nil
     end
 
     it "builds the correct URL, query params and headers, and parses a successful JSON response" do

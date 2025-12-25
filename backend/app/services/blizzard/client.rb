@@ -54,13 +54,17 @@ module Blizzard
     private
 
       def http_client
-        @http_client ||= HTTPX.with(
-          timeout: {
-            connect_timeout:   5,
-            operation_timeout: 10
-          }
-          # debug: $stdout   # enable if needed
-        )
+        # Use thread-local persistent connection pool for better performance
+        # This reuses TCP connections across requests
+        Thread.current[:blizzard_http_client] ||= HTTPX
+          .plugin(:persistent)
+          .plugin(:retries, retry_on: ->(res) { res.is_a?(HTTPX::ErrorResponse) }, max_retries: 2)
+          .with(
+            timeout: {
+              connect_timeout:   5,
+              operation_timeout: 10
+            }
+          )
       end
 
       def build_url(path)

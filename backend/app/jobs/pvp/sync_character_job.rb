@@ -3,7 +3,6 @@ module Pvp
     self.enqueue_after_transaction_commit = :always
     queue_as :character_sync
 
-    # Retry on API errors with exponential backoff (network issues, rate limits, etc.)
     retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
       Rails.logger.warn("[SyncCharacterJob] API error, will retry: #{error.message}")
     end

@@ -136,7 +136,10 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
         expect(created.slot).to eq("HEAD")
         expect(created.item_level).to eq(540)
         expect(created.context).to eq("some_context")
-        expect(created.raw).to eq(raw_equipment["equipped_items"].first)
+        # Raw now contains the processed structure with item_id
+        expect(created.raw["blizzard_id"]).to eq(blizzard_item_id)
+        expect(created.raw["item_id"]).to eq(item.id)
+        expect(created.raw["item_level"]).to eq(540)
       end
     end
 

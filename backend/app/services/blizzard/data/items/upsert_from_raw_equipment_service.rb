@@ -5,12 +5,12 @@ module Blizzard
         EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
 
         def call
-          return if items.empty?
+          return { "equipped_items" => {} } if items.empty?
 
           # Bulk upsert all items at once for better performance
           item_records = items.filter_map { |raw_item| build_item_record(raw_item) }
 
-          return if item_records.empty?
+          return { "equipped_items" => {} } if item_records.empty?
 
           unique_item_records = item_records.uniq { |record| record[:blizzard_id] }
 
@@ -24,10 +24,30 @@ module Blizzard
           # rubocop:enable Rails/SkipsModelValidations
 
           # Handle translations separately (translations are localized and may vary)
-          # Reuse blizzard_ids from item_records to avoid re-extraction
           blizzard_ids = unique_item_records.map { |record| record[:blizzard_id] }
-
           upsert_translations(blizzard_ids)
+
+          # Fetch internal item IDs for the mapping
+          items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).pluck(:blizzard_id, :id).to_h
+
+          # Build slot -> item mapping with all relevant data
+          equipped_items = {}
+          items.each do |raw_item|
+            slot = raw_item.dig("slot", "type")&.downcase
+            blizzard_id = extract_blizzard_id(raw_item)
+            next unless slot && blizzard_id
+
+            equipped_items[slot] = {
+              "blizzard_id" => blizzard_id,
+              "item_id" => items_by_blizzard_id[blizzard_id],
+              "item_level" => raw_item.dig("level", "value"),
+              "name" => raw_item["name"],
+              "quality" => raw_item.dig("quality", "type")&.downcase,
+              "context" => raw_item["context"]
+            }
+          end
+
+          { "equipped_items" => equipped_items }
         end
 
         def self.call(raw_equipment:, locale: "en_US")
@@ -124,7 +144,7 @@ module Blizzard
 
             # Deduplicate by unique constraint columns to avoid CardinalityViolation
             unique_records = translation_records.uniq do |r|
-              [r[:translatable_type], r[:translatable_id], r[:locale], r[:key]]
+              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
             end
 
             # Bulk upsert all translations in one query instead of N individual saves

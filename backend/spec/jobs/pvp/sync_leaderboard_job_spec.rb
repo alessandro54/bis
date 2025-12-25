@@ -189,7 +189,7 @@ RSpec.describe Pvp::SyncLeaderboardJob, type: :job do
         api_response["entries"] = []
 
         # Create many entries to test batch slicing - all above 2000 rating
-        600.times do |i|
+        250.times do |i|
           api_response["entries"] << {
             "character" => {
               "id" => 100_000 + i,
@@ -204,13 +204,13 @@ RSpec.describe Pvp::SyncLeaderboardJob, type: :job do
         end
       end
 
-      it "enqueues batch jobs in chunks of 500" do
+      it "enqueues batch jobs in chunks of 100" do
         perform_job
 
-        # 600 characters / 500 = 2 batch jobs
+        # 250 characters / 100 = 3 batch jobs
         expect(Pvp::SyncCharacterBatchJob)
           .to have_been_enqueued
-          .at_least(2).times
+          .at_least(3).times
       end
     end
   end

@@ -17,7 +17,8 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
           "item_class" => { "name" => "Armor" },
           "item_subclass" => { "name" => "Plate" },
           "media" => { "id" => 111 },
-          "quality" => { "type" => "EPIC" }
+          "quality" => { "type" => "EPIC" },
+          "context" => "raid-normal"
         },
         {
           "item" => { "id" => 67_890 },
@@ -28,7 +29,8 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
           "item_class" => { "name" => "Armor" },
           "item_subclass" => { "name" => "Plate" },
           "media" => { "id" => 222 },
-          "quality" => { "type" => "EPIC" }
+          "quality" => { "type" => "EPIC" },
+          "context" => "raid-heroic"
         }
       ]
     }
@@ -43,6 +45,26 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
       expect(item.inventory_type).to eq("head")
       expect(item.item_class).to eq("armor")
       expect(item.item_subclass).to eq("plate")
+    end
+
+    it "returns a hash with slot -> item mapping" do
+      result = service.call
+
+      expect(result).to be_a(Hash)
+      expect(result["equipped_items"]).to be_a(Hash)
+      expect(result["equipped_items"].keys).to contain_exactly("head", "chest")
+    end
+
+    it "includes item_id in the returned structure" do
+      result = service.call
+
+      head_item = result["equipped_items"]["head"]
+      expect(head_item["blizzard_id"]).to eq(12_345)
+      expect(head_item["item_id"]).to eq(Item.find_by(blizzard_id: 12_345).id)
+      expect(head_item["item_level"]).to eq(540)
+      expect(head_item["name"]).to eq("Helm of Valor")
+      expect(head_item["quality"]).to eq("epic")
+      expect(head_item["context"]).to eq("raid-normal")
     end
 
     it "upserts translations in bulk" do
@@ -142,8 +164,10 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
     context "with empty equipped_items" do
       let(:raw_equipment) { { "equipped_items" => [] } }
 
-      it "returns early without errors" do
-        expect { service.call }.not_to raise_error
+      it "returns empty hash structure without errors" do
+        result = service.call
+
+        expect(result).to eq({ "equipped_items" => {} })
         expect(Item.count).to eq(0)
       end
     end

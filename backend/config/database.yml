@@ -24,12 +24,12 @@ development:
   primary:
     <<: *default
     database: wow_bis_development
-    pool: <%= ENV.fetch("DB_POOL", 20) %>
+    pool: <%= ENV.fetch("DB_POOL", 25) %>
   queue:
     <<: *default
     database: wow_bis_development_queue
     migrations_paths: db/queue_migrate
-    pool: <%= ENV.fetch("DB_POOL", 20) %>
+    pool: <%= ENV.fetch("DB_POOL", 25) %>
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.
