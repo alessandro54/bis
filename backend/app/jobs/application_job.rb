@@ -2,7 +2,7 @@
 class ApplicationJob < ActiveJob::Base
   # Automatically retry jobs that encountered a deadlock with exponential backoff
   # This prevents queue pollution and allows database to recover from contention
-  retry_on ActiveRecord::Deadlocked, wait: :exponentially_longer, attempts: 5
+  retry_on ActiveRecord::Deadlocked, wait: :polynomially_longer, attempts: 5
 
   # Most jobs are safe to ignore if the underlying records are no longer available
   # This prevents jobs from failing permanently when records are deleted during processing

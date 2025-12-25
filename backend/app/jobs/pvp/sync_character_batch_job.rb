@@ -3,54 +3,70 @@ module Pvp
     self.enqueue_after_transaction_commit = :always
     queue_as :character_sync
 
-    SYNC_QUEUES = %i[
-      character_sync_a
-      character_sync_b
-      character_sync_c
-      character_sync_d
-    ].freeze
+    # Retry on API errors with exponential backoff
+    retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|
+      Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
+    end
 
     def perform(character_ids:, locale: "en_US")
       ids = Array(character_ids).compact
       return if ids.empty?
 
-      parallelism = ENV.fetch("PVP_SYNC_BATCH_PARALLELISM", 2).to_i
-      parallelism = 1 if parallelism < 1
+      # Preload all non-private characters in one query
+      # Filter out private characters early to avoid unnecessary processing
+      characters_by_id = Character
+        .where(id: ids)
+        .where(is_private: false)
+        .index_by(&:id)
 
-      if parallelism == 1
-        ids.each do |character_id|
-          sync_one(character_id: character_id, locale: locale)
-        end
-        return
+      return if characters_by_id.empty?
+
+      # Collect all entry IDs that need processing
+      all_entry_ids = []
+
+      # Process sequentially - parallelism is achieved via multiple batch jobs
+      # Threading within a job causes connection pool exhaustion
+      characters_by_id.each_value do |character|
+        entry_ids = sync_one(character: character, locale: locale)
+        all_entry_ids.concat(entry_ids) if entry_ids.present?
       end
 
-      work_queue = ::Queue.new
-      ids.each { |id| work_queue << id }
-
-      threads = Array.new(parallelism) do |i|
-        Thread.new do
-          ActiveRecord::Base.connection_pool.with_connection do
-            while (character_id = (work_queue.pop(true) rescue nil))
-              sync_one(
-                character_id: character_id,
-                locale: locale,
-                queue: SYNC_QUEUES[character_id % SYNC_QUEUES.size]
-              )
-            end
-          end
-        end
+      # Enqueue a single batch job for all entries instead of one per character
+      if all_entry_ids.any?
+        Pvp::ProcessLeaderboardEntryBatchJob.perform_later(
+          entry_ids: all_entry_ids,
+          locale:    locale
+        )
       end
-
-      threads.each(&:join)
     end
 
     private
 
-      def sync_one(character_id:, locale:, queue: :character_sync)
-        Pvp::SyncCharacterJob.set(queue: queue).perform_later(
-          character_id: character_id,
-          locale: locale
+      # Returns array of entry IDs that need processing, or nil
+      def sync_one(character:, locale:)
+        return unless character
+
+        result = Pvp::Characters::SyncCharacterService.call(
+          character:          character,
+          locale:             locale,
+          enqueue_processing: false  # Don't enqueue individually, we'll batch them
         )
+
+        return unless result.success?
+
+        # Return entry IDs if fresh snapshot was applied
+        result.context[:entry_ids_to_process]
+      rescue Blizzard::Client::Error => e
+        # Log but don't raise - let other characters in batch continue processing
+        Rails.logger.warn(
+          "[SyncCharacterBatchJob] API error for character #{character&.id}: #{e.message}"
+        )
+        nil
+      rescue => e
+        Rails.logger.error(
+          "[SyncCharacterBatchJob] Unexpected error for character #{character&.id}: #{e.class}: #{e.message}"
+        )
+        nil
       end
   end
 end

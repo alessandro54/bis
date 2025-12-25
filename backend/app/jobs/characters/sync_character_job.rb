@@ -10,7 +10,7 @@ module Characters
     queue_as :character_sync
 
     # Retry on API errors with exponential backoff (network issues, rate limits, etc.)
-    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
+    retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |job, error|
       Rails.logger.warn("[Characters::SyncCharacterJob] API error, will retry: #{error.message}")
     end
 

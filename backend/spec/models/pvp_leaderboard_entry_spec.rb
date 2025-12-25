@@ -28,6 +28,7 @@
 #
 # Indexes
 #
+#  index_entries_for_reusable_snapshot_lookup              (character_id,equipment_processed_at DESC) WHERE ((equipment_processed_at IS NOT NULL) AND (specialization_processed_at IS NOT NULL) AND (raw_equipment IS NOT NULL) AND (raw_specialization IS NOT NULL))
 #  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
 #  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
 #  index_pvp_entries_on_snapshot_at                        (snapshot_at)

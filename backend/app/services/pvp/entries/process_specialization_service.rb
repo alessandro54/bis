@@ -35,13 +35,17 @@ module Pvp
             raw_specialization:          spec_service.talents
           )
 
+          # Only update character if class info is missing or changed
           if spec_service.class_slug.present?
             normalized_slug = spec_service.class_slug.to_s.downcase.strip.gsub(" ", "_")
+            character = entry.character
 
-            entry.character.update!(
-              class_slug: normalized_slug,
-              class_id:   class_id
-            )
+            if character.class_slug != normalized_slug || character.class_id != class_id
+              character.update!(
+                class_slug: normalized_slug,
+                class_id:   class_id
+              )
+            end
           end
         end
 

@@ -35,9 +35,8 @@ RSpec.describe Pvp::SyncCharacterJob, type: :job do
       perform_job
 
       expect(Pvp::Characters::SyncCharacterService).to have_received(:call).with(
-        character:         character,
-        locale:            locale,
-        processing_queues: nil
+        character: character,
+        locale:    locale
       )
     end
   end

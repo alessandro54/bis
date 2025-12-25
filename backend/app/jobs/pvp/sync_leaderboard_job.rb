@@ -95,8 +95,28 @@ module Pvp
             PvpLeaderboardEntry.insert_all!(entry_records)
             # rubocop:enable Rails/SkipsModelValidations
 
+            # Filter out characters that were recently synced to avoid duplicate API calls
+            # Same character can appear in multiple brackets, no need to sync them again
+            all_character_ids = character_ids.values
+            recently_synced_ids = PvpLeaderboardEntry
+              .where(character_id: all_character_ids)
+              .where("equipment_processed_at > ?", 1.hour.ago)
+              .distinct
+              .pluck(:character_id)
+              .to_set
+
+            characters_to_sync = all_character_ids.reject { |id| recently_synced_ids.include?(id) }
+
+            skipped_count = all_character_ids.size - characters_to_sync.size
+            Rails.logger.info(
+              "[SyncLeaderboardJob] #{bracket}: " \
+              "#{characters_to_sync.size} characters to sync, " \
+              "#{skipped_count} skipped (recently synced)"
+            )
+
             # Enqueue character sync jobs in batches to reduce queue write overhead
-            character_ids.values.each_slice(200) do |character_id_batch|
+            # Using 500 per batch for optimal balance between parallelism and overhead
+            characters_to_sync.each_slice(500) do |character_id_batch|
               Pvp::SyncCharacterBatchJob
                 .set(queue: job_queue)
                 .perform_later(

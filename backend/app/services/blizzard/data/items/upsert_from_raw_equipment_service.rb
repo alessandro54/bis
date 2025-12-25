@@ -98,19 +98,42 @@ module Blizzard
             # Batch fetch items that need translations
             return if blizzard_ids.empty?
 
-            items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).index_by(&:blizzard_id)
+            items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).pluck(:blizzard_id, :id).to_h
+            now = Time.current
 
-            items.each do |raw_item|
+            translation_records = items.filter_map do |raw_item|
               blizzard_id = extract_blizzard_id(raw_item)
               name = raw_item.dig("name")
+              item_id = items_by_blizzard_id[blizzard_id]
 
-              next unless blizzard_id && name.present?
+              next unless blizzard_id && name.present? && item_id
 
-              item = items_by_blizzard_id[blizzard_id]
-              next unless item
-
-              item.set_translation("name", locale, name, meta: { source: "blizzard", raw: raw_item })
+              {
+                translatable_type: "Item",
+                translatable_id:   item_id,
+                key:               "name",
+                locale:            locale,
+                value:             name,
+                meta:              { source: "blizzard" },
+                created_at:        now,
+                updated_at:        now
+              }
             end
+
+            return if translation_records.empty?
+
+            # Deduplicate by unique constraint columns to avoid CardinalityViolation
+            unique_records = translation_records.uniq do |r|
+              [r[:translatable_type], r[:translatable_id], r[:locale], r[:key]]
+            end
+
+            # Bulk upsert all translations in one query instead of N individual saves
+            # rubocop:disable Rails/SkipsModelValidations
+            Translation.upsert_all(
+              unique_records,
+              unique_by: %i[translatable_type translatable_id locale key]
+            )
+            # rubocop:enable Rails/SkipsModelValidations
           end
       end
     end

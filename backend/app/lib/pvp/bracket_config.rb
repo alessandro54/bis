@@ -2,20 +2,20 @@ module Pvp
   module BracketConfig
     FAMILY_DEFAULTS = {
       two_v_two:     {
-        rating_min:        2000,
-        job_queue:         :pvp_sync_2v2,
+        rating_min: 2000,
+        job_queue:  :pvp_sync_2v2
       },
       three_v_three: {
-        rating_min:        2200,
-        job_queue:         :pvp_sync_3v3,
+        rating_min: 2200,
+        job_queue:  :pvp_sync_3v3
       },
       shuffle_like:  {
-        rating_min:        2400,
-        job_queue:         :pvp_sync_shuffle,
+        rating_min: 2400,
+        job_queue:  :pvp_sync_shuffle
       },
       rbg_like:      {
-        rating_min:        2200,
-        job_queue:         :pvp_sync_rbg
+        rating_min: 2200,
+        job_queue:  :pvp_sync_rbg
       }
     }.freeze
 
