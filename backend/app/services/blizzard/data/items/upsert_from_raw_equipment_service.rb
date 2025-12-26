@@ -3,7 +3,9 @@ module Blizzard
     module Items
       class UpsertFromRawEquipmentService
         EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
+        ITEM_CACHE_TTL = 1.hour
 
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def call
           return { "equipped_items" => {} } if items.empty?
 
@@ -27,8 +29,8 @@ module Blizzard
           blizzard_ids = unique_item_records.map { |record| record[:blizzard_id] }
           upsert_translations(blizzard_ids)
 
-          # Fetch internal item IDs for the mapping
-          items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).pluck(:blizzard_id, :id).to_h
+          # Fetch internal item IDs - use cache to avoid repeated DB queries
+          items_by_blizzard_id = fetch_item_ids_with_cache(blizzard_ids)
 
           # Build slot -> item mapping with all relevant data
           equipped_items = {}
@@ -49,6 +51,7 @@ module Blizzard
 
           { "equipped_items" => equipped_items }
         end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
         def self.call(raw_equipment:, locale: "en_US")
           new(raw_equipment:, locale:).call
@@ -96,6 +99,35 @@ module Blizzard
 
           attr_reader :items, :locale
 
+          # Fetch item IDs with caching to reduce DB queries
+          # Items rarely change, so we can cache the blizzard_id -> id mapping
+          def fetch_item_ids_with_cache(blizzard_ids)
+            return {} if blizzard_ids.empty?
+
+            result = {}
+            uncached_ids = []
+
+            # Check cache first
+            blizzard_ids.each do |blz_id|
+              cached = Rails.cache.read("item:blz:#{blz_id}")
+              if cached
+                result[blz_id] = cached
+              else
+                uncached_ids << blz_id
+              end
+            end
+
+            # Fetch uncached from DB and populate cache
+            if uncached_ids.any?
+              Item.where(blizzard_id: uncached_ids).pluck(:blizzard_id, :id).each do |blz_id, id|
+                result[blz_id] = id
+                Rails.cache.write("item:blz:#{blz_id}", id, expires_in: ITEM_CACHE_TTL)
+              end
+            end
+
+            result
+          end
+
           def extract_blizzard_id(raw_item)
             raw_item.dig("item", "id")
           end
@@ -114,6 +146,7 @@ module Blizzard
             }
           end
 
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           def upsert_translations(blizzard_ids)
             # Batch fetch items that need translations
             return if blizzard_ids.empty?
@@ -155,6 +188,7 @@ module Blizzard
             )
             # rubocop:enable Rails/SkipsModelValidations
           end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
       end
     end
   end

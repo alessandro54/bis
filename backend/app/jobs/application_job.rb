@@ -18,7 +18,14 @@ class ApplicationJob < ActiveJob::Base
   # Add performance monitoring to all jobs
   around_perform :monitor_performance
 
+  # Enable query cache for all jobs - caches repeated SELECT queries within a job
+  around_perform :with_query_cache
+
   private
+
+    def with_query_cache(&block)
+      ActiveRecord::Base.cache(&block)
+    end
 
     def monitor_performance(&block)
       start_time = Time.current

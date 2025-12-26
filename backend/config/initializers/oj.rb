@@ -14,4 +14,3 @@ Oj.default_options = {
   allow_blank:      true,         # Allow nil/empty input
   second_precision: 3             # Millisecond precision for Time objects
 }
-

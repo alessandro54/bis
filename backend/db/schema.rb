@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_12_25_031750) do
+ActiveRecord::Schema[8.1].define(version: 2025_12_26_182800) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -75,8 +75,8 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_25_031750) do
     t.bigint "pvp_leaderboard_id", null: false
     t.integer "rank"
     t.integer "rating"
-    t.jsonb "raw_equipment"
-    t.jsonb "raw_specialization"
+    t.binary "raw_equipment"
+    t.binary "raw_specialization"
     t.datetime "snapshot_at"
     t.integer "spec_id"
     t.datetime "specialization_processed_at"
@@ -86,11 +86,13 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_25_031750) do
     t.integer "tier_set_pieces"
     t.datetime "updated_at", null: false
     t.integer "wins", default: 0
-    t.index ["character_id", "equipment_processed_at"], name: "index_entries_for_reusable_snapshot_lookup", order: { equipment_processed_at: :desc }, where: "((equipment_processed_at IS NOT NULL) AND (specialization_processed_at IS NOT NULL) AND (raw_equipment IS NOT NULL) AND (raw_specialization IS NOT NULL))"
     t.index ["character_id", "equipment_processed_at"], name: "index_pvp_entries_on_character_and_equipment_processed", where: "(equipment_processed_at IS NOT NULL)"
     t.index ["character_id", "snapshot_at"], name: "index_pvp_entries_on_character_and_snapshot"
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
+    t.index ["id", "equipment_processed_at"], name: "index_entries_for_batch_processing"
+    t.index ["pvp_leaderboard_id", "rating"], name: "index_entries_on_leaderboard_and_rating"
+    t.index ["pvp_leaderboard_id", "spec_id", "rating"], name: "index_entries_for_spec_meta"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
     t.index ["snapshot_at"], name: "index_pvp_entries_on_snapshot_at"

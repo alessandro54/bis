@@ -30,26 +30,10 @@ RSpec.describe Blizzard::Client do
     let(:region) { "us" }
     let(:locale) { "en_US" }
     let(:client) { described_class.new(region: region, locale: locale, auth: auth_double) }
-    let(:http_double) { instance_double("HTTPX::Session") }
 
     let(:path) { "/data/wow/pvp-season/37/pvp-leaderboard/3v3" }
     let(:namespace) { "dynamic-us" }
     let(:extra_params) { { "page" => 2 } }
-
-    before do
-      # Clear thread-local cache
-      Thread.current[:blizzard_http_client] = nil
-
-      # Stub HTTPX plugin chain to return our double
-      plugin_chain = double("HTTPX::PluginChain")
-      allow(HTTPX).to receive(:plugin).with(:persistent).and_return(plugin_chain)
-      allow(plugin_chain).to receive(:plugin).and_return(plugin_chain)
-      allow(plugin_chain).to receive(:with).and_return(http_double)
-    end
-
-    after do
-      Thread.current[:blizzard_http_client] = nil
-    end
 
     it "builds the correct URL, query params and headers, and parses a successful JSON response" do
       response_body = { "ok" => true, "data" => [ 1, 2, 3 ] }.to_json
@@ -65,7 +49,8 @@ RSpec.describe Blizzard::Client do
         locale:    locale
       }.merge(extra_params)
 
-      expect(http_double).to receive(:get).with(
+      # Stub the shared HTTP_CLIENT constant
+      allow(Blizzard::Client::HTTP_CLIENT).to receive(:get).with(
         expected_url,
         params:  expected_query,
         headers: { Authorization: "Bearer fake-token" }
@@ -83,7 +68,7 @@ RSpec.describe Blizzard::Client do
         body:   double("body", to_s: "Not Found")
       )
 
-      allow(http_double).to receive(:get).and_return(response_double)
+      allow(Blizzard::Client::HTTP_CLIENT).to receive(:get).and_return(response_double)
 
       expect {
         client.get(path, namespace: namespace)
@@ -100,7 +85,7 @@ RSpec.describe Blizzard::Client do
         body:   double("body", to_s: "this is not json")
       )
 
-      allow(http_double).to receive(:get).and_return(response_double)
+      allow(Blizzard::Client::HTTP_CLIENT).to receive(:get).and_return(response_double)
 
       expect {
         client.get(path, namespace: namespace)

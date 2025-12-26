@@ -134,7 +134,7 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
 
   context "when an unexpected error happens" do
     before do
-      allow(entry).to receive(:update!).and_raise(StandardError.new("boom"))
+      allow(entry).to receive(:update_columns).and_raise(StandardError.new("boom"))
     end
 
     it "returns a failure with the exception as error" do

@@ -204,13 +204,17 @@ RSpec.describe Pvp::SyncLeaderboardJob, type: :job do
         end
       end
 
-      it "enqueues batch jobs in chunks of 100" do
+      it "enqueues batch jobs in chunks of configured batch size" do
+        # Get the configured batch size (defaults to 50)
+        batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+        expected_batches = (250.0 / batch_size).ceil
+
         perform_job
 
-        # 250 characters / 100 = 3 batch jobs
+        # Verify batch jobs are enqueued based on configured batch size
         expect(Pvp::SyncCharacterBatchJob)
           .to have_been_enqueued
-          .at_least(3).times
+          .at_least(expected_batches).times
       end
     end
   end

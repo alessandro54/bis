@@ -30,8 +30,17 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
   end
 
   describe "#call" do
-    context "when equipment is already processed" do
-      let(:equipment_processed_at) { Time.current }
+    context "when equipment is already processed within TTL" do
+      # Use a time within the default 1-hour TTL
+      let(:equipment_processed_at) { 30.minutes.ago }
+
+      before do
+        # Ensure TTL is 1 hour for this test (dev .env sets it to 0)
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("EQUIPMENT_PROCESS_TTL_HOURS", 1).and_return(1)
+        # Remove the default mock setup for this context
+        RSpec::Mocks.space.proxy_for(Blizzard::Data::Items::UpsertFromRawEquipmentService).reset
+      end
 
       it "returns success and does not call the Blizzard equipment service" do
         expect(Blizzard::Data::Items::UpsertFromRawEquipmentService).not_to receive(:new)
@@ -39,7 +48,6 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
         res = result
 
         expect(res).to be_success
-        # si tu ServiceResult expone `payload`, comprueba:
         expect(res.payload).to eq(entry) if res.respond_to?(:payload)
       end
     end

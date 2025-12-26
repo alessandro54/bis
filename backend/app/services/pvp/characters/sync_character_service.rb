@@ -10,6 +10,7 @@ module Pvp
         @enqueue_processing = enqueue_processing
       end
 
+      # rubocop:disable Metrics/AbcSize
       def call
         return success(nil, context: { status: :not_found }) unless character
         return success(nil, context: { status: :skipped_private }) if character.is_private
@@ -33,6 +34,7 @@ module Pvp
       rescue => e
         failure(e)
       end
+      # rubocop:enable Metrics/AbcSize
 
       private
 
@@ -53,15 +55,17 @@ module Pvp
             snapshot.specialization_processed_at.present?
         end
 
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def reuse_snapshot_for_entries(snapshot, entries)
           entry_ids = entries.map(&:id)
           return if entry_ids.empty?
 
           # Bulk update all entries at once instead of N individual updates
+          # Use read_attribute to get raw compressed bytes directly (avoid decompress/recompress)
           # rubocop:disable Rails/SkipsModelValidations
           PvpLeaderboardEntry.where(id: entry_ids).update_all(
-            raw_equipment:               snapshot.raw_equipment,
-            raw_specialization:          snapshot.raw_specialization,
+            raw_equipment:               snapshot.read_attribute(:raw_equipment),
+            raw_specialization:          snapshot.read_attribute(:raw_specialization),
             item_level:                  snapshot.item_level,
             tier_set_id:                 snapshot.tier_set_id,
             tier_set_name:               snapshot.tier_set_name,
@@ -81,6 +85,7 @@ module Pvp
             "for #{entry_ids.size} entries: #{entry_ids.join(', ')}"
           )
         end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
         def apply_fresh_snapshot(entries, equipment_json, talents_json)
           entry_ids = entries.map(&:id)
@@ -92,10 +97,11 @@ module Pvp
           )
 
           # Bulk update all entries at once instead of N individual updates
+          # Compress JSON data for storage efficiency
           # rubocop:disable Rails/SkipsModelValidations
           PvpLeaderboardEntry.where(id: entry_ids).update_all(
-            raw_equipment:      equipment_json,
-            raw_specialization: talents_json,
+            raw_equipment:      PvpLeaderboardEntry.compress_json_value(equipment_json),
+            raw_specialization: PvpLeaderboardEntry.compress_json_value(talents_json),
             updated_at:         Time.current
           )
           # rubocop:enable Rails/SkipsModelValidations

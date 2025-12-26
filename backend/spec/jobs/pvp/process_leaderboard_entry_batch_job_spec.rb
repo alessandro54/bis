@@ -10,8 +10,9 @@ RSpec.describe Pvp::ProcessLeaderboardEntryBatchJob, type: :job do
     )
   end
 
-  let!(:entry1) { create(:pvp_leaderboard_entry) }
-  let!(:entry2) { create(:pvp_leaderboard_entry) }
+  # Create entries without equipment_processed_at so they pass the TTL filter
+  let!(:entry1) { create(:pvp_leaderboard_entry, equipment_processed_at: nil) }
+  let!(:entry2) { create(:pvp_leaderboard_entry, equipment_processed_at: nil) }
   let(:entry_ids) { [ entry1.id, entry2.id ] }
   let(:locale) { "en_US" }
 
@@ -36,9 +37,10 @@ RSpec.describe Pvp::ProcessLeaderboardEntryBatchJob, type: :job do
         .with(entry: entry2, locale: locale)
     end
 
-    it "preloads all entries in a single query" do
-      expect(PvpLeaderboardEntry).to receive(:where)
-        .with(id: entry_ids)
+    it "preloads entries with characters using includes" do
+      # The query now uses includes(:character) and filters by TTL
+      expect(PvpLeaderboardEntry).to receive(:includes)
+        .with(:character)
         .and_call_original
 
       perform_job
@@ -88,6 +90,55 @@ RSpec.describe Pvp::ProcessLeaderboardEntryBatchJob, type: :job do
           .to have_received(:call)
           .with(entry: entry1, locale: locale)
           .once
+      end
+    end
+
+    context "when entry was recently processed (within TTL)" do
+      before do
+        # Ensure TTL is 1 hour for this test (dev .env sets it to 0)
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("EQUIPMENT_PROCESS_TTL_HOURS", 1).and_return(1)
+      end
+
+      let(:recently_processed_entry) do
+        create(:pvp_leaderboard_entry, equipment_processed_at: 30.minutes.ago)
+      end
+      let(:entry_ids) { [ entry1.id, recently_processed_entry.id ] }
+
+      it "skips the recently processed entry" do
+        perform_job
+
+        # Only entry1 should be processed (recently_processed_entry is skipped)
+        expect(Pvp::Entries::ProcessEntryService)
+          .to have_received(:call)
+          .with(entry: entry1, locale: locale)
+          .once
+      end
+
+      it "logs the skip count" do
+        allow(Rails.logger).to receive(:info).and_call_original
+
+        perform_job
+
+        expect(Rails.logger).to have_received(:info).with(/Skipped 1\/2 already processed entries/)
+      end
+    end
+
+    context "when all entries were recently processed" do
+      before do
+        # Ensure TTL is 1 hour for this test (dev .env sets it to 0)
+        allow(ENV).to receive(:fetch).and_call_original
+        allow(ENV).to receive(:fetch).with("EQUIPMENT_PROCESS_TTL_HOURS", 1).and_return(1)
+      end
+
+      let(:processed_entry1) { create(:pvp_leaderboard_entry, equipment_processed_at: 30.minutes.ago) }
+      let(:processed_entry2) { create(:pvp_leaderboard_entry, equipment_processed_at: 30.minutes.ago) }
+      let(:entry_ids) { [ processed_entry1.id, processed_entry2.id ] }
+
+      it "returns early without processing any entries" do
+        expect(Pvp::Entries::ProcessEntryService).not_to receive(:call)
+
+        perform_job
       end
     end
 

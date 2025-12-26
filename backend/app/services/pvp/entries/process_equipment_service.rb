@@ -26,18 +26,26 @@ module Pvp
         )
         processed_equipment = equipment_service.call
 
+        # Build equipment attributes
+        # Compress raw_equipment for storage efficiency
+        equipment_attrs = {
+          equipment_processed_at: Time.zone.now,
+          raw_equipment:          PvpLeaderboardEntry.compress_json_value(processed_equipment)
+        }
+
+        # Add optional fields if they exist
+        equipment_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
+        equipment_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
+
+        # Wrap update and item rebuild in a single transaction for atomicity
+        # This ensures if item rebuild fails, the entry update is rolled back
         ActiveRecord::Base.transaction do
-          # Always update equipment_processed_at and raw_equipment
-          equipment_attrs = {
-            equipment_processed_at: Time.zone.now,
-            raw_equipment:          processed_equipment
-          }
+          # Use update_columns for faster update (skips callbacks/validations)
+          # rubocop:disable Rails/SkipsModelValidations
+          entry.update_columns(equipment_attrs)
+          # rubocop:enable Rails/SkipsModelValidations
 
-          # Add optional fields if they exist
-          equipment_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
-          equipment_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
-
-          entry.update!(equipment_attrs)
+          # Rebuild entry items
           rebuild_entry_items(processed_equipment)
         end
 
