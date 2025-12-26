@@ -81,12 +81,12 @@ module Blizzard
         end
 
         if response.status == 200
-          return JSON.parse(response.body.to_s)
+          return Oj.load(response.body.to_s, mode: :compat)
         end
 
         raise Error,
               "Blizzard API error: HTTP #{response.status}, body=#{response.body}"
-      rescue JSON::ParserError => e
+      rescue Oj::ParseError, JSON::ParserError => e
         raise Error,
               "Blizzard API error: invalid JSON: #{e.message}\n#{response.body}"
       end

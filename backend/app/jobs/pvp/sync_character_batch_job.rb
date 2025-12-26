@@ -4,8 +4,9 @@ module Pvp
     queue_as :character_sync
 
     # Number of concurrent API calls per batch job
-    # Blizzard API allows 100 requests/second, so 10 concurrent is safe
-    CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 10).to_i
+    # Blizzard API allows 100 requests/second, but lower defaults for resource-constrained servers
+    # Increase via environment variable for more powerful instances
+    CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 5).to_i
 
     # Retry on API errors with exponential backoff
     retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|

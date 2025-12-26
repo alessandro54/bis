@@ -97,6 +97,7 @@ production:
     database: wow_bis_production
     username: wow_bis
     password: <%= ENV["WOW_BIS_DATABASE_PASSWORD"] %>
+    pool: <%= ENV.fetch("DB_POOL", 20) %>
   cache:
     <<: *primary_production
     database: wow_bis_production_cache

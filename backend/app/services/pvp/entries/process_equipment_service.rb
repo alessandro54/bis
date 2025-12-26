@@ -8,7 +8,12 @@ module Pvp
 
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def call
-        return success(entry) if entry.equipment_processed_at.present?
+        # Skip if equipment was recently processed (within configurable TTL)
+        # This prevents redundant processing when same entry is queued multiple times
+        ttl_hours = ENV.fetch("EQUIPMENT_PROCESS_TTL_HOURS", 1).to_i
+        if entry.equipment_processed_at.present? && entry.equipment_processed_at > ttl_hours.hours.ago
+          return success(entry)
+        end
 
         raw_equipment = entry.raw_equipment
         unless raw_equipment.is_a?(Hash) && raw_equipment["equipped_items"].present?

@@ -115,8 +115,8 @@ module Pvp
             )
 
             # Enqueue character sync jobs in smaller batches for better parallelism
-            # Each batch processes 100 chars with 10 concurrent API calls = 10x speedup
-            batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 100).to_i
+            # Lower default for resource-constrained servers, increase via env var for more powerful instances
+            batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
             characters_to_sync.each_slice(batch_size) do |character_id_batch|
               Pvp::SyncCharacterBatchJob
                 .set(queue: job_queue)
