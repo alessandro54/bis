@@ -83,7 +83,7 @@ GEM
     base64 (0.3.0)
     bcrypt_pbkdf (1.1.2)
     bigdecimal (4.0.1)
-    bootsnap (1.19.0)
+    bootsnap (1.20.1)
       msgpack (~> 1.2)
     brakeman (7.1.1)
       racc
@@ -424,7 +424,7 @@ PLATFORMS
 DEPENDENCIES
   amazing_print (~> 2.0)
   annotaterb (~> 4.20)
-  bootsnap (~> 1.19)
+  bootsnap (~> 1.20)
   brakeman
   bundler-audit
   database_cleaner-active_record (~> 2.2)
