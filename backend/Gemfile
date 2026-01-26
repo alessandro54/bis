@@ -7,7 +7,7 @@ gem "rails", "~> 8.1.1"
 gem "bootsnap", "~> 1.19", require: false
 
 # HTTP client
-gem "httpx", "~> 1.6"
+gem "httpx", "~> 1.7"
 
 # Image transformations (Active Storage)
 gem "image_processing", "~> 1.14"
