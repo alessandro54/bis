@@ -4,7 +4,7 @@ source "https://rubygems.org"
 gem "rails", "~> 8.1.1"
 
 # Boot-time caching for faster startup
-gem "bootsnap", "~> 1.19", require: false
+gem "bootsnap", "~> 1.22", require: false
 
 # HTTP client
 gem "httpx", "~> 1.6"
