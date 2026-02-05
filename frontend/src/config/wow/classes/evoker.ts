@@ -18,7 +18,7 @@ const EvokerConfig: WowClassConfig = {
       id: 1468,
       name: "preservation",
       url: "/evoker/preservation",
-      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/spell_evoker_preservation.jpg",
+      iconUrl: "https://render.worldofwarcraft.com/us/icons/56/classicon_evoker_preservation.jpg",
     },
     {
       id: 1473,

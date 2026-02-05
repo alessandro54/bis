@@ -2,7 +2,7 @@
 class ApplicationJob < ActiveJob::Base
   # Automatically retry jobs that encountered a deadlock with exponential backoff
   # This prevents queue pollution and allows database to recover from contention
-  retry_on ActiveRecord::Deadlocked, wait: :exponentially_longer, attempts: 5
+  retry_on ActiveRecord::Deadlocked, wait: :polynomially_longer, attempts: 5
 
   # Most jobs are safe to ignore if the underlying records are no longer available
   # This prevents jobs from failing permanently when records are deleted during processing
@@ -14,5 +14,44 @@ class ApplicationJob < ActiveJob::Base
 
   # Note: Network/API errors should be handled in individual jobs with specific error classes
   # Avoid retry_on StandardError as it's too broad and may retry programming errors
+
+  # Add performance monitoring to all jobs
+  around_perform :monitor_performance
+
+  # Enable query cache for all jobs - caches repeated SELECT queries within a job
+  around_perform :with_query_cache
+
+  private
+
+    def with_query_cache(&block)
+      ActiveRecord::Base.cache(&block)
+    end
+
+    def monitor_performance(&block)
+      start_time = Time.current
+      result = block.call
+      duration = Time.current - start_time
+
+      # Track performance metrics
+      JobPerformanceMonitor.track_job_performance(
+        self.class,
+        duration,
+        success: true
+      )
+
+      result
+    rescue => error
+      duration = Time.current - start_time
+
+      # Track failure metrics
+      JobPerformanceMonitor.track_job_performance(
+        self.class,
+        duration,
+        success: false,
+        error:   error
+      )
+
+      raise error
+    end
 end
 # :nocov:

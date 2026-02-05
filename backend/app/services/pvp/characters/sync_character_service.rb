@@ -3,13 +3,14 @@ module Pvp
     class SyncCharacterService < ApplicationService
       DEFAULT_TTL_HOURS = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
 
-      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS, processing_queues: nil)
+      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS, enqueue_processing: true)
         @character = character
         @locale = locale
         @ttl_hours = ttl_hours
-        @processing_queues = processing_queues
+        @enqueue_processing = enqueue_processing
       end
 
+      # rubocop:disable Metrics/AbcSize
       def call
         return success(nil, context: { status: :not_found }) unless character
         return success(nil, context: { status: :skipped_private }) if character.is_private
@@ -28,15 +29,16 @@ module Pvp
         return success(nil, context: { status: :equipment_unavailable }) unless equipment_json
         return success(nil, context: { status: :talents_unavailable }) unless talents_json
 
-        apply_fresh_snapshot(entries, equipment_json, talents_json)
-        success(entries, context: { status: :applied_fresh_snapshot })
+        entry_ids = apply_fresh_snapshot(entries, equipment_json, talents_json)
+        success(entries, context: { status: :applied_fresh_snapshot, entry_ids_to_process: entry_ids })
       rescue => e
         failure(e)
       end
+      # rubocop:enable Metrics/AbcSize
 
       private
 
-        attr_reader :character, :locale, :ttl_hours
+        attr_reader :character, :locale, :ttl_hours, :enqueue_processing
 
         def last_equipment_snapshot
           ::Pvp::Characters::LastEquipmentSnapshotFinderService.call(
@@ -53,55 +55,64 @@ module Pvp
             snapshot.specialization_processed_at.present?
         end
 
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def reuse_snapshot_for_entries(snapshot, entries)
-          Rails.logger.silence do
-            entries.each do |entry|
-              copy_from_snapshot(snapshot, entry)
-            end
-          end
+          entry_ids = entries.map(&:id)
+          return if entry_ids.empty?
+
+          # Bulk update all entries at once instead of N individual updates
+          # Use read_attribute to get raw compressed bytes directly (avoid decompress/recompress)
+          # rubocop:disable Rails/SkipsModelValidations
+          PvpLeaderboardEntry.where(id: entry_ids).update_all(
+            raw_equipment:               snapshot.read_attribute(:raw_equipment),
+            raw_specialization:          snapshot.read_attribute(:raw_specialization),
+            item_level:                  snapshot.item_level,
+            tier_set_id:                 snapshot.tier_set_id,
+            tier_set_name:               snapshot.tier_set_name,
+            tier_set_pieces:             snapshot.tier_set_pieces,
+            tier_4p_active:              snapshot.tier_4p_active,
+            equipment_processed_at:      snapshot.equipment_processed_at,
+            spec_id:                     snapshot.spec_id,
+            hero_talent_tree_name:       snapshot.hero_talent_tree_name,
+            hero_talent_tree_id:         snapshot.hero_talent_tree_id,
+            specialization_processed_at: snapshot.specialization_processed_at,
+            updated_at:                  Time.current
+          )
+          # rubocop:enable Rails/SkipsModelValidations
+
+          logger.info(
+            "[SyncCharacterService] Reused snapshot from entry #{snapshot.id} " \
+            "for #{entry_ids.size} entries: #{entry_ids.join(', ')}"
+          )
         end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
         def apply_fresh_snapshot(entries, equipment_json, talents_json)
+          entry_ids = entries.map(&:id)
+          return [] if entry_ids.empty?
+
           logger.info(
             "[SyncCharacterService] Fetched fresh snapshot for character #{entries.first.character_id} " \
               "and applying to #{entries.size} latest entries per bracket"
           )
 
-          Rails.logger.silence do
-            entry_ids = []
-            entries.each do |entry|
-              entry.update!(
-                raw_equipment:      equipment_json,
-                raw_specialization: talents_json
-              )
+          # Bulk update all entries at once instead of N individual updates
+          # Compress JSON data for storage efficiency
+          # rubocop:disable Rails/SkipsModelValidations
+          PvpLeaderboardEntry.where(id: entry_ids).update_all(
+            raw_equipment:      PvpLeaderboardEntry.compress_json_value(equipment_json),
+            raw_specialization: PvpLeaderboardEntry.compress_json_value(talents_json),
+            updated_at:         Time.current
+          )
+          # rubocop:enable Rails/SkipsModelValidations
 
-              entry_ids << entry.id
-            end
-
+          # Only enqueue if enqueue_processing is true (default behavior)
+          # When false, caller is responsible for batching and enqueueing
+          if enqueue_processing
             Pvp::ProcessLeaderboardEntryBatchJob.perform_later(entry_ids: entry_ids, locale: locale)
           end
-        end
 
-        def copy_from_snapshot(source, target)
-          logger.info(
-            "[SyncCharacterService] Reusing equipment snapshot from entry #{source.id} " \
-              "for entry #{target.id}"
-          )
-
-          target.update!(
-            raw_equipment:               source.raw_equipment,
-            raw_specialization:          source.raw_specialization,
-            item_level:                  source.item_level,
-            tier_set_id:                 source.tier_set_id,
-            tier_set_name:               source.tier_set_name,
-            tier_set_pieces:             source.tier_set_pieces,
-            tier_4p_active:              source.tier_4p_active,
-            equipment_processed_at:      source.equipment_processed_at,
-            spec_id:                     source.spec_id,
-            hero_talent_tree_name:       source.hero_talent_tree_name,
-            hero_talent_tree_id:         source.hero_talent_tree_id,
-            specialization_processed_at: source.specialization_processed_at
-          )
+          entry_ids
         end
 
         def safe_fetch

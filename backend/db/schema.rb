@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_12_13_140000) do
+ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -51,6 +51,19 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_13_140000) do
     t.index ["blizzard_id"], name: "index_items_on_blizzard_id", unique: true
   end
 
+  create_table "job_performance_metrics", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.float "duration", null: false
+    t.string "error_class"
+    t.string "job_class", null: false
+    t.boolean "success", default: false, null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_job_performance_metrics_on_created_at"
+    t.index ["job_class", "created_at"], name: "index_job_performance_metrics_on_job_class_and_created_at"
+    t.index ["job_class"], name: "index_job_performance_metrics_on_job_class"
+    t.index ["success"], name: "index_job_performance_metrics_on_success"
+  end
+
   create_table "pvp_leaderboard_entries", force: :cascade do |t|
     t.bigint "character_id", null: false
     t.datetime "created_at", null: false
@@ -62,8 +75,8 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_13_140000) do
     t.bigint "pvp_leaderboard_id", null: false
     t.integer "rank"
     t.integer "rating"
-    t.jsonb "raw_equipment"
-    t.jsonb "raw_specialization"
+    t.binary "raw_equipment"
+    t.binary "raw_specialization"
     t.datetime "snapshot_at"
     t.integer "spec_id"
     t.datetime "specialization_processed_at"
@@ -77,6 +90,10 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_13_140000) do
     t.index ["character_id", "snapshot_at"], name: "index_pvp_entries_on_character_and_snapshot"
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
+    t.index ["id", "equipment_processed_at"], name: "index_entries_for_batch_processing"
+    t.index ["pvp_leaderboard_id", "rating"], name: "index_entries_on_leaderboard_and_rating"
+    t.index ["pvp_leaderboard_id", "snapshot_at"], name: "index_entries_on_leaderboard_and_snapshot"
+    t.index ["pvp_leaderboard_id", "spec_id", "rating"], name: "index_entries_for_spec_meta"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
     t.index ["snapshot_at"], name: "index_pvp_entries_on_snapshot_at"

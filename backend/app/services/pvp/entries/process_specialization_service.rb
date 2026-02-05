@@ -26,24 +26,31 @@ module Pvp
           return failure("Unknown spec id: #{active_spec["id"].inspect}")
         end
 
-        ActiveRecord::Base.transaction do
-          entry.update!(
-            specialization_processed_at: Time.zone.now,
-            spec_id:                     spec_id,
-            hero_talent_tree_name:       hero_tree&.fetch("name", nil).to_s.downcase,
-            hero_talent_tree_id:         hero_tree&.fetch("id", nil),
-            raw_specialization:          spec_service.talents
-          )
+        # Use update_columns for performance (skips callbacks/validations)
+        # Compress raw_specialization for storage efficiency
+        # rubocop:disable Rails/SkipsModelValidations
+        entry.update_columns(
+          specialization_processed_at: Time.zone.now,
+          spec_id:                     spec_id,
+          hero_talent_tree_name:       hero_tree&.fetch("name", nil).to_s.downcase,
+          hero_talent_tree_id:         hero_tree&.fetch("id", nil),
+          raw_specialization:          PvpLeaderboardEntry.compress_json_value(spec_service.talents)
+        )
 
-          if spec_service.class_slug.present?
-            normalized_slug = spec_service.class_slug.to_s.downcase.strip.gsub(" ", "_")
+        # Only update character if class info is missing or changed
+        # Character is preloaded from batch job to avoid N+1
+        if spec_service.class_slug.present?
+          normalized_slug = spec_service.class_slug.to_s.downcase.strip.gsub(" ", "_")
+          character = entry.character
 
-            entry.character.update!(
+          if character.class_slug != normalized_slug || character.class_id != class_id
+            character.update_columns(
               class_slug: normalized_slug,
               class_id:   class_id
             )
           end
         end
+        # rubocop:enable Rails/SkipsModelValidations
 
         success(entry)
       rescue => e

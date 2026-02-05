@@ -1,9 +1,16 @@
 module Characters
   class SyncCharacterJob < ApplicationJob
+    CHARACTER_SYNC_QUEUES = %i[
+      character_sync_a
+      character_sync_b
+      character_sync_c
+      character_sync_d
+    ].freeze
+
     queue_as :character_sync
 
     # Retry on API errors with exponential backoff (network issues, rate limits, etc.)
-    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
+    retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |job, error|
       Rails.logger.warn("[Characters::SyncCharacterJob] API error, will retry: #{error.message}")
     end
 
@@ -21,6 +28,11 @@ module Characters
       update_character(character, profile, assets)
     rescue Blizzard::Client::Error => e
       handle_blizzard_error(e, character)
+    end
+
+    def self.queue_for(character_id, queues: nil)
+      queues ||= CHARACTER_SYNC_QUEUES
+      queues[character_id % queues.size]
     end
 
     private

@@ -20,7 +20,6 @@ module Pvp
       bracket_config = Pvp::BracketConfig.for(bracket)
       rating_min = bracket_config&.dig(:rating_min)
       job_queue = bracket_config&.dig(:job_queue) || :character_sync
-      processing_queues = bracket_config&.dig(:processing_queues)
 
       if rating_min
         entries.select! { |entry| entry["rating"].to_i >= rating_min }
@@ -96,14 +95,34 @@ module Pvp
             PvpLeaderboardEntry.insert_all!(entry_records)
             # rubocop:enable Rails/SkipsModelValidations
 
-            # Enqueue character sync jobs in batches to reduce queue write overhead
-            character_ids.values.each_slice(200) do |character_id_batch|
+            # Filter out characters that were recently synced to avoid duplicate API calls
+            # Same character can appear in multiple brackets, no need to sync them again
+            all_character_ids = character_ids.values
+            recently_synced_ids = PvpLeaderboardEntry
+              .where(character_id: all_character_ids)
+              .where("equipment_processed_at > ?", 1.hour.ago)
+              .distinct
+              .pluck(:character_id)
+              .to_set
+
+            characters_to_sync = all_character_ids.reject { |id| recently_synced_ids.include?(id) }
+
+            skipped_count = all_character_ids.size - characters_to_sync.size
+            Rails.logger.info(
+              "[SyncLeaderboardJob] #{bracket}: " \
+              "#{characters_to_sync.size} characters to sync, " \
+              "#{skipped_count} skipped (recently synced)"
+            )
+
+            # Enqueue character sync jobs in smaller batches for better parallelism
+            # Lower default for resource-constrained servers, increase via env var for more powerful instances
+            batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+            characters_to_sync.each_slice(batch_size) do |character_id_batch|
               Pvp::SyncCharacterBatchJob
                 .set(queue: job_queue)
                 .perform_later(
-                  character_ids:     character_id_batch,
-                  locale:            locale,
-                  processing_queues: processing_queues
+                  character_ids: character_id_batch,
+                  locale:        locale
                 )
             end
 

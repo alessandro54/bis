@@ -1,6 +1,6 @@
 require "httpx"
 require "uri"
-require "json"
+require "oj"
 
 module Blizzard
   class Auth
@@ -67,8 +67,9 @@ module Blizzard
       end
 
       def parse_response_body(response)
-        JSON.parse(response.body)
-      rescue JSON::ParserError
+        # Use Oj directly for ~2-3x faster JSON parsing
+        Oj.load(response.body, mode: :compat)
+      rescue Oj::ParseError, JSON::ParserError
         raise Error, "Blizzard OAuth error: invalid JSON response\n#{response.body}"
       end
 

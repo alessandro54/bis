@@ -4,6 +4,18 @@ module Blizzard
   class Client
     class Error < StandardError; end
 
+    # Shared HTTP client instance with connection pooling
+    # Thread-safe: HTTPX handles concurrent requests internally
+    HTTP_CLIENT = HTTPX
+      .plugin(:persistent)
+      .plugin(:retries, retry_on: ->(res) { res.is_a?(HTTPX::ErrorResponse) }, max_retries: 2)
+      .with(
+        timeout: {
+          connect_timeout:   5,
+          operation_timeout: 15
+        }
+      )
+
     attr_reader :region, :locale, :auth
 
     API_HOST_TEMPLATE = "%{region}.api.blizzard.com".freeze
@@ -42,7 +54,7 @@ module Blizzard
 
       headers = auth_header
 
-      response = http_client.get(url, params: query, headers: headers)
+      response = HTTP_CLIENT.get(url, params: query, headers: headers)
 
       parse_response(response)
     end
@@ -53,15 +65,6 @@ module Blizzard
 
     private
 
-      def http_client
-        @http_client ||= HTTPX.with(
-          timeout: {
-            connect_timeout:   5,
-            operation_timeout: 10
-          }
-          # debug: $stdout   # enable if needed
-        )
-      end
 
       def build_url(path)
         "https://#{API_HOST_TEMPLATE % { region: region }}#{path}"
@@ -77,12 +80,12 @@ module Blizzard
         end
 
         if response.status == 200
-          return JSON.parse(response.body.to_s)
+          return Oj.load(response.body.to_s, mode: :compat)
         end
 
         raise Error,
               "Blizzard API error: HTTP #{response.status}, body=#{response.body}"
-      rescue JSON::ParserError => e
+      rescue Oj::ParseError, JSON::ParserError => e
         raise Error,
               "Blizzard API error: invalid JSON: #{e.message}\n#{response.body}"
       end

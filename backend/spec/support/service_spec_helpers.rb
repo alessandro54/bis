@@ -24,14 +24,27 @@ module ServiceSpecHelpers
           "item" => { "id" => blizzard_item_id },
           "slot" => { "type" => "HEAD" },
           "level" => { "value" => 540 },
-          "context" => "some_context"
+          "context" => "some_context",
+          "name" => "Test Helm",
+          "quality" => { "type" => "EPIC" }
         }
       ]
     }
   end
 
   def processed_equipment
-    raw_equipment
+    {
+      "equipped_items" => {
+        "head" => {
+          "blizzard_id" => blizzard_item_id,
+          "item_id" => item.id,
+          "item_level" => 540,
+          "name" => "Test Helm",
+          "quality" => "epic",
+          "context" => "some_context"
+        }
+      }
+    }
   end
 
   def tier_set_data

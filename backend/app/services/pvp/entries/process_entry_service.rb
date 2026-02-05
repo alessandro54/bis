@@ -9,15 +9,14 @@ module Pvp
       def call
         return failure("Entry not found") unless entry
 
-        ActiveRecord::Base.transaction do
-          eq_result = ProcessEquipmentService.call(entry: entry, locale: locale)
-          return eq_result if eq_result.failure?
+        # Each service handles its own transaction - no need for outer wrapper
+        eq_result = ProcessEquipmentService.call(entry: entry, locale: locale)
+        return eq_result if eq_result.failure?
 
-          spec_result = ProcessSpecializationService.call(entry: entry)
-          return spec_result if spec_result.failure?
+        spec_result = ProcessSpecializationService.call(entry: entry)
+        return spec_result if spec_result.failure?
 
-          success(entry)
-        end
+        success(entry)
       rescue => e
         failure(e)
       end

@@ -44,11 +44,13 @@ class Character < ApplicationRecord
   def enqueue_sync_meta_job
     return if meta_synced?
 
-    Characters::SyncCharacterJob.perform_later(
-      region:,
-      realm:,
-      name:
-    )
+    Characters::SyncCharacterJob
+      .set(queue: Characters::SyncCharacterJob.queue_for(id))
+      .perform_later(
+        region:,
+        realm:,
+        name:
+      )
   end
 
   def display_name

@@ -10,7 +10,7 @@ module Api
             region  = params.fetch(:region, "us")
 
             distribution = ::Pvp::Meta::ClassDistributionService.new(
-              role:    params[:role],
+              role:    params[:role] || :dps,
               season:  season,
               bracket: bracket,
               region:  region,

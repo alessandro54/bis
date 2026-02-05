@@ -3,14 +3,16 @@ module Blizzard
     module Items
       class UpsertFromRawEquipmentService
         EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
+        ITEM_CACHE_TTL = 1.hour
 
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def call
-          return if items.empty?
+          return { "equipped_items" => {} } if items.empty?
 
           # Bulk upsert all items at once for better performance
           item_records = items.filter_map { |raw_item| build_item_record(raw_item) }
 
-          return if item_records.empty?
+          return { "equipped_items" => {} } if item_records.empty?
 
           unique_item_records = item_records.uniq { |record| record[:blizzard_id] }
 
@@ -24,10 +26,32 @@ module Blizzard
           # rubocop:enable Rails/SkipsModelValidations
 
           # Handle translations separately (translations are localized and may vary)
-          # Reuse blizzard_ids from item_records to avoid re-extraction
           blizzard_ids = unique_item_records.map { |record| record[:blizzard_id] }
           upsert_translations(blizzard_ids)
+
+          # Fetch internal item IDs - use cache to avoid repeated DB queries
+          items_by_blizzard_id = fetch_item_ids_with_cache(blizzard_ids)
+
+          # Build slot -> item mapping with all relevant data
+          equipped_items = {}
+          items.each do |raw_item|
+            slot = raw_item.dig("slot", "type")&.downcase
+            blizzard_id = extract_blizzard_id(raw_item)
+            next unless slot && blizzard_id
+
+            equipped_items[slot] = {
+              "blizzard_id" => blizzard_id,
+              "item_id" => items_by_blizzard_id[blizzard_id],
+              "item_level" => raw_item.dig("level", "value"),
+              "name" => raw_item["name"],
+              "quality" => raw_item.dig("quality", "type")&.downcase,
+              "context" => raw_item["context"]
+            }
+          end
+
+          { "equipped_items" => equipped_items }
         end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
         def self.call(raw_equipment:, locale: "en_US")
           new(raw_equipment:, locale:).call
@@ -75,6 +99,35 @@ module Blizzard
 
           attr_reader :items, :locale
 
+          # Fetch item IDs with caching to reduce DB queries
+          # Items rarely change, so we can cache the blizzard_id -> id mapping
+          def fetch_item_ids_with_cache(blizzard_ids)
+            return {} if blizzard_ids.empty?
+
+            result = {}
+            uncached_ids = []
+
+            # Check cache first
+            blizzard_ids.each do |blz_id|
+              cached = Rails.cache.read("item:blz:#{blz_id}")
+              if cached
+                result[blz_id] = cached
+              else
+                uncached_ids << blz_id
+              end
+            end
+
+            # Fetch uncached from DB and populate cache
+            if uncached_ids.any?
+              Item.where(blizzard_id: uncached_ids).pluck(:blizzard_id, :id).each do |blz_id, id|
+                result[blz_id] = id
+                Rails.cache.write("item:blz:#{blz_id}", id, expires_in: ITEM_CACHE_TTL)
+              end
+            end
+
+            result
+          end
+
           def extract_blizzard_id(raw_item)
             raw_item.dig("item", "id")
           end
@@ -93,24 +146,49 @@ module Blizzard
             }
           end
 
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           def upsert_translations(blizzard_ids)
             # Batch fetch items that need translations
             return if blizzard_ids.empty?
 
-            items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).index_by(&:blizzard_id)
+            items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).pluck(:blizzard_id, :id).to_h
+            now = Time.current
 
-            items.each do |raw_item|
+            translation_records = items.filter_map do |raw_item|
               blizzard_id = extract_blizzard_id(raw_item)
               name = raw_item.dig("name")
+              item_id = items_by_blizzard_id[blizzard_id]
 
-              next unless blizzard_id && name.present?
+              next unless blizzard_id && name.present? && item_id
 
-              item = items_by_blizzard_id[blizzard_id]
-              next unless item
-
-              item.set_translation("name", locale, name)
+              {
+                translatable_type: "Item",
+                translatable_id:   item_id,
+                key:               "name",
+                locale:            locale,
+                value:             name,
+                meta:              { source: "blizzard" },
+                created_at:        now,
+                updated_at:        now
+              }
             end
+
+            return if translation_records.empty?
+
+            # Deduplicate by unique constraint columns to avoid CardinalityViolation
+            unique_records = translation_records.uniq do |r|
+              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
+            end
+
+            # Bulk upsert all translations in one query instead of N individual saves
+            # rubocop:disable Rails/SkipsModelValidations
+            Translation.upsert_all(
+              unique_records,
+              unique_by: %i[translatable_type translatable_id locale key]
+            )
+            # rubocop:enable Rails/SkipsModelValidations
           end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
       end
     end
   end

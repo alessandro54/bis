@@ -29,7 +29,7 @@ export default function DynamicBackground() {
       className="absolute left-1/2 -translate-x-1/2 w-[90vw] h-[50vw] rounded-full filter blur-3xl opacity-30 animate-blob animation-delay-6000 pointer-events-none overflow-hidden transition-all duration-700 ease-in-out"
       style={{
         zIndex: -1,
-        bottom: "-35vw",
+        bottom: "-45vw",
         background
       }}
     />
