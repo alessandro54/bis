@@ -24,13 +24,24 @@ class JobPerformanceMonitor
       query = JobPerformanceMetric.where("created_at > ?", time_range.ago)
       query = query.where(job_class: job_class.name) if job_class
 
-      stats = query.group(:job_class).calculate(
-        count: :id,
-        avg:   :duration,
-        max:   :duration,
-        min:   :duration,
-        sum:   :success
+      rows = query.group(:job_class).pluck(
+        :job_class,
+        Arel.sql("COUNT(id)"),
+        Arel.sql("AVG(duration)"),
+        Arel.sql("MAX(duration)"),
+        Arel.sql("MIN(duration)"),
+        Arel.sql("SUM(CASE WHEN success THEN 1 ELSE 0 END)")
       )
+
+      stats = rows.each_with_object({}) do |(job_class, count, avg, max, min, sum), hash|
+        hash[job_class] = {
+          count: count,
+          avg:   avg,
+          max:   max,
+          min:   min,
+          sum:   sum
+        }
+      end
 
       format_performance_stats(stats)
     end
