@@ -10,8 +10,8 @@
 #  losses                      :integer          default(0)
 #  rank                        :integer
 #  rating                      :integer
-#  raw_equipment               :binary
-#  raw_specialization          :binary
+#  raw_equipment               :jsonb
+#  raw_specialization          :jsonb
 #  snapshot_at                 :datetime
 #  specialization_processed_at :datetime
 #  tier_4p_active              :boolean          default(FALSE)
@@ -28,11 +28,8 @@
 #
 # Indexes
 #
-#  index_entries_for_batch_processing                      (id,equipment_processed_at)
-#  index_entries_for_spec_meta                             (pvp_leaderboard_id,spec_id,rating)
-#  index_entries_on_leaderboard_and_rating                 (pvp_leaderboard_id,rating)
-#  index_entries_on_leaderboard_and_snapshot               (pvp_leaderboard_id,snapshot_at)
-#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
+#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) \
+#    WHERE (equipment_processed_at IS NOT NULL)
 #  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
 #  index_pvp_entries_on_snapshot_at                        (snapshot_at)
 #  index_pvp_leaderboard_entries_on_character_id           (character_id)
@@ -48,10 +45,6 @@
 #
 class PvpLeaderboardEntry < ApplicationRecord
   include Translatable
-  include CompressedJson
-
-  # Compress raw JSON fields for ~60% storage reduction
-  compressed_json :raw_equipment, :raw_specialization
 
   belongs_to :pvp_leaderboard
   belongs_to :character
