@@ -33,13 +33,13 @@ class JobPerformanceMonitor
         Arel.sql("SUM(CASE WHEN success THEN 1 ELSE 0 END)")
       )
 
-      stats = rows.each_with_object({}) do |(job_class, count, avg, max, min, sum), hash|
+      stats = rows.each_with_object({}) do |(job_class, count, avg, max, min, success_count), hash|
         hash[job_class] = {
           count: count,
           avg:   avg,
           max:   max,
           min:   min,
-          sum:   sum
+          sum:   success_count
         }
       end
 
