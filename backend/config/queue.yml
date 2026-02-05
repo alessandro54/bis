@@ -3,36 +3,54 @@ default: &base
     - polling_interval: 0.5
       batch_size: 100
 
+  # All queues in a single process to minimize DB connections.
+  # Batch jobs use internal thread pools (safe_concurrency) for parallelism,
+  # so SolidQueue threads just need to dispatch — not do heavy work themselves.
+  # Total DB connections: 1 process × pool=10 × 2 DBs = 20 (well within PG limits)
   workers:
-    # Character sync queues - handles API calls to Blizzard
-    - queues: [character_sync_a, character_sync_b, character_sync_c, character_sync_d]
-      threads: <%= ENV.fetch("CHARACTER_SYNC_THREADS", 2) %>
+    - queues:
+        - character_sync_a
+        - character_sync_b
+        - character_sync_c
+        - character_sync_d
+        - pvp_sync_2v2
+        - pvp_sync_3v3
+        - pvp_sync_rbg
+        - pvp_sync_shuffle
+        - pvp_processing
+        - "*"
+      threads: <%= ENV.fetch("SOLID_QUEUE_THREADS", 5) %>
       processes: 1
       polling_interval: 0.25
-
-    # PVP sync queues - fetches leaderboard data
-    - queues: [pvp_sync_2v2, pvp_sync_3v3, pvp_sync_rbg, pvp_sync_shuffle]
-      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 2) %>
-      processes: 1
-      polling_interval: 0.5
-
-    # Processing queue - CPU-intensive data processing
-    - queues: [pvp_processing]
-      threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 2) %>
-      processes: 1
-      polling_interval: 0.25
-
-    # Default queue - misc jobs
-    - queues: "*"
-      threads: <%= ENV.fetch("DEFAULT_THREADS", 2) %>
-      processes: 1
-      polling_interval: 0.5
 
 development:
   <<: *base
 
-production:
-  <<: *base
+production: &production
+  dispatchers:
+    - polling_interval: 0.5
+      batch_size: 100
+
+  workers:
+    # I/O-bound: API calls (batch jobs handle concurrency internally)
+    - queues:
+        - character_sync_a
+        - character_sync_b
+        - character_sync_c
+        - character_sync_d
+        - pvp_sync_2v2
+        - pvp_sync_3v3
+        - pvp_sync_rbg
+        - pvp_sync_shuffle
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 3) %>
+      processes: 1
+      polling_interval: 0.25
+
+    # CPU-bound: data processing + default
+    - queues: [pvp_processing, "*"]
+      threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 3) %>
+      processes: 1
+      polling_interval: 0.25
 
 # Low-resource profile for cheap cloud instances (2 vCPU, 2GB RAM)
 # Use with: QUEUE_PROFILE=low_resource
@@ -42,23 +60,8 @@ low_resource:
       batch_size: 50
 
   workers:
-    - queues: [character_sync_a, character_sync_b, character_sync_c, character_sync_d]
-      threads: 1
-      processes: 1
-      polling_interval: 0.5
-
-    - queues: [pvp_sync_2v2, pvp_sync_3v3, pvp_sync_rbg, pvp_sync_shuffle]
-      threads: 1
-      processes: 1
-      polling_interval: 1.0
-
-    - queues: [pvp_processing]
-      threads: 1
-      processes: 1
-      polling_interval: 0.5
-
     - queues: "*"
-      threads: 1
+      threads: 2
       processes: 1
       polling_interval: 1.0
 

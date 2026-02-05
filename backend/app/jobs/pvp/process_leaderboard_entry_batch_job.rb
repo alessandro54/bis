@@ -43,7 +43,7 @@ module Pvp
       def process_entries_concurrently(entries, locale)
         return if entries.empty?
 
-        concurrency = [ CONCURRENCY, entries.size ].min
+        concurrency = safe_concurrency(CONCURRENCY, entries.size)
 
         # Use thread pool for parallel processing
         pool = Concurrent::FixedThreadPool.new(concurrency)

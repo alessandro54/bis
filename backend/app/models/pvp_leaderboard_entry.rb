@@ -45,6 +45,9 @@
 #
 class PvpLeaderboardEntry < ApplicationRecord
   include Translatable
+  include CompressedJson
+
+  compressed_json :raw_equipment, :raw_specialization
 
   belongs_to :pvp_leaderboard
   belongs_to :character

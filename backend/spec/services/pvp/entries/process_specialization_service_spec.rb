@@ -95,18 +95,18 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
   end
 
   context "when everything goes well" do
-    it "updates the entry with specialization info and talents" do
+    it "returns attrs with specialization info and compressed talents" do
       freeze_time do
         res = result
 
         expect(res).to be_success
-        entry.reload
+        attrs = res.context[:attrs]
 
-        expect(entry.specialization_processed_at).to be_within(1.second).of(Time.current)
-        expect(entry.spec_id).to eq(active_spec["id"])
-        expect(entry.hero_talent_tree_name).to eq(hero_tree["name"].downcase)
-        expect(entry.hero_talent_tree_id).to eq(hero_tree["id"])
-        expect(entry.raw_specialization).to eq(talents)
+        expect(attrs[:specialization_processed_at]).to be_within(1.second).of(Time.current)
+        expect(attrs[:spec_id]).to eq(active_spec["id"])
+        expect(attrs[:hero_talent_tree_name]).to eq(hero_tree["name"].downcase)
+        expect(attrs[:hero_talent_tree_id]).to eq(hero_tree["id"])
+        expect(attrs[:raw_specialization]).to be_present
       end
     end
 
@@ -134,7 +134,7 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
 
   context "when an unexpected error happens" do
     before do
-      allow(entry).to receive(:update_columns).and_raise(StandardError.new("boom"))
+      allow(PvpLeaderboardEntry).to receive(:compress_json_value).and_raise(StandardError.new("boom"))
     end
 
     it "returns a failure with the exception as error" do

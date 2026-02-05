@@ -23,6 +23,13 @@ class ApplicationJob < ActiveJob::Base
 
   private
 
+    # Cap thread pool concurrency to available DB pool connections.
+    # Leaves 2 connections free for the SolidQueue worker thread + main thread.
+    def safe_concurrency(desired, work_size)
+      available = ActiveRecord::Base.connection_pool.size - 2
+      [ desired, work_size, [ available, 1 ].max ].min
+    end
+
     def with_query_cache(&block)
       ActiveRecord::Base.cache(&block)
     end

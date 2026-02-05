@@ -49,8 +49,8 @@ module Pvp
 
         def reusable_snapshot?(snapshot)
           snapshot.present? &&
-            snapshot.raw_equipment.present? &&
-            snapshot.raw_specialization.present? &&
+            snapshot.read_attribute(:raw_equipment).present? &&
+            snapshot.read_attribute(:raw_specialization).present? &&
             snapshot.equipment_processed_at.present? &&
             snapshot.specialization_processed_at.present?
         end

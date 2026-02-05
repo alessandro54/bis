@@ -83,22 +83,20 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
                 .with(raw_equipment: raw_equipment, locale: locale)
       end
 
-      it "updates the entry with processed equipment and tier set info" do
+      it "returns attrs with processed equipment and tier set info" do
         now = Time.current
 
         res = result
         expect(res).to be_success
 
-        entry.reload
-
-        expect(entry.equipment_processed_at).not_to be_nil
-        expect(entry.equipment_processed_at).to be >= now
-        expect(entry.item_level).to eq(540)
-        expect(entry.raw_equipment).to eq(processed_equipment)
-        expect(entry.tier_set_id).to eq(999)
-        expect(entry.tier_set_name).to eq("Gladiator Set")
-        expect(entry.tier_set_pieces).to eq(4)
-        expect(entry.tier_4p_active).to eq(true)
+        attrs = res.context[:attrs]
+        expect(attrs[:equipment_processed_at]).to be >= now
+        expect(attrs[:item_level]).to eq(540)
+        expect(attrs[:tier_set_id]).to eq(999)
+        expect(attrs[:tier_set_name]).to eq("Gladiator Set")
+        expect(attrs[:tier_set_pieces]).to eq(4)
+        expect(attrs[:tier_4p_active]).to eq(true)
+        expect(attrs[:raw_equipment]).to be_present
       end
 
       context "when the upsert service provides nil item level and tier set data" do
@@ -111,20 +109,18 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
           )
         end
 
-        it "still updates processed_at and raw_equipment but leaves optional fields nil" do
-          result
+        it "returns attrs with processed_at and raw_equipment but no optional fields" do
+          res = result
+          attrs = res.context[:attrs]
 
-          entry.reload
-
-          expect(entry.equipment_processed_at).not_to be_nil
-          expect(entry.item_level).to be_nil
-          expect(entry.tier_set_id).to be_nil
-          expect(entry.raw_equipment).to eq(processed_equipment)
+          expect(attrs[:equipment_processed_at]).to be_present
+          expect(attrs[:raw_equipment]).to be_present
+          expect(attrs).not_to have_key(:item_level)
+          expect(attrs).not_to have_key(:tier_set_id)
         end
       end
 
-      it "rebuilds the associated pvp_leaderboard_entry_items" do
-        # Creamos un item previo para asegurarnos que se borra
+      it "provides a rebuild_items_proc that rebuilds associated pvp_leaderboard_entry_items" do
         old_item = create(:item)
         entry.pvp_leaderboard_entry_items.create!(
           item:       old_item,
@@ -134,7 +130,11 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
           raw:        {}
         )
 
-        result
+        res = result
+        # Simulate what ProcessEntryService does: call the rebuild proc inside a transaction
+        ActiveRecord::Base.transaction do
+          res.context[:rebuild_items_proc].call
+        end
         entry.reload
 
         expect(entry.pvp_leaderboard_entry_items.count).to eq(1)
@@ -144,32 +144,23 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
         expect(created.slot).to eq("HEAD")
         expect(created.item_level).to eq(540)
         expect(created.context).to eq("some_context")
-        # Raw now contains the processed structure with item_id
         expect(created.raw["blizzard_id"]).to eq(blizzard_item_id)
         expect(created.raw["item_id"]).to eq(item.id)
         expect(created.raw["item_level"]).to eq(540)
       end
     end
 
-    context "when an error occurs while rebuilding items" do
-      it "returns a failure and rolls back changes" do
-        # stub para romper dentro de la transacción
-        allow(entry.pvp_leaderboard_entry_items)
-          .to receive(:delete_all)
-                .and_call_original
+    context "when an unexpected error occurs" do
+      it "returns a failure wrapping the exception" do
+        allow(Blizzard::Data::Items::UpsertFromRawEquipmentService)
+          .to receive(:new)
+                .and_raise(StandardError.new("unexpected error"))
 
-        allow(PvpLeaderboardEntryItem)
-          .to receive(:insert_all!)
-                .and_raise(StandardError.new("DB error"))
-
-        res = result
+        res = described_class.call(entry: entry, locale: locale)
 
         expect(res).to be_failure
         expect(res.error).to be_a(StandardError)
-
-        entry.reload
-        expect(entry.equipment_processed_at).to be_nil
-        expect(entry.pvp_leaderboard_entry_items).to be_empty
+        expect(res.error.message).to eq("unexpected error")
       end
     end
   end

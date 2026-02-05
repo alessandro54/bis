@@ -26,19 +26,17 @@ module Pvp
           return failure("Unknown spec id: #{active_spec["id"].inspect}")
         end
 
-        # Use update_columns for performance (skips callbacks/validations)
-        # Compress raw_specialization for storage efficiency
-        # rubocop:disable Rails/SkipsModelValidations
-        entry.update_columns(
+        # Build attrs (written by ProcessEntryService in a single UPDATE)
+        spec_attrs = {
           specialization_processed_at: Time.zone.now,
           spec_id:                     spec_id,
           hero_talent_tree_name:       hero_tree&.fetch("name", nil).to_s.downcase,
           hero_talent_tree_id:         hero_tree&.fetch("id", nil),
           raw_specialization:          PvpLeaderboardEntry.compress_json_value(spec_service.talents)
-        )
+        }
 
-        # Only update character if class info is missing or changed
-        # Character is preloaded from batch job to avoid N+1
+        # Update character class info if missing or changed
+        # rubocop:disable Rails/SkipsModelValidations
         if spec_service.class_slug.present?
           normalized_slug = spec_service.class_slug.to_s.downcase.strip.gsub(" ", "_")
           character = entry.character
@@ -52,7 +50,7 @@ module Pvp
         end
         # rubocop:enable Rails/SkipsModelValidations
 
-        success(entry)
+        success(entry, context: { attrs: spec_attrs })
       rescue => e
         failure(e)
       end

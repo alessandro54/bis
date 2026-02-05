@@ -25,6 +25,9 @@ module Pvp
         entries.select! { |entry| entry["rating"].to_i >= rating_min }
       end
 
+      # Collect characters to sync inside the lock, enqueue outside to minimize lock hold time
+      characters_to_sync = []
+
       # rubocop:disable Metrics/BlockLength
       with_deadlock_retry do
         leaderboard = PvpLeaderboard.find_or_create_by!(
@@ -114,23 +117,22 @@ module Pvp
               "#{skipped_count} skipped (recently synced)"
             )
 
-            # Enqueue character sync jobs in smaller batches for better parallelism
-            # Lower default for resource-constrained servers, increase via env var for more powerful instances
-            batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
-            characters_to_sync.each_slice(batch_size) do |character_id_batch|
-              Pvp::SyncCharacterBatchJob
-                .set(queue: job_queue)
-                .perform_later(
-                  character_ids: character_id_batch,
-                  locale:        locale
-                )
-            end
-
             leaderboard.update!(last_synced_at: snapshot_time)
           end
           # rubocop:enable Metrics/BlockLength
         end
         # rubocop:enable Metrics/BlockLength
+      end
+
+      # Enqueue outside the lock — data is committed, no need to hold the row lock during SolidQueue writes
+      batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+      characters_to_sync.each_slice(batch_size) do |character_id_batch|
+        Pvp::SyncCharacterBatchJob
+          .set(queue: job_queue)
+          .perform_later(
+            character_ids: character_id_batch,
+            locale:        locale
+          )
       end
     end
     # rubocop:enable Metrics/MethodLength, Metrics/AbcSize

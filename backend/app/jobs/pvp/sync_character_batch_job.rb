@@ -43,7 +43,7 @@ module Pvp
       def process_characters_concurrently(characters, locale)
         return [] if characters.empty?
 
-        concurrency = [ CONCURRENCY, characters.size ].min
+        concurrency = safe_concurrency(CONCURRENCY, characters.size)
         all_entry_ids = Concurrent::Array.new
 
         # Use a thread pool for concurrent API calls

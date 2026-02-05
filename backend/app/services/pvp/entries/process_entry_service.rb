@@ -6,20 +6,37 @@ module Pvp
         @locale = locale
       end
 
+      # rubocop:disable Metrics/AbcSize
       def call
         return failure("Entry not found") unless entry
 
-        # Each service handles its own transaction - no need for outer wrapper
         eq_result = ProcessEquipmentService.call(entry: entry, locale: locale)
         return eq_result if eq_result.failure?
 
         spec_result = ProcessSpecializationService.call(entry: entry)
         return spec_result if spec_result.failure?
 
+        # Merge attrs from both services into a single UPDATE
+        merged_attrs = {}
+        merged_attrs.merge!(eq_result.context[:attrs]) if eq_result.context[:attrs]
+        merged_attrs.merge!(spec_result.context[:attrs]) if spec_result.context[:attrs]
+
+        if merged_attrs.any?
+          ActiveRecord::Base.transaction do
+            # rubocop:disable Rails/SkipsModelValidations
+            entry.update_columns(merged_attrs)
+            # rubocop:enable Rails/SkipsModelValidations
+
+            # Rebuild entry items if equipment was processed
+            eq_result.context[:rebuild_items_proc]&.call
+          end
+        end
+
         success(entry)
       rescue => e
         failure(e)
       end
+      # rubocop:enable Metrics/AbcSize
 
       private
 

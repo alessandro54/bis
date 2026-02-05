@@ -25,12 +25,13 @@ module Blizzard
           )
           # rubocop:enable Rails/SkipsModelValidations
 
-          # Handle translations separately (translations are localized and may vary)
           blizzard_ids = unique_item_records.map { |record| record[:blizzard_id] }
-          upsert_translations(blizzard_ids)
 
           # Fetch internal item IDs - use cache to avoid repeated DB queries
           items_by_blizzard_id = fetch_item_ids_with_cache(blizzard_ids)
+
+          # Handle translations separately, reusing the ID map to avoid a duplicate query
+          upsert_translations(items_by_blizzard_id)
 
           # Build slot -> item mapping with all relevant data
           equipped_items = {}
@@ -101,17 +102,21 @@ module Blizzard
 
           # Fetch item IDs with caching to reduce DB queries
           # Items rarely change, so we can cache the blizzard_id -> id mapping
+          # rubocop:disable Metrics/AbcSize
           def fetch_item_ids_with_cache(blizzard_ids)
             return {} if blizzard_ids.empty?
+
+            # Single round-trip to cache store instead of N individual reads
+            cache_keys = blizzard_ids.index_with { |blz_id| "item:blz:#{blz_id}" }
+            cached = Rails.cache.read_multi(*cache_keys.values)
 
             result = {}
             uncached_ids = []
 
-            # Check cache first
             blizzard_ids.each do |blz_id|
-              cached = Rails.cache.read("item:blz:#{blz_id}")
-              if cached
-                result[blz_id] = cached
+              cached_value = cached[cache_keys[blz_id]]
+              if cached_value
+                result[blz_id] = cached_value
               else
                 uncached_ids << blz_id
               end
@@ -127,6 +132,7 @@ module Blizzard
 
             result
           end
+          # rubocop:enable Metrics/AbcSize
 
           def extract_blizzard_id(raw_item)
             raw_item.dig("item", "id")
@@ -147,11 +153,9 @@ module Blizzard
           end
 
           # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-          def upsert_translations(blizzard_ids)
-            # Batch fetch items that need translations
-            return if blizzard_ids.empty?
+          def upsert_translations(items_by_blizzard_id)
+            return if items_by_blizzard_id.empty?
 
-            items_by_blizzard_id = Item.where(blizzard_id: blizzard_ids).pluck(:blizzard_id, :id).to_h
             now = Time.current
 
             translation_records = items.filter_map do |raw_item|
