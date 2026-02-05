@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_12_26_182800) do
+ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -92,6 +92,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_182800) do
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["id", "equipment_processed_at"], name: "index_entries_for_batch_processing"
     t.index ["pvp_leaderboard_id", "rating"], name: "index_entries_on_leaderboard_and_rating"
+    t.index ["pvp_leaderboard_id", "snapshot_at"], name: "index_entries_on_leaderboard_and_snapshot"
     t.index ["pvp_leaderboard_id", "spec_id", "rating"], name: "index_entries_for_spec_meta"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"

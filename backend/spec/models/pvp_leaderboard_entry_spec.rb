@@ -28,10 +28,10 @@
 #
 # Indexes
 #
-# rubocop:disable Layout/LineLength
 #  index_entries_for_batch_processing                      (id,equipment_processed_at)
 #  index_entries_for_spec_meta                             (pvp_leaderboard_id,spec_id,rating)
 #  index_entries_on_leaderboard_and_rating                 (pvp_leaderboard_id,rating)
+#  index_entries_on_leaderboard_and_snapshot               (pvp_leaderboard_id,snapshot_at)
 #  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
 #  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
 #  index_pvp_entries_on_snapshot_at                        (snapshot_at)
@@ -40,7 +40,6 @@
 #  index_pvp_leaderboard_entries_on_pvp_leaderboard_id     (pvp_leaderboard_id)
 #  index_pvp_leaderboard_entries_on_rank                   (rank)
 #  index_pvp_leaderboard_entries_on_tier_set_id            (tier_set_id)
-# rubocop:enable Layout/LineLength
 #
 # Foreign Keys
 #
