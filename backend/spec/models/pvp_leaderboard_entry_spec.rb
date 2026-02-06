@@ -156,6 +156,40 @@ RSpec.describe PvpLeaderboardEntry, type: :model do
         expect(results).not_to include(entry_current_snapshot)
         expect(results).not_to include(entry_non_snapshot)
       end
+
+      context 'when latest snapshot has unprocessed entries' do
+        let!(:new_snapshot_time) { 1.hour.from_now }
+
+        before do
+          leaderboard_current.update!(last_synced_at: new_snapshot_time)
+        end
+
+        let!(:unprocessed_entry) do
+          create(:pvp_leaderboard_entry,
+            character:       character,
+            pvp_leaderboard: leaderboard_current,
+            snapshot_at:     new_snapshot_time,
+            spec_id:         nil
+          )
+        end
+
+        it 'falls back to the previous processed snapshot' do
+          results = described_class.latest_snapshot_for_bracket('2v2')
+          expect(results).to include(entry_current_snapshot)
+          expect(results).not_to include(unprocessed_entry)
+        end
+      end
+
+      context 'when no entries have been processed' do
+        before do
+          PvpLeaderboardEntry.update_all(spec_id: nil) # rubocop:disable Rails/SkipsModelValidations
+        end
+
+        it 'returns no results' do
+          results = described_class.latest_snapshot_for_bracket('2v2')
+          expect(results).to be_empty
+        end
+      end
     end
   end
 

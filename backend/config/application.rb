@@ -28,5 +28,9 @@ module WowBis
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # Each fiber gets its own ActiveRecord connection checkout,
+    # preventing fibers from sharing/corrupting each other's queries.
+    config.active_support.isolation_level = :fiber
   end
 end

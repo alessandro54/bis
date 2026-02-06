@@ -140,38 +140,20 @@ module Pvp
           )
         end
 
-        # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def fetch_remote_data
           equipment_json = nil
           talents_json   = nil
 
-          threads = []
+          Async do
+            equipment_task = Async { equipment_json = safe_fetch { fetch_equipment_json } }
+            talents_task   = Async { talents_json = safe_fetch { fetch_talents_json } }
 
-          threads << Thread.new do
-            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
-              equipment_json = safe_fetch { fetch_equipment_json }
-            end
-          rescue => e
-            Thread.current[:error] = e
-          end
-
-          threads << Thread.new do
-            ActiveSupport::Dependencies.interlock.permit_concurrent_loads do
-              talents_json = safe_fetch { fetch_talents_json }
-            end
-          rescue => e
-            Thread.current[:error] = e
-          end
-
-          threads.each(&:join)
-
-          threads.each do |thr|
-            raise thr[:error] if thr[:error]
+            equipment_task.wait
+            talents_task.wait
           end
 
           [ equipment_json, talents_json ]
         end
-        # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
         def handle_blizzard_error(error)
           if error.message.include?("404")

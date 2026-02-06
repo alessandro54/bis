@@ -45,23 +45,15 @@ module Pvp
 
         concurrency = safe_concurrency(CONCURRENCY, entries.size)
 
-        # Use thread pool for parallel processing
-        pool = Concurrent::FixedThreadPool.new(concurrency)
-
-        entries.each do |entry|
-          pool.post do
-            process_one(entry: entry, locale: locale)
-          end
+        run_concurrently(entries, concurrency: concurrency) do |entry|
+          process_one(entry: entry, locale: locale)
         end
-
-        pool.shutdown
-        pool.wait_for_termination
       end
 
       def process_one(entry:, locale:)
         return unless entry
 
-        # Each thread gets its own DB connection
+        # Each fiber gets its own DB connection
         ActiveRecord::Base.connection_pool.with_connection do
           result = Pvp::Entries::ProcessEntryService.call(entry: entry, locale: locale)
           return if result.success?

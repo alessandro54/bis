@@ -60,10 +60,22 @@ class PvpLeaderboardEntry < ApplicationRecord
         PvpSeason.where(is_current: true).select(:id).limit(1)
       end
 
+    leaderboard_ids = PvpLeaderboard
+      .where(bracket: bracket)
+      .where(pvp_season_id: season_filter)
+      .select(:id)
+
+    # Use the latest snapshot that has at least one processed entry (spec_id set).
+    # Falls back to previous snapshot when the current sync is still in progress or failed.
+    latest_processed = PvpLeaderboardEntry
+      .where(pvp_leaderboard_id: leaderboard_ids)
+      .where.not(spec_id: nil)
+      .select("MAX(pvp_leaderboard_entries.snapshot_at)")
+
     joins(pvp_leaderboard: :pvp_season)
       .where(pvp_leaderboards: { bracket: bracket })
       .where(pvp_seasons: { id: season_filter })
-      .where("pvp_leaderboard_entries.snapshot_at = pvp_leaderboards.last_synced_at")
+      .where("pvp_leaderboard_entries.snapshot_at = (#{latest_processed.to_sql})")
   }
 
   has_many :pvp_leaderboard_entry_items, dependent: :destroy

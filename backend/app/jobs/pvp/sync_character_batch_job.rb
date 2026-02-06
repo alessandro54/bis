@@ -44,29 +44,19 @@ module Pvp
         return [] if characters.empty?
 
         concurrency = safe_concurrency(CONCURRENCY, characters.size)
-        all_entry_ids = Concurrent::Array.new
 
-        # Use a thread pool for concurrent API calls
-        pool = Concurrent::FixedThreadPool.new(concurrency)
-
-        characters.each do |character|
-          pool.post do
-            entry_ids = sync_one(character: character, locale: locale)
-            all_entry_ids.concat(entry_ids) if entry_ids.present?
-          end
+        results = run_concurrently(characters, concurrency: concurrency) do |character|
+          sync_one(character: character, locale: locale)
         end
 
-        pool.shutdown
-        pool.wait_for_termination
-
-        all_entry_ids.to_a
+        results.flatten
       end
 
       # Returns array of entry IDs that need processing, or nil
       def sync_one(character:, locale:)
         return unless character
 
-        # Each thread gets its own DB connection
+        # Each fiber gets its own DB connection
         ActiveRecord::Base.connection_pool.with_connection do
           result = Pvp::Characters::SyncCharacterService.call(
             character:          character,

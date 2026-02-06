@@ -1,4 +1,7 @@
-# :nocov:
+require "async"
+require "async/semaphore"
+require "async/barrier"
+
 class ApplicationJob < ActiveJob::Base
   # Automatically retry jobs that encountered a deadlock with exponential backoff
   # This prevents queue pollution and allows database to recover from contention
@@ -23,11 +26,37 @@ class ApplicationJob < ActiveJob::Base
 
   private
 
-    # Cap thread pool concurrency to available DB pool connections.
-    # Leaves 2 connections free for the SolidQueue worker thread + main thread.
+    # Cap fiber concurrency to available DB pool connections.
+    # Leaves 1 connection free for the main fiber.
     def safe_concurrency(desired, work_size)
-      available = ActiveRecord::Base.connection_pool.size - 2
+      available = ActiveRecord::Base.connection_pool.size - 1
       [ desired, work_size, [ available, 1 ].max ].min
+    end
+
+    # Run block for each item using Async fibers with bounded concurrency.
+    # Returns collected non-nil results from each block invocation.
+    def run_concurrently(items, concurrency:)
+      return [] if items.empty?
+
+      results = []
+
+      Async do
+        semaphore = Async::Semaphore.new(concurrency)
+        barrier = Async::Barrier.new(parent: semaphore)
+
+        items.each do |item|
+          barrier.async do
+            result = yield(item)
+            results << result unless result.nil?
+          end
+        end
+
+        barrier.wait
+      ensure
+        barrier.stop
+      end
+
+      results
     end
 
     def with_query_cache(&block)
@@ -61,4 +90,3 @@ class ApplicationJob < ActiveJob::Base
       raise error
     end
 end
-# :nocov:
