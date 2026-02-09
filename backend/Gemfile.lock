@@ -408,7 +408,7 @@ GEM
       websocket-extensions (>= 0.1.0)
     websocket-extensions (0.1.5)
     zeitwerk (2.7.4)
-    zstd-ruby (1.5.7.1)
+    zstd-ruby (2.0.5)
 
 PLATFORMS
   aarch64-linux
@@ -454,7 +454,7 @@ DEPENDENCIES
   solid_queue
   thruster (~> 0.1)
   tzinfo-data
-  zstd-ruby (~> 1.5)
+  zstd-ruby (~> 2.0)
 
 BUNDLED WITH
    2.6.9
