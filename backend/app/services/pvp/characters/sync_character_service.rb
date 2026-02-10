@@ -144,13 +144,14 @@ module Pvp
           equipment_json = nil
           talents_json   = nil
 
-          Async do
-            equipment_task = Async { equipment_json = safe_fetch { fetch_equipment_json } }
-            talents_task   = Async { talents_json = safe_fetch { fetch_talents_json } }
+          # Already inside an Async reactor (from run_concurrently).
+          # Create child tasks directly — a wrapping Async do block would
+          # return immediately without waiting, leaving the variables nil.
+          equipment_task = Async { equipment_json = safe_fetch { fetch_equipment_json } }
+          talents_task   = Async { talents_json = safe_fetch { fetch_talents_json } }
 
-            equipment_task.wait
-            talents_task.wait
-          end
+          equipment_task.wait
+          talents_task.wait
 
           [ equipment_json, talents_json ]
         end
@@ -158,6 +159,8 @@ module Pvp
         def handle_blizzard_error(error)
           if error.message.include?("404")
             logger.warn("[SyncCharacterService] 404 → profile private or deleted")
+          elsif error.is_a?(Blizzard::Client::RateLimitedError)
+            logger.warn("[SyncCharacterService] Rate limited (429), skipping character")
           else
             logger.error("[SyncCharacterService] Error fetching profile: #{error.message}")
           end

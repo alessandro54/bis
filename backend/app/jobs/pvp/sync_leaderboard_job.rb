@@ -2,7 +2,14 @@ module Pvp
   class SyncLeaderboardJob < ApplicationJob
     queue_as :default
 
-    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |job, error|
+    # RateLimitedError inherits from Error but needs to be listed first
+    # so ActiveJob matches the more specific class.
+    # The client already sleeps for Retry-After before raising, so a short wait suffices.
+    retry_on Blizzard::Client::RateLimitedError, wait: 5, attempts: 5 do |_job, error|
+      Rails.logger.warn("[SyncLeaderboardJob] Rate limited, will retry: #{error.message}")
+    end
+
+    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncLeaderboardJob] API error, will retry: #{error.message}")
     end
 

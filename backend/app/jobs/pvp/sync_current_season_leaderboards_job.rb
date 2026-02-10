@@ -2,7 +2,7 @@ module Pvp
   class SyncCurrentSeasonLeaderboardsJob < ApplicationJob
     queue_as :default
 
-    BRACKETS = %w[ 2v2 3v3 rbg shuffle-overall ].freeze
+    BRACKETS = %w[ 2v2 ].freeze
 
     def perform(region: "us", locale: "en_US")
       season = PvpSeason.current

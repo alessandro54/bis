@@ -161,9 +161,18 @@ RSpec.describe Pvp::ProcessLeaderboardEntryBatchJob, type: :job do
         expect(Pvp::Entries::ProcessEntryService)
           .to have_received(:call).twice
       end
+
+      it "logs the batch summary" do
+        allow(Rails.logger).to receive(:info).and_call_original
+        allow(Rails.logger).to receive(:error).and_call_original
+
+        perform_job
+
+        expect(Rails.logger).to have_received(:info).with(/Batch complete: 1\/2 succeeded, 1 failed/)
+      end
     end
 
-    context "when an unexpected error occurs" do
+    context "when an unexpected error occurs for one entry" do
       before do
         allow(Pvp::Entries::ProcessEntryService).to receive(:call)
           .with(entry: entry1, locale: locale)
@@ -179,9 +188,32 @@ RSpec.describe Pvp::ProcessLeaderboardEntryBatchJob, type: :job do
 
         perform_job
 
-
         expect(Pvp::Entries::ProcessEntryService)
           .to have_received(:call).twice
+      end
+    end
+
+    context "when all entries fail" do
+      before do
+        allow(Pvp::Entries::ProcessEntryService).to receive(:call)
+          .and_return(ServiceResult.failure("Processing error"))
+      end
+
+      it "raises TotalBatchFailureError" do
+        expect { perform_job }
+          .to raise_error(BatchOutcome::TotalBatchFailureError, /All 2 items failed/)
+      end
+    end
+
+    context "when all entries fail with unexpected errors" do
+      before do
+        allow(Pvp::Entries::ProcessEntryService).to receive(:call)
+          .and_raise(StandardError.new("Unexpected error"))
+      end
+
+      it "raises TotalBatchFailureError" do
+        expect { perform_job }
+          .to raise_error(BatchOutcome::TotalBatchFailureError, /All 2 items failed/)
       end
     end
   end

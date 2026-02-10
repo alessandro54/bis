@@ -141,12 +141,27 @@ context: { status: :applied_fresh_snapshot, entry_ids_to_process: [ 1, 2 ] }))
         expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call).twice
       end
+
+      it "logs the batch summary" do
+        allow(Rails.logger).to receive(:info).and_call_original
+
+        perform_job
+
+        expect(Rails.logger).to have_received(:info).with(/Batch complete: 1\/2 succeeded, 1 failed/)
+      end
     end
 
-    context "when a Blizzard API error occurs" do
+    context "when a Blizzard API error occurs for one character" do
       before do
-        allow(Pvp::Characters::SyncCharacterService).to receive(:call)
-          .and_raise(Blizzard::Client::Error.new("Rate limited"))
+        call_count = 0
+        allow(Pvp::Characters::SyncCharacterService).to receive(:call) do
+          call_count += 1
+          if call_count == 1
+            raise Blizzard::Client::Error, "Server error"
+          else
+            ServiceResult.success(nil, context: { status: :no_entries })
+          end
+        end
       end
 
       it "logs the error and continues with other characters" do
@@ -155,7 +170,31 @@ context: { status: :applied_fresh_snapshot, entry_ids_to_process: [ 1, 2 ] }))
         perform_job
 
         expect(Pvp::Characters::SyncCharacterService)
-          .to have_received(:call).at_least(:once)
+          .to have_received(:call).twice
+      end
+    end
+
+    context "when all characters fail with Blizzard API errors" do
+      before do
+        allow(Pvp::Characters::SyncCharacterService).to receive(:call)
+          .and_raise(Blizzard::Client::Error.new("Rate limited"))
+      end
+
+      it "raises TotalBatchFailureError" do
+        expect { perform_job }
+          .to raise_error(BatchOutcome::TotalBatchFailureError, /All 2 items failed/)
+      end
+    end
+
+    context "when all characters fail with rate limiting" do
+      before do
+        allow(Pvp::Characters::SyncCharacterService).to receive(:call)
+          .and_raise(Blizzard::Client::RateLimitedError.new("429"))
+      end
+
+      it "raises TotalBatchFailureError with rate_limited status" do
+        expect { perform_job }
+          .to raise_error(BatchOutcome::TotalBatchFailureError, /rate_limited: 2/)
       end
     end
   end

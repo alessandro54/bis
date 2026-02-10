@@ -3,6 +3,7 @@
 module Blizzard
   class Client
     class Error < StandardError; end
+    class RateLimitedError < Error; end
 
     # Shared HTTP client instance with connection pooling
     # Thread-safe: HTTPX handles concurrent requests internally
@@ -15,6 +16,14 @@ module Blizzard
           operation_timeout: 15
         }
       )
+
+    # Rate limiting strategy:
+    # - Per-job concurrency is bounded by run_concurrently's Async::Semaphore
+    #   (default 5 fibers via PVP_SYNC_CONCURRENCY)
+    # - 429 responses trigger sleep(Retry-After) + RateLimitedError
+    # - Blizzard allows 100 req/s; with persistent connections and bounded
+    #   concurrency, throughput is naturally limited by API latency (~300ms)
+    #   giving ~5-10 chars/s per job which stays well under the limit.
 
     attr_reader :region, :locale, :auth
 
@@ -81,6 +90,13 @@ module Blizzard
 
         if response.status == 200
           return Oj.load(response.body.to_s, mode: :compat)
+        end
+
+        if response.status == 429
+          retry_after = response.headers["retry-after"]&.to_i || 1
+          sleep(retry_after)
+          raise RateLimitedError,
+                "Blizzard API rate limited (429). Retry-After: #{retry_after}s"
         end
 
         raise Error,

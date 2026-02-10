@@ -33,39 +33,49 @@ module Pvp
         )
       end
 
+      outcome = BatchOutcome.new
+
       # Process entries with controlled concurrency
-      process_entries_concurrently(entries, locale)
+      process_entries_concurrently(entries, locale, outcome)
+
+      Rails.logger.info(outcome.summary_message(job_label: "ProcessLeaderboardEntryBatchJob"))
+      outcome.raise_if_total_failure!(job_label: "ProcessLeaderboardEntryBatchJob")
     end
     # rubocop:enable Metrics/AbcSize
 
     private
 
-      def process_entries_concurrently(entries, locale)
+      def process_entries_concurrently(entries, locale, outcome)
         return if entries.empty?
 
         concurrency = safe_concurrency(CONCURRENCY, entries.size)
 
         run_concurrently(entries, concurrency: concurrency) do |entry|
-          process_one(entry: entry, locale: locale)
+          process_one(entry: entry, locale: locale, outcome: outcome)
         end
       end
 
-      def process_one(entry:, locale:)
+      def process_one(entry:, locale:, outcome:)
         return unless entry
 
         # Each fiber gets its own DB connection
         ActiveRecord::Base.connection_pool.with_connection do
           result = Pvp::Entries::ProcessEntryService.call(entry: entry, locale: locale)
-          return if result.success?
 
-          Rails.logger.error(
-            "[ProcessLeaderboardEntryBatchJob] Failed for entry #{entry.id}: #{result.error}"
-          )
+          if result.success?
+            outcome.record_success(id: entry.id, status: :processed)
+          else
+            Rails.logger.error(
+              "[ProcessLeaderboardEntryBatchJob] Failed for entry #{entry.id}: #{result.error}"
+            )
+            outcome.record_failure(id: entry.id, status: :failed, error: result.error.to_s)
+          end
         end
       rescue => e
         Rails.logger.error(
           "[ProcessLeaderboardEntryBatchJob] Error for entry #{entry&.id}: #{e.class}: #{e.message}"
         )
+        outcome.record_failure(id: entry&.id, status: :unexpected_error, error: "#{e.class}: #{e.message}")
       end
   end
 end
