@@ -49,8 +49,6 @@ module Pvp
 
         def reusable_snapshot?(snapshot)
           snapshot.present? &&
-            snapshot.read_attribute(:raw_equipment).present? &&
-            snapshot.read_attribute(:raw_specialization).present? &&
             snapshot.equipment_processed_at.present? &&
             snapshot.specialization_processed_at.present?
         end
@@ -60,12 +58,9 @@ module Pvp
           entry_ids = entries.map(&:id)
           return if entry_ids.empty?
 
-          # Bulk update all entries at once instead of N individual updates
-          # Use read_attribute to get raw compressed bytes directly (avoid decompress/recompress)
+          # Copy structured data only — blobs were freed after the snapshot was processed
           # rubocop:disable Rails/SkipsModelValidations
           PvpLeaderboardEntry.where(id: entry_ids).update_all(
-            raw_equipment:               snapshot.read_attribute(:raw_equipment),
-            raw_specialization:          snapshot.read_attribute(:raw_specialization),
             item_level:                  snapshot.item_level,
             tier_set_id:                 snapshot.tier_set_id,
             tier_set_name:               snapshot.tier_set_name,
@@ -80,12 +75,40 @@ module Pvp
           )
           # rubocop:enable Rails/SkipsModelValidations
 
+          # Clone entry items from the snapshot to each new entry
+          clone_entry_items(snapshot, entry_ids)
+
           logger.info(
             "[SyncCharacterService] Reused snapshot from entry #{snapshot.id} " \
             "for #{entry_ids.size} entries: #{entry_ids.join(', ')}"
           )
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+        def clone_entry_items(snapshot, entry_ids)
+          source_items = snapshot.pvp_leaderboard_entry_items
+          return if source_items.empty?
+
+          now = Time.current
+          records = entry_ids.flat_map do |entry_id|
+            source_items.map do |item|
+              {
+                pvp_leaderboard_entry_id: entry_id,
+                item_id:                  item.item_id,
+                slot:                     item.slot,
+                item_level:               item.item_level,
+                context:                  item.context,
+                raw:                      item.raw,
+                created_at:               now,
+                updated_at:               now
+              }
+            end
+          end
+
+          # rubocop:disable Rails/SkipsModelValidations
+          PvpLeaderboardEntryItem.insert_all!(records) if records.any?
+          # rubocop:enable Rails/SkipsModelValidations
+        end
 
         def apply_fresh_snapshot(entries, equipment_json, talents_json)
           entry_ids = entries.map(&:id)

@@ -13,7 +13,9 @@ module Pvp
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
     end
 
-    def perform(character_ids:, locale: "en_US")
+    def perform(character_ids:, locale: "en_US", sync_cycle_id: nil)
+      @sync_cycle_id = sync_cycle_id
+
       ids = Array(character_ids).compact
       return if ids.empty?
 
@@ -41,6 +43,8 @@ module Pvp
         entry_ids: all_entry_ids,
         locale:    locale
       )
+    ensure
+      track_sync_cycle_completion
     end
 
     private
@@ -96,6 +100,23 @@ module Pvp
         )
         outcome.record_failure(id: character&.id, status: :unexpected_error, error: "#{e.class}: #{e.message}")
         nil
+      end
+
+      def track_sync_cycle_completion
+        return unless @sync_cycle_id
+
+        cycle = PvpSyncCycle.find_by(id: @sync_cycle_id)
+        return unless cycle
+
+        cycle.increment_completed_character_batches!
+
+        if cycle.all_character_batches_done?
+          Pvp::BuildAggregationsJob.perform_later(sync_cycle_id: @sync_cycle_id)
+        end
+      rescue => e
+        Rails.logger.error(
+          "[SyncCharacterBatchJob] Failed to track sync cycle #{@sync_cycle_id}: #{e.message}"
+        )
       end
   end
 end

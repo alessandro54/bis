@@ -35,8 +35,10 @@ module Pvp
         equipment_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
         equipment_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
 
-        # Return attrs and a proc for rebuilding items (called inside the shared transaction)
-        rebuild_proc = -> { rebuild_entry_items(processed_equipment) }
+        # Only rebuild items if equipment actually changed (change detection)
+        rebuild_proc = if items_changed?(processed_equipment)
+          -> { rebuild_entry_items(processed_equipment) }
+        end
 
         success(entry, context: { attrs: equipment_attrs, rebuild_items_proc: rebuild_proc })
       rescue => e
@@ -47,6 +49,21 @@ module Pvp
       private
 
         attr_reader :entry, :locale
+
+        def items_changed?(processed_equipment)
+          equipped_items = processed_equipment.is_a?(Hash) ? processed_equipment["equipped_items"] : {}
+          return true if equipped_items.empty? && entry.pvp_leaderboard_entry_items.any?
+          return true if entry.pvp_leaderboard_entry_items.empty?
+
+          new_fingerprint = equipped_items.sort.map { |slot, data| "#{slot}:#{data["item_id"]}" }.join(",")
+          existing_fingerprint = entry.pvp_leaderboard_entry_items
+            .order(:slot)
+            .pluck(:slot, :item_id)
+            .map { |slot, item_id| "#{slot.upcase}:#{item_id}" }
+            .join(",")
+
+          new_fingerprint != existing_fingerprint
+        end
 
         # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def rebuild_entry_items(processed_equipment)

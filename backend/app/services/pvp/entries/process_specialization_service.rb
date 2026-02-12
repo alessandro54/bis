@@ -1,8 +1,9 @@
 module Pvp
   module Entries
     class ProcessSpecializationService < ApplicationService
-      def initialize(entry:)
-        @entry = entry
+      def initialize(entry:, locale: "en_US")
+        @entry  = entry
+        @locale = locale
       end
 
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
@@ -50,7 +51,27 @@ module Pvp
         end
         # rubocop:enable Rails/SkipsModelValidations
 
-        success(entry, context: { attrs: spec_attrs })
+        # Upsert talent entities (always — cheap idempotent upsert)
+        talent_upsert = Blizzard::Data::Talents::UpsertFromRawSpecializationService.call(
+          raw_specialization: spec_service.talents,
+          locale:             locale
+        )
+
+        # Only rebuild character junction records if the build actually changed
+        new_loadout_code = spec_service.talents["talent_loadout_code"]
+        character = entry.character
+        talents_changed = character.talent_loadout_code != new_loadout_code
+
+        rebuild_proc = if talents_changed
+          -> {
+            # rubocop:disable Rails/SkipsModelValidations
+            character.update_columns(talent_loadout_code: new_loadout_code)
+            # rubocop:enable Rails/SkipsModelValidations
+            rebuild_character_talents(character, talent_upsert)
+          }
+        end
+
+        success(entry, context: { attrs: spec_attrs, rebuild_talents_proc: rebuild_proc })
       rescue => e
         failure(e)
       end
@@ -58,7 +79,34 @@ module Pvp
 
       private
 
-        attr_reader :entry
+        attr_reader :entry, :locale
+
+        def rebuild_character_talents(character, talent_upsert)
+          character.character_talents.delete_all
+
+          records = []
+          now = Time.current
+
+          talent_upsert.each do |_type, talents|
+            Array(talents).each do |talent_data|
+              next unless talent_data[:talent_id]
+
+              records << {
+                character_id: character.id,
+                talent_id:    talent_data[:talent_id],
+                talent_type:  talent_data[:talent_type],
+                rank:         talent_data[:rank] || 1,
+                slot_number:  talent_data[:slot_number],
+                created_at:   now,
+                updated_at:   now
+              }
+            end
+          end
+
+          # rubocop:disable Rails/SkipsModelValidations
+          CharacterTalent.insert_all!(records) if records.any?
+          # rubocop:enable Rails/SkipsModelValidations
+        end
     end
   end
 end

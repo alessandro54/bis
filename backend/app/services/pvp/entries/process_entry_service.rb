@@ -13,7 +13,7 @@ module Pvp
         eq_result = ProcessEquipmentService.call(entry: entry, locale: locale)
         return eq_result if eq_result.failure?
 
-        spec_result = ProcessSpecializationService.call(entry: entry)
+        spec_result = ProcessSpecializationService.call(entry: entry, locale: locale)
         return spec_result if spec_result.failure?
 
         # Merge attrs from both services into a single UPDATE
@@ -29,7 +29,16 @@ module Pvp
 
             # Rebuild entry items if equipment was processed
             eq_result.context[:rebuild_items_proc]&.call
+
+            # Rebuild character talents if build changed
+            spec_result.context[:rebuild_talents_proc]&.call
           end
+
+          # Free raw blobs now that structured data is extracted.
+          # Saves ~5 KB/entry (97% of row size).
+          # rubocop:disable Rails/SkipsModelValidations
+          entry.update_columns(raw_equipment: nil, raw_specialization: nil)
+          # rubocop:enable Rails/SkipsModelValidations
         end
 
         success(entry)

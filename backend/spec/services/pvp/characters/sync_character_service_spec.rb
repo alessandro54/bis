@@ -108,8 +108,10 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
         expect(result).to be_success
         expect(result.context[:status]).to eq(:reused_snapshot)
 
-        expect(entry_2v2.reload.raw_equipment).to eq(snapshot_entry.raw_equipment)
-        expect(entry_3v3.reload.raw_equipment).to eq(snapshot_entry.raw_equipment)
+        # Structured data is copied, blobs are not (freed after processing)
+        expect(entry_2v2.reload.item_level).to eq(snapshot_entry.item_level)
+        expect(entry_3v3.reload.item_level).to eq(snapshot_entry.item_level)
+        expect(entry_2v2.reload.spec_id).to eq(snapshot_entry.spec_id)
       end
 
       it "does not call the Blizzard APIs" do

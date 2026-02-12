@@ -48,6 +48,7 @@ module Wow
 
       577 => { spec_slug: "havoc", class_id: 12, class_slug: "demon_hunter", role: :dps },
       581 => { spec_slug: "vengeance", class_id: 12, class_slug: "demon_hunter", role: :tank },
+      1480 => { spec_slug: "devourer", class_id: 12, class_slug: "demon_hunter", role: :dps },
 
       1467 => { spec_slug: "devastation",  class_id: 13, class_slug: "evoker",    role: :dps },
       1468 => { spec_slug: "preservation", class_id: 13, class_slug: "evoker",    role: :healer },

@@ -12,12 +12,10 @@ module Pvp
 
       def entry
         # Optimized query with proper indexing - uses composite index on character_id + equipment_processed_at
+        # Blobs are nulled after processing, so only check structured data presence
         PvpLeaderboardEntry
           .where(character_id:)
-          .where.not(equipment_processed_at:      nil,
-                     specialization_processed_at: nil,
-                     raw_equipment:               nil,
-                     raw_specialization:          nil)
+          .where.not(equipment_processed_at: nil, specialization_processed_at: nil)
           .where("equipment_processed_at > ?", ttl_hours.hours.ago)
           .order(equipment_processed_at: :desc)
           .limit(1)

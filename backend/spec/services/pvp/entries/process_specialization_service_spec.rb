@@ -48,7 +48,7 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
       "name" => "Stormbringer"
     }
   end
-  let(:talents)    { [ { "dummy" => "talent" } ] }
+  let(:talents)    { { "class_talents" => [], "spec_talents" => [], "hero_talents" => [], "pvp_talents" => [], "talent_loadout_code" => "abc123" } }
   let(:class_slug) { "Shaman" }
   let(:class_id)   { 7 }
 

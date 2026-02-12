@@ -13,8 +13,8 @@
 #
 # Indexes
 #
-#  index_pvp_leaderboards_on_pvp_season_id              (pvp_season_id)
-#  index_pvp_leaderboards_on_pvp_season_id_and_bracket  (pvp_season_id,bracket) UNIQUE
+#  idx_leaderboards_season_bracket_region   (pvp_season_id,bracket,region) UNIQUE
+#  index_pvp_leaderboards_on_pvp_season_id  (pvp_season_id)
 #
 # Foreign Keys
 #

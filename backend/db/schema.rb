@@ -10,9 +10,22 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_11_234148) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "character_talents", force: :cascade do |t|
+    t.bigint "character_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "rank", default: 1
+    t.integer "slot_number"
+    t.bigint "talent_id", null: false
+    t.string "talent_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["character_id", "talent_id"], name: "idx_character_talents_on_char_and_talent", unique: true
+    t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
+    t.index ["talent_id"], name: "index_character_talents_on_talent_id"
+  end
 
   create_table "characters", force: :cascade do |t|
     t.string "avatar_url"
@@ -31,10 +44,12 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.integer "race_id"
     t.string "realm"
     t.string "region"
+    t.string "talent_loadout_code"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
+    t.index ["talent_loadout_code"], name: "index_characters_on_talent_loadout_code"
   end
 
   create_table "items", force: :cascade do |t|
@@ -121,8 +136,76 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.bigint "pvp_season_id", null: false
     t.string "region"
     t.datetime "updated_at", null: false
-    t.index ["pvp_season_id", "bracket"], name: "index_pvp_leaderboards_on_pvp_season_id_and_bracket", unique: true
+    t.index ["pvp_season_id", "bracket", "region"], name: "idx_leaderboards_season_bracket_region", unique: true
     t.index ["pvp_season_id"], name: "index_pvp_leaderboards_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_hero_trees", force: :cascade do |t|
+    t.decimal "avg_rating", precision: 7, scale: 2
+    t.decimal "avg_winrate", precision: 5, scale: 4
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.integer "hero_talent_tree_id", null: false
+    t.string "hero_talent_tree_name"
+    t.bigint "pvp_season_id", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["pvp_season_id", "bracket", "spec_id"], name: "idx_hero_trees_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_hero_trees_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_item_popularity", force: :cascade do |t|
+    t.decimal "avg_item_level", precision: 6, scale: 2
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "item_id", null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "slot", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["item_id"], name: "index_pvp_meta_item_popularity_on_item_id"
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_item_popularity_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_item_popularity_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_talent_builds", force: :cascade do |t|
+    t.decimal "avg_rating", precision: 7, scale: 2
+    t.decimal "avg_winrate", precision: 5, scale: 4
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "pvp_season_id", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.string "talent_loadout_code", null: false
+    t.integer "total_entries", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["pvp_season_id", "bracket", "spec_id"], name: "idx_talent_builds_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_talent_builds_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_talent_picks", force: :cascade do |t|
+    t.decimal "avg_rating", precision: 7, scale: 2
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.decimal "pick_rate", precision: 5, scale: 4
+    t.bigint "pvp_season_id", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.bigint "talent_id", null: false
+    t.string "talent_type", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.index ["pvp_season_id", "bracket", "spec_id", "talent_type"], name: "idx_talent_picks_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_talent_picks_on_pvp_season_id"
+    t.index ["talent_id"], name: "index_pvp_meta_talent_picks_on_talent_id"
   end
 
   create_table "pvp_seasons", force: :cascade do |t|
@@ -136,6 +219,31 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.index ["blizzard_id"], name: "index_pvp_seasons_on_blizzard_id", unique: true
     t.index ["is_current"], name: "index_pvp_seasons_on_is_current"
     t.index ["updated_at"], name: "index_pvp_seasons_on_updated_at"
+  end
+
+  create_table "pvp_sync_cycles", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.integer "completed_character_batches", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.integer "expected_character_batches", default: 0, null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "regions", default: [], null: false, array: true
+    t.datetime "snapshot_at", null: false
+    t.string "status", default: "syncing_leaderboards", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pvp_season_id", "status"], name: "index_pvp_sync_cycles_on_pvp_season_id_and_status"
+    t.index ["pvp_season_id"], name: "index_pvp_sync_cycles_on_pvp_season_id"
+  end
+
+  create_table "talents", force: :cascade do |t|
+    t.bigint "blizzard_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name"
+    t.integer "spell_id"
+    t.string "talent_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["blizzard_id"], name: "index_talents_on_blizzard_id", unique: true
+    t.index ["talent_type", "blizzard_id"], name: "index_talents_on_talent_type_and_blizzard_id"
   end
 
   create_table "translations", force: :cascade do |t|
@@ -153,9 +261,18 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.index ["translatable_type", "translatable_id"], name: "index_translations_on_translatable"
   end
 
+  add_foreign_key "character_talents", "characters"
+  add_foreign_key "character_talents", "talents"
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
   add_foreign_key "pvp_leaderboard_entry_items", "items"
   add_foreign_key "pvp_leaderboard_entry_items", "pvp_leaderboard_entries"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"
+  add_foreign_key "pvp_meta_hero_trees", "pvp_seasons"
+  add_foreign_key "pvp_meta_item_popularity", "items"
+  add_foreign_key "pvp_meta_item_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_talent_builds", "pvp_seasons"
+  add_foreign_key "pvp_meta_talent_picks", "pvp_seasons"
+  add_foreign_key "pvp_meta_talent_picks", "talents"
+  add_foreign_key "pvp_sync_cycles", "pvp_seasons"
 end

@@ -59,7 +59,7 @@ RSpec.describe Pvp::Entries::ProcessEntryService, type: :service do
 
         allow(Pvp::Entries::ProcessSpecializationService)
           .to receive(:call)
-                .with(entry: entry)
+                .with(entry: entry, locale: locale)
                 .and_return(specialization_result)
       end
 
@@ -75,7 +75,7 @@ RSpec.describe Pvp::Entries::ProcessEntryService, type: :service do
 
         expect(Pvp::Entries::ProcessSpecializationService)
           .to have_received(:call)
-                .with(entry: entry)
+                .with(entry: entry, locale: locale)
       end
     end
 
@@ -91,7 +91,7 @@ RSpec.describe Pvp::Entries::ProcessEntryService, type: :service do
 
         allow(Pvp::Entries::ProcessSpecializationService)
           .to receive(:call)
-                .with(entry: entry)
+                .with(entry: entry, locale: locale)
                 .and_return(specialization_result)
       end
 
@@ -107,7 +107,7 @@ RSpec.describe Pvp::Entries::ProcessEntryService, type: :service do
 
         expect(Pvp::Entries::ProcessSpecializationService)
           .to have_received(:call)
-                .with(entry: entry)
+                .with(entry: entry, locale: locale)
       end
     end
 

@@ -16,6 +16,7 @@
 #  race                       :string
 #  realm                      :string
 #  region                     :string
+#  talent_loadout_code        :string
 #  created_at                 :datetime         not null
 #  updated_at                 :datetime         not null
 #  blizzard_id                :bigint
@@ -27,8 +28,12 @@
 #  index_characters_on_blizzard_id_and_region     (blizzard_id,region) UNIQUE
 #  index_characters_on_is_private                 (is_private) WHERE (is_private = true)
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
+#  index_characters_on_talent_loadout_code        (talent_loadout_code)
 #
 class Character < ApplicationRecord
+  has_many :character_talents, dependent: :delete_all
+  has_many :talents, through: :character_talents
+
   validates :name, :realm, :region, presence: true
   validates :name, uniqueness: { scope: %i[realm region] }
 
