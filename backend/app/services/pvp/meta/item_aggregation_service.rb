@@ -28,18 +28,24 @@ module Pvp
           rows = ActiveRecord::Base.connection.exec_query(<<~SQL.squish, "ItemPopularity", [season.id, bracket, rating_min])
             SELECT
               e.spec_id,
-              ei.slot,
-              ei.item_id,
+              ci.slot,
+              ci.item_id,
               COUNT(*) AS usage_count,
-              AVG(ei.item_level) AS avg_item_level
-            FROM pvp_leaderboard_entry_items ei
-            JOIN pvp_leaderboard_entries e ON e.id = ei.pvp_leaderboard_entry_id
-            JOIN pvp_leaderboards lb ON lb.id = e.pvp_leaderboard_id
-            WHERE lb.pvp_season_id = $1
-              AND lb.bracket = $2
-              AND e.rating >= $3
-              AND e.spec_id IS NOT NULL
-            GROUP BY e.spec_id, ei.slot, ei.item_id
+              AVG(ci.item_level) AS avg_item_level
+            FROM character_items ci
+            JOIN (
+              SELECT DISTINCT ON (e.character_id)
+                e.character_id,
+                e.spec_id
+              FROM pvp_leaderboard_entries e
+              JOIN pvp_leaderboards lb ON lb.id = e.pvp_leaderboard_id
+              WHERE lb.pvp_season_id = $1
+                AND lb.bracket = $2
+                AND e.rating >= $3
+                AND e.spec_id IS NOT NULL
+              ORDER BY e.character_id, e.rating DESC
+            ) e ON e.character_id = ci.character_id
+            GROUP BY e.spec_id, ci.slot, ci.item_id
           SQL
 
           return if rows.empty?

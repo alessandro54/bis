@@ -10,9 +10,27 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_11_234148) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_11_234151) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "character_items", force: :cascade do |t|
+    t.integer "bonus_list", default: [], array: true
+    t.bigint "character_id", null: false
+    t.integer "context"
+    t.datetime "created_at", null: false
+    t.integer "embellishment_spell_id"
+    t.integer "enchantment_id"
+    t.bigint "enchantment_source_item_id"
+    t.bigint "item_id", null: false
+    t.integer "item_level"
+    t.string "slot", null: false
+    t.jsonb "sockets", default: []
+    t.datetime "updated_at", null: false
+    t.index ["character_id", "slot"], name: "idx_character_items_on_char_and_slot", unique: true
+    t.index ["enchantment_id"], name: "index_character_items_on_enchantment_id", where: "(enchantment_id IS NOT NULL)"
+    t.index ["item_id"], name: "index_character_items_on_item_id"
+  end
 
   create_table "character_talents", force: :cascade do |t|
     t.bigint "character_id", null: false
@@ -33,6 +51,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_11_234148) do
     t.bigint "class_id"
     t.string "class_slug"
     t.datetime "created_at", null: false
+    t.string "equipment_fingerprint"
     t.integer "faction"
     t.string "inset_url"
     t.boolean "is_private", default: false
@@ -47,6 +66,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_11_234148) do
     t.string "talent_loadout_code"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
+    t.index ["equipment_fingerprint"], name: "index_characters_on_equipment_fingerprint"
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
     t.index ["talent_loadout_code"], name: "index_characters_on_talent_loadout_code"
@@ -113,20 +133,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_11_234148) do
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
     t.index ["snapshot_at"], name: "index_pvp_entries_on_snapshot_at"
     t.index ["tier_set_id"], name: "index_pvp_leaderboard_entries_on_tier_set_id"
-  end
-
-  create_table "pvp_leaderboard_entry_items", force: :cascade do |t|
-    t.string "context"
-    t.datetime "created_at", null: false
-    t.bigint "item_id", null: false
-    t.integer "item_level"
-    t.bigint "pvp_leaderboard_entry_id", null: false
-    t.jsonb "raw"
-    t.string "slot"
-    t.datetime "updated_at", null: false
-    t.index ["item_id"], name: "index_pvp_leaderboard_entry_items_on_item_id"
-    t.index ["pvp_leaderboard_entry_id", "slot"], name: "index_entry_items_on_entry_and_slot", unique: true
-    t.index ["pvp_leaderboard_entry_id"], name: "index_pvp_leaderboard_entry_items_on_pvp_leaderboard_entry_id"
   end
 
   create_table "pvp_leaderboards", force: :cascade do |t|
@@ -261,12 +267,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_11_234148) do
     t.index ["translatable_type", "translatable_id"], name: "index_translations_on_translatable"
   end
 
+  add_foreign_key "character_items", "characters"
+  add_foreign_key "character_items", "items"
+  add_foreign_key "character_items", "items", column: "enchantment_source_item_id"
   add_foreign_key "character_talents", "characters"
   add_foreign_key "character_talents", "talents"
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
-  add_foreign_key "pvp_leaderboard_entry_items", "items"
-  add_foreign_key "pvp_leaderboard_entry_items", "pvp_leaderboard_entries"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"
   add_foreign_key "pvp_meta_hero_trees", "pvp_seasons"
   add_foreign_key "pvp_meta_item_popularity", "items"

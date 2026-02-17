@@ -81,9 +81,6 @@ class PvpLeaderboardEntry < ApplicationRecord
       .where("pvp_leaderboard_entries.snapshot_at = (#{latest_processed.to_sql})")
   }
 
-  has_many :pvp_leaderboard_entry_items, dependent: :destroy
-  has_many :items, through: :pvp_leaderboard_entry_items
-
   self.filter_attributes += %i[
     raw_equipment raw_specialization
   ]

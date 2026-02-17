@@ -22,8 +22,8 @@
 class Item < ApplicationRecord
   include Translatable
 
-  has_many :pvp_leaderboard_entry_items, dependent: :destroy
-  has_many :pvp_leaderboard_entries, through: :pvp_leaderboard_entry_items
+  has_many :character_items, dependent: :destroy
+  has_many :characters, through: :character_items
 
   validates :blizzard_id, presence: true, uniqueness: true
 

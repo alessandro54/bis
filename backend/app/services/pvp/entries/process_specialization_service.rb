@@ -1,18 +1,15 @@
 module Pvp
   module Entries
-    class ProcessSpecializationService < ApplicationService
-      def initialize(entry:, locale: "en_US")
-        @entry  = entry
-        @locale = locale
+    class ProcessSpecializationService < BaseService
+      def initialize(character:, raw_specialization:, locale: "en_US")
+        @character          = character
+        @raw_specialization = raw_specialization
+        @locale             = locale
       end
 
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def call
-        return success(entry) if entry.specialization_processed_at.present?
-
-        spec_service = Blizzard::Data::CharacterEquipmentSpecializationsService.new(
-          entry.raw_specialization
-        )
+        spec_service = Blizzard::Data::CharacterEquipmentSpecializationsService.new(raw_specialization)
 
         unless spec_service.has_data?
           return failure("No specialization data")
@@ -27,51 +24,34 @@ module Pvp
           return failure("Unknown spec id: #{active_spec["id"].inspect}")
         end
 
-        # Build attrs (written by ProcessEntryService in a single UPDATE)
-        spec_attrs = {
-          specialization_processed_at: Time.zone.now,
-          spec_id:                     spec_id,
-          hero_talent_tree_name:       hero_tree&.fetch("name", nil).to_s.downcase,
-          hero_talent_tree_id:         hero_tree&.fetch("id", nil),
-          raw_specialization:          PvpLeaderboardEntry.compress_json_value(spec_service.talents)
-        }
-
-        # Update character class info if missing or changed
         # rubocop:disable Rails/SkipsModelValidations
         if spec_service.class_slug.present?
           normalized_slug = spec_service.class_slug.to_s.downcase.strip.gsub(" ", "_")
-          character = entry.character
-
           if character.class_slug != normalized_slug || character.class_id != class_id
-            character.update_columns(
-              class_slug: normalized_slug,
-              class_id:   class_id
-            )
+            character.update_columns(class_slug: normalized_slug, class_id: class_id)
           end
         end
-        # rubocop:enable Rails/SkipsModelValidations
 
-        # Upsert talent entities (always — cheap idempotent upsert)
-        talent_upsert = Blizzard::Data::Talents::UpsertFromRawSpecializationService.call(
+        talent_upsert    = Blizzard::Data::Talents::UpsertFromRawSpecializationService.call(
           raw_specialization: spec_service.talents,
           locale:             locale
         )
-
-        # Only rebuild character junction records if the build actually changed
         new_loadout_code = spec_service.talents["talent_loadout_code"]
-        character = entry.character
-        talents_changed = character.talent_loadout_code != new_loadout_code
 
-        rebuild_proc = if talents_changed
-          -> {
-            # rubocop:disable Rails/SkipsModelValidations
-            character.update_columns(talent_loadout_code: new_loadout_code)
-            # rubocop:enable Rails/SkipsModelValidations
-            rebuild_character_talents(character, talent_upsert)
-          }
+        if character.talent_loadout_code != new_loadout_code
+          character.update_columns(talent_loadout_code: new_loadout_code)
+          rebuild_character_talents(talent_upsert)
         end
+        # rubocop:enable Rails/SkipsModelValidations
 
-        success(entry, context: { attrs: spec_attrs, rebuild_talents_proc: rebuild_proc })
+        entry_attrs = {
+          specialization_processed_at: Time.zone.now,
+          spec_id:                     spec_id,
+          hero_talent_tree_name:       hero_tree&.fetch("name", nil).to_s.downcase,
+          hero_talent_tree_id:         hero_tree&.fetch("id", nil)
+        }
+
+        success(nil, context: { entry_attrs: entry_attrs })
       rescue => e
         failure(e)
       end
@@ -79,13 +59,13 @@ module Pvp
 
       private
 
-        attr_reader :entry, :locale
+        attr_reader :character, :raw_specialization, :locale
 
-        def rebuild_character_talents(character, talent_upsert)
+        def rebuild_character_talents(talent_upsert)
           character.character_talents.delete_all
 
+          now     = Time.current
           records = []
-          now = Time.current
 
           talent_upsert.each do |_type, talents|
             Array(talents).each do |talent_data|

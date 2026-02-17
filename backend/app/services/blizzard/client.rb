@@ -39,6 +39,10 @@ module Blizzard
     }.stringify_keys!.freeze
     DEFAULT_LOCALE = "en_US".freeze
 
+    def self.default_locale_for(region)
+      VALID_LOCALES.fetch(region.to_s, VALID_LOCALES["us"]).first
+    end
+
     def initialize(region: "us", locale: DEFAULT_LOCALE, auth: Blizzard::Auth.new)
       raise ArgumentError, "Unsupported Blizzard API region: #{region}" unless VALID_REGIONS.include?(region)
 

@@ -9,28 +9,27 @@ module Blizzard
         def call
           return { "equipped_items" => {} } if items.empty?
 
-          # Bulk upsert all items at once for better performance
           item_records = items.filter_map { |raw_item| build_item_record(raw_item) }
-
           return { "equipped_items" => {} } if item_records.empty?
 
-          unique_item_records = item_records.uniq { |record| record[:blizzard_id] }
+          # Enchantment source items (scrolls/reagents) are referenced by FK in
+          # character_items but are NOT part of the equipped_items list, so they must
+          # be upserted separately before the FK insert happens.
+          enchantment_source_records = items.filter_map do |raw_item|
+            blz_id = extract_enchantment_source_blizzard_id(raw_item)
+            blz_id ? { blizzard_id: blz_id } : nil
+          end
 
-          # Upsert items in bulk
+          all_records = (item_records + enchantment_source_records).uniq { |r| r[:blizzard_id] }
+
           # rubocop:disable Rails/SkipsModelValidations
-          Item.upsert_all(
-            unique_item_records,
-            unique_by: :blizzard_id,
-            returning: false
-          )
+          Item.upsert_all(all_records, unique_by: :blizzard_id, returning: false)
           # rubocop:enable Rails/SkipsModelValidations
 
-          blizzard_ids = unique_item_records.map { |record| record[:blizzard_id] }
+          all_blizzard_ids = all_records.map { |r| r[:blizzard_id] }
+          items_by_blizzard_id = fetch_item_ids_with_cache(all_blizzard_ids)
 
-          # Fetch internal item IDs - use cache to avoid repeated DB queries
-          items_by_blizzard_id = fetch_item_ids_with_cache(blizzard_ids)
-
-          # Handle translations separately, reusing the ID map to avoid a duplicate query
+          # Translations only for equipped items — enchantment sources have no name in raw data
           upsert_translations(items_by_blizzard_id)
 
           # Build slot -> item mapping with all relevant data
@@ -40,13 +39,20 @@ module Blizzard
             blizzard_id = extract_blizzard_id(raw_item)
             next unless slot && blizzard_id
 
+            enc_src_blz_id = extract_enchantment_source_blizzard_id(raw_item)
+
             equipped_items[slot] = {
-              "blizzard_id" => blizzard_id,
-              "item_id" => items_by_blizzard_id[blizzard_id],
-              "item_level" => raw_item.dig("level", "value"),
-              "name" => raw_item["name"],
-              "quality" => raw_item.dig("quality", "type")&.downcase,
-              "context" => raw_item["context"]
+              "blizzard_id"                => blizzard_id,
+              "item_id"                    => items_by_blizzard_id[blizzard_id],
+              "item_level"                 => raw_item.dig("level", "value"),
+              "name"                       => raw_item["name"],
+              "quality"                    => raw_item.dig("quality", "type")&.downcase,
+              "context"                    => raw_item["context"],
+              "bonus_list"                 => raw_item["bonus_list"] || [],
+              "enchantment_id"             => extract_enchantment_id(raw_item),
+              "enchantment_source_item_id" => enc_src_blz_id ? items_by_blizzard_id[enc_src_blz_id] : nil,
+              "embellishment_spell_id"     => extract_embellishment_spell_id(raw_item),
+              "sockets"                    => extract_sockets(raw_item)
             }
           end
 
@@ -136,6 +142,32 @@ module Blizzard
 
           def extract_blizzard_id(raw_item)
             raw_item.dig("item", "id")
+          end
+
+          def extract_enchantment_id(raw_item)
+            permanent = Array(raw_item["enchantments"])
+              .find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
+            permanent&.dig("enchantment_id")
+          end
+
+          # Returns the Blizzard ID of the enchanting reagent/scroll, not an internal item ID.
+          def extract_enchantment_source_blizzard_id(raw_item)
+            permanent = Array(raw_item["enchantments"])
+              .find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
+            permanent&.dig("source_item", "id")
+          end
+
+          def extract_embellishment_spell_id(raw_item)
+            Array(raw_item["spells"]).first&.dig("spell", "id")
+          end
+
+          def extract_sockets(raw_item)
+            Array(raw_item["sockets"]).map do |socket|
+              {
+                "type"    => socket.dig("socket_type", "type"),
+                "item_id" => socket.dig("item", "id")
+              }
+            end
           end
 
           def build_item_record(raw_item)

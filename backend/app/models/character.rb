@@ -6,6 +6,7 @@
 #  id                         :bigint           not null, primary key
 #  avatar_url                 :string
 #  class_slug                 :string
+#  equipment_fingerprint      :string
 #  faction                    :integer
 #  inset_url                  :string
 #  is_private                 :boolean          default(FALSE)
@@ -26,6 +27,7 @@
 # Indexes
 #
 #  index_characters_on_blizzard_id_and_region     (blizzard_id,region) UNIQUE
+#  index_characters_on_equipment_fingerprint      (equipment_fingerprint)
 #  index_characters_on_is_private                 (is_private) WHERE (is_private = true)
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
 #  index_characters_on_talent_loadout_code        (talent_loadout_code)
@@ -33,6 +35,8 @@
 class Character < ApplicationRecord
   has_many :character_talents, dependent: :delete_all
   has_many :talents, through: :character_talents
+  has_many :character_items, dependent: :delete_all
+  has_many :items, through: :character_items
 
   validates :name, :realm, :region, presence: true
   validates :name, uniqueness: { scope: %i[realm region] }
