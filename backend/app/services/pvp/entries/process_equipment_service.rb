@@ -1,6 +1,8 @@
 module Pvp
   module Entries
     class ProcessEquipmentService < BaseService
+      EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
+
       def initialize(character:, raw_equipment:, locale: "en_US")
         @character     = character
         @raw_equipment = raw_equipment
@@ -13,15 +15,21 @@ module Pvp
           return failure("Missing equipped_items in raw_equipment")
         end
 
+        # Compute fingerprint from raw Blizzard IDs + item level + enchantment —
+        # no DB round-trip required. Skip all DB writes when gear is unchanged.
+        new_fingerprint = raw_fingerprint
+
+        if character.equipment_fingerprint == new_fingerprint
+          return success(nil, context: { entry_attrs: { equipment_processed_at: Time.zone.now } })
+        end
+
         equipment_service = Blizzard::Data::Items::UpsertFromRawEquipmentService.new(
           raw_equipment: raw_equipment,
           locale:        locale
         )
         processed = equipment_service.call
 
-        new_fingerprint = compute_fingerprint(processed)
-        rebuild_character_items(character, processed,
-new_fingerprint) if character.equipment_fingerprint != new_fingerprint
+        rebuild_character_items(character, processed, new_fingerprint)
 
         entry_attrs = { equipment_processed_at: Time.zone.now }
         entry_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
@@ -37,9 +45,27 @@ new_fingerprint) if character.equipment_fingerprint != new_fingerprint
 
         attr_reader :character, :raw_equipment, :locale
 
-        def compute_fingerprint(processed)
-          equipped_items = processed.is_a?(Hash) ? processed["equipped_items"] : {}
-          equipped_items.sort.map { |slot, data| "#{slot}:#{data["item_id"]}" }.join(",")
+        # Fingerprint built entirely from raw API data — slot, Blizzard item ID,
+        # item level, and permanent enchantment ID. No DB lookups needed, so the
+        # check happens before any writes.
+        def raw_fingerprint
+          Array(raw_equipment["equipped_items"])
+            .reject { |item|
+              slot  = item.dig("slot", "type")
+              ilvl  = item.dig("level", "value").to_i
+              EXCLUDED_SLOTS.include?(slot) || ilvl <= 0
+            }
+            .map { |item|
+              slot   = item.dig("slot", "type")&.downcase
+              blz_id = item.dig("item", "id")
+              ilvl   = item.dig("level", "value").to_i
+              enc    = Array(item["enchantments"])
+                         .find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
+                         &.dig("enchantment_id")
+              "#{slot}:#{blz_id}:#{ilvl}:#{enc}"
+            }
+            .sort
+            .join(",")
         end
 
         # rubocop:disable Metrics/MethodLength

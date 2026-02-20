@@ -3,10 +3,11 @@ module Pvp
     class SyncCharacterService < BaseService
       DEFAULT_TTL_HOURS = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
 
-      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS)
-        @character = character
-        @locale    = locale
-        @ttl_hours = ttl_hours
+      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS, entries: nil)
+        @character         = character
+        @locale            = locale
+        @ttl_hours         = ttl_hours
+        @preloaded_entries = entries
       end
 
       def call
@@ -33,7 +34,7 @@ module Pvp
 
       private
 
-        attr_reader :character, :locale, :ttl_hours
+        attr_reader :character, :locale, :ttl_hours, :preloaded_entries
 
         # ------------------------------------------------------------------
         # TTL / reuse
@@ -193,6 +194,10 @@ module Pvp
         end
 
         def latest_entries_per_bracket
+          # Use pre-loaded data when available (batch job pre-loads for all
+          # characters at once to avoid N+1 queries).
+          return preloaded_entries unless preloaded_entries.nil?
+
           PvpLeaderboardEntry
             .joins(:pvp_leaderboard)
             .where(character_id: character.id)

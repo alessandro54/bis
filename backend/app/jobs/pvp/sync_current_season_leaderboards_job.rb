@@ -9,6 +9,18 @@ module Pvp
       "eu" => "en_GB"
     }.freeze
 
+    # Each region gets its own SolidQueue worker so US and EU API calls never
+    # compete for the same worker — and a rate-limit hit on one region doesn't
+    # stall the other.
+    REGION_QUEUES = {
+      "us" => :character_sync_us,
+      "eu" => :character_sync_eu
+    }.freeze
+
+    # Max simultaneous Blizzard HTTP calls during leaderboard discovery + sync.
+    # Raise via PVP_LEADERBOARD_CONCURRENCY env var if rate limits allow.
+    MAX_LEADERBOARD_CONCURRENCY = ENV.fetch("PVP_LEADERBOARD_CONCURRENCY", 10).to_i
+
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def perform(locale: "en_US")
       season = PvpSeason.current
@@ -22,64 +34,67 @@ module Pvp
         status:      :syncing_leaderboards
       )
 
-      # Phase 1: Sync all regions x all brackets inline, collect character_ids
-      all_character_ids = []
+      # Phase 1: Discover brackets for all regions concurrently (parallel HTTP).
+      brackets_by_region = discover_all_brackets_concurrently(season, locale)
 
-      REGIONS.each do |region|
-        brackets = discover_brackets(season, region, REGION_LOCALES.fetch(region, locale))
-
-        brackets.each do |bracket|
-          result = Pvp::Leaderboards::SyncLeaderboardService.call(
-            season:      season,
-            bracket:     bracket,
-            region:      region,
-            locale:      REGION_LOCALES.fetch(region, locale),
-            snapshot_at: snapshot_at
-          )
-          all_character_ids.concat(result.context[:character_ids]) if result.success?
-        rescue => e
-          Rails.logger.error(
-            "[SyncCurrentSeasonLeaderboardsJob] #{region}/#{bracket} failed: #{e.message}"
-          )
-        end
-      end
-
-      # Phase 2: Deduplicate across ALL regions and brackets
-      all_character_ids.uniq!
-
-      recently_synced = PvpLeaderboardEntry
-        .where(character_id: all_character_ids)
-        .where("equipment_processed_at > ?", 1.hour.ago)
-        .distinct.pluck(:character_id).to_set
-
-      characters_to_sync = all_character_ids.reject { |id| recently_synced.include?(id) }
-
-      Rails.logger.info(
-        "[SyncCurrentSeasonLeaderboardsJob] " \
-        "#{all_character_ids.size} total characters, " \
-        "#{characters_to_sync.size} to sync (#{all_character_ids.size - characters_to_sync.size} deduped/recently synced)"
+      # Phase 2: Sync all brackets across all regions concurrently (parallel HTTP).
+      # A character that appears in 2v2 AND shuffle is the same record —
+      # dedup within the region so it is only fetched from Blizzard once.
+      character_ids_by_region = sync_all_leaderboards_concurrently(
+        season, brackets_by_region, snapshot_at
       )
 
-      # Enqueue character batches
-      batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
-      batches = characters_to_sync.each_slice(batch_size).to_a
+      REGIONS.each { |r| character_ids_by_region[r]&.uniq! }
+
+      # Phase 3: Filter recently synced per region, then enqueue each region's
+      # batches to its dedicated queue so US and EU process in parallel.
+      batch_size       = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+      total_batches    = 0
+      region_batch_map = {}
+
+      character_ids_by_region.each do |region, char_ids|
+        next if char_ids.empty?
+
+        recently_synced = PvpLeaderboardEntry
+          .where(character_id: char_ids)
+          .where("equipment_processed_at > ?", 1.hour.ago)
+          .distinct.pluck(:character_id).to_set
+
+        to_sync = char_ids.reject { |id| recently_synced.include?(id) }
+
+        Rails.logger.info(
+          "[SyncCurrentSeasonLeaderboardsJob] #{region}: " \
+          "#{char_ids.size} total, #{to_sync.size} to sync " \
+          "(#{char_ids.size - to_sync.size} recently synced)"
+        )
+
+        region_batch_map[region] = to_sync.each_slice(batch_size).to_a
+        total_batches += region_batch_map[region].size
+      end
 
       sync_cycle.update!(
         status:                     :syncing_characters,
-        expected_character_batches: batches.size
+        expected_character_batches: total_batches
       )
 
-      if batches.empty?
-        Pvp::BuildAggregationsJob.perform_later(sync_cycle_id: sync_cycle.id)
+      if total_batches.zero?
+        sync_cycle.update!(status: :completed)
         return
       end
 
-      batches.each do |batch|
-        Pvp::SyncCharacterBatchJob.perform_later(
-          character_ids: batch,
-          locale:        locale,
-          sync_cycle_id: sync_cycle.id
-        )
+      region_batch_map.each do |region, batches|
+        queue         = REGION_QUEUES.fetch(region, :character_sync_us)
+        region_locale = REGION_LOCALES.fetch(region, locale)
+
+        batches.each do |batch|
+          Pvp::SyncCharacterBatchJob
+            .set(queue: queue)
+            .perform_later(
+              character_ids: batch,
+              locale:        region_locale,
+              sync_cycle_id: sync_cycle.id
+            )
+        end
       end
     rescue => e
       sync_cycle&.update!(status: :failed) if sync_cycle&.persisted?
@@ -89,6 +104,54 @@ module Pvp
 
     private
 
+      # Discover brackets for all regions concurrently via parallel HTTP calls.
+      def discover_all_brackets_concurrently(season, locale)
+        results = run_concurrently(REGIONS, concurrency: REGIONS.size) do |region|
+          region_locale = REGION_LOCALES.fetch(region, locale)
+          brackets      = discover_brackets(season, region, region_locale)
+          { region: region, brackets: brackets, locale: region_locale }
+        end
+
+        results.each_with_object({}) { |r, h| h[r[:region]] = r }
+      end
+
+      # Sync every bracket across every region concurrently.
+      # Returns Hash[region => [character_id, ...]] (not yet deduped).
+      def sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at)
+        tasks = REGIONS.flat_map do |region|
+          info          = brackets_by_region.fetch(region, { brackets: [], locale: REGION_LOCALES[region] })
+          region_locale = info[:locale] || REGION_LOCALES[region]
+          Array(info[:brackets]).map { |b| { region: region, bracket: b, locale: region_locale } }
+        end
+
+        character_ids_by_region = Hash.new { |h, k| h[k] = [] }
+        return character_ids_by_region if tasks.empty?
+
+        concurrency = [tasks.size, MAX_LEADERBOARD_CONCURRENCY].min
+
+        run_concurrently(tasks, concurrency: concurrency) do |task|
+          result = Pvp::Leaderboards::SyncLeaderboardService.call(
+            season:      season,
+            bracket:     task[:bracket],
+            region:      task[:region],
+            locale:      task[:locale],
+            snapshot_at: snapshot_at
+          )
+          { region: task[:region], ids: result.context[:character_ids] } if result.success?
+        rescue => e
+          Rails.logger.error(
+            "[SyncCurrentSeasonLeaderboardsJob] #{task[:region]}/#{task[:bracket]} failed: #{e.message}"
+          )
+          nil
+        end.each do |r|
+          next unless r
+
+          character_ids_by_region[r[:region]].concat(r[:ids] || [])
+        end
+
+        character_ids_by_region
+      end
+
       def discover_brackets(season, region, locale)
         response = Blizzard::Api::GameData::PvpSeason::LeaderboardsIndex.fetch(
           pvp_season_id: season.blizzard_id,
@@ -96,7 +159,7 @@ module Pvp
           locale:        locale
         )
 
-        leaderboards = response.fetch("leaderboards", [])
+        leaderboards  = response.fetch("leaderboards", [])
         bracket_names = leaderboards.map { |lb| lb.dig("name") }.compact
 
         # Only keep brackets that have a known config

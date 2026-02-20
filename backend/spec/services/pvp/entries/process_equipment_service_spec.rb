@@ -102,8 +102,13 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
 
       context "when equipment fingerprint is already current" do
         before do
-          # Fingerprint that matches what processed_equipment produces
-          character.update_columns(equipment_fingerprint: "head:#{item.id}")
+          # Fingerprint computed from raw data: slot:blizzard_id:ilvl:enchantment_id
+          character.update_columns(equipment_fingerprint: "head:#{blizzard_item_id}:540:7534")
+        end
+
+        it "does not call UpsertFromRawEquipmentService" do
+          expect(Blizzard::Data::Items::UpsertFromRawEquipmentService).not_to receive(:new)
+          result
         end
 
         it "does not touch character_items" do
@@ -112,6 +117,11 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
 
         it "does not update the fingerprint" do
           expect { result }.not_to change { character.reload.equipment_fingerprint }
+        end
+
+        it "still returns entry_attrs with equipment_processed_at" do
+          expect(result).to be_success
+          expect(result.context[:entry_attrs][:equipment_processed_at]).to be_present
         end
       end
     end

@@ -1,9 +1,9 @@
 module Pvp
   class SyncCharacterBatchJob < ApplicationJob
     self.enqueue_after_transaction_commit = :always
-    queue_as :character_sync
+    queue_as :character_sync_us  # overridden per-region via .set(queue:) when enqueued
 
-    CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 5).to_i
+    CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 10).to_i
 
     retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
@@ -40,20 +40,46 @@ module Pvp
       def process_characters_concurrently(characters, locale, outcome)
         return if characters.empty?
 
+        # Pre-load all latest entries per bracket for every character in one
+        # DISTINCT ON query — eliminates N per-character queries in the service.
+        entries_by_character_id = batch_load_entries(characters.map(&:id))
+
         concurrency = safe_concurrency(CONCURRENCY, characters.size)
 
         run_concurrently(characters, concurrency: concurrency) do |character|
-          sync_one(character: character, locale: locale, outcome: outcome)
+          sync_one(
+            character: character,
+            locale:    locale,
+            outcome:   outcome,
+            entries:   entries_by_character_id[character.id] || []
+          )
         end
       end
 
-      def sync_one(character:, locale:, outcome:)
+      # Single DISTINCT ON query for all characters; groups results by character_id.
+      def batch_load_entries(character_ids)
+        PvpLeaderboardEntry
+          .joins(:pvp_leaderboard)
+          .where(character_id: character_ids)
+          .select(
+            "DISTINCT ON (pvp_leaderboard_entries.character_id, pvp_leaderboards.bracket) " \
+            "pvp_leaderboard_entries.*"
+          )
+          .order(
+            "pvp_leaderboard_entries.character_id, pvp_leaderboards.bracket, " \
+            "pvp_leaderboard_entries.snapshot_at DESC, pvp_leaderboard_entries.id DESC"
+          )
+          .group_by(&:character_id)
+      end
+
+      def sync_one(character:, locale:, outcome:, entries: nil)
         return unless character
 
         ActiveRecord::Base.connection_pool.with_connection do
           result = Pvp::Characters::SyncCharacterService.call(
             character: character,
-            locale:    locale
+            locale:    locale,
+            entries:   entries
           )
 
           if result.success?
@@ -86,10 +112,7 @@ module Pvp
         return unless cycle
 
         cycle.increment_completed_character_batches!
-
-        if cycle.all_character_batches_done?
-          Pvp::BuildAggregationsJob.perform_later(sync_cycle_id: @sync_cycle_id)
-        end
+        cycle.update!(status: :completed) if cycle.all_character_batches_done?
       rescue => e
         Rails.logger.error(
           "[SyncCharacterBatchJob] Failed to track sync cycle #{@sync_cycle_id}: #{e.message}"

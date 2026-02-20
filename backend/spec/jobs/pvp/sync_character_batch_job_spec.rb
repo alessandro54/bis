@@ -29,11 +29,11 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
       expect(Pvp::Characters::SyncCharacterService)
         .to have_received(:call)
-        .with(character: character1, locale: locale)
+        .with(character: character1, locale: locale, entries: anything)
 
       expect(Pvp::Characters::SyncCharacterService)
         .to have_received(:call)
-        .with(character: character2, locale: locale)
+        .with(character: character2, locale: locale, entries: anything)
     end
 
     it "preloads all characters in a single query" do
@@ -52,7 +52,7 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
         expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call)
-          .with(character: character1, locale: locale)
+          .with(character: character1, locale: locale, entries: anything)
           .once
       end
     end
@@ -87,11 +87,11 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
         expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call)
-          .with(character: character1, locale: locale)
+          .with(character: character1, locale: locale, entries: anything)
 
         expect(Pvp::Characters::SyncCharacterService)
           .not_to have_received(:call)
-          .with(character: private_character, locale: anything)
+          .with(character: private_character, locale: anything, entries: anything)
       end
     end
 

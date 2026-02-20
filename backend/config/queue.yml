@@ -3,16 +3,11 @@ default: &base
     - polling_interval: 0.5
       batch_size: 100
 
-  # All queues in a single process to minimize DB connections.
-  # Batch jobs use internal thread pools (safe_concurrency) for parallelism,
-  # so SolidQueue threads just need to dispatch — not do heavy work themselves.
-  # Total DB connections: 1 process × pool=10 × 2 DBs = 20 (well within PG limits)
+  # Single worker for development — both region queues + everything else.
   workers:
     - queues:
-        - character_sync_a
-        - character_sync_b
-        - character_sync_c
-        - character_sync_d
+        - character_sync_us
+        - character_sync_eu
         - pvp_sync_2v2
         - pvp_sync_3v3
         - pvp_sync_rbg
@@ -32,12 +27,21 @@ production: &production
       batch_size: 100
 
   workers:
-    # I/O-bound: API calls (batch jobs handle concurrency internally)
+    # US characters — dedicated worker so a Blizzard US rate-limit never stalls EU.
+    # Batch jobs handle internal concurrency with async fibers (PVP_SYNC_CONCURRENCY).
+    - queues: [character_sync_us]
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 3) %>
+      processes: 1
+      polling_interval: 0.25
+
+    # EU characters — independent from US, separate Blizzard rate-limit bucket.
+    - queues: [character_sync_eu]
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 3) %>
+      processes: 1
+      polling_interval: 0.25
+
+    # Leaderboard sync + bracket-specific queues
     - queues:
-        - character_sync_a
-        - character_sync_b
-        - character_sync_c
-        - character_sync_d
         - pvp_sync_2v2
         - pvp_sync_3v3
         - pvp_sync_rbg
@@ -46,7 +50,7 @@ production: &production
       processes: 1
       polling_interval: 0.25
 
-    # CPU-bound: data processing + default
+    # CPU-bound: aggregations + default catch-all
     - queues: [pvp_processing, "*"]
       threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 3) %>
       processes: 1
@@ -64,4 +68,3 @@ low_resource:
       threads: 2
       processes: 1
       polling_interval: 1.0
-
