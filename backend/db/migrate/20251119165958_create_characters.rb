@@ -13,8 +13,8 @@ class CreateCharacters < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :characters, [ :blizzard_id, :region ], unique: true
+    add_index :characters, %i[blizzard_id region], unique: true
 
-    add_index :characters,  [ :name, :realm, :region ]
+    add_index :characters, %i[name realm region]
   end
 end

@@ -5,9 +5,9 @@ class AddLeaderboardSnapshotIndexToPvpLeaderboardEntries < ActiveRecord::Migrati
     # Compound index for faster latest_snapshot_for_bracket queries
     # This allows the DB to efficiently filter by leaderboard_id AND snapshot_at together
     add_index :pvp_leaderboard_entries,
-              [:pvp_leaderboard_id, :snapshot_at],
-              name: "index_entries_on_leaderboard_and_snapshot",
-              algorithm: :concurrently,
+              %i[pvp_leaderboard_id snapshot_at],
+              name:          "index_entries_on_leaderboard_and_snapshot",
+              algorithm:     :concurrently,
               if_not_exists: true
   end
 end

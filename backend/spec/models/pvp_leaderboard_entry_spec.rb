@@ -52,8 +52,6 @@ RSpec.describe PvpLeaderboardEntry, type: :model do
   describe 'associations' do
     it { should belong_to(:pvp_leaderboard) }
     it { should belong_to(:character) }
-    it { should have_many(:pvp_leaderboard_entry_items).dependent(:destroy) }
-    it { should have_many(:items).through(:pvp_leaderboard_entry_items) }
   end
 
   describe 'included modules' do

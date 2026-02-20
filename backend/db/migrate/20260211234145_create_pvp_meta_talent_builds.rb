@@ -14,7 +14,7 @@ class CreatePvpMetaTalentBuilds < ActiveRecord::Migration[8.0]
       t.timestamps
     end
     add_index :pvp_meta_talent_builds,
-      [:pvp_season_id, :bracket, :spec_id],
+      %i[pvp_season_id bracket spec_id],
       name: "idx_talent_builds_lookup"
   end
 end

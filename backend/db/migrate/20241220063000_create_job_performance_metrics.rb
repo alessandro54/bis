@@ -8,9 +8,9 @@ class CreateJobPerformanceMetrics < ActiveRecord::Migration[8.1]
       t.datetime :created_at, null: false
       t.datetime :updated_at, null: false
 
-      t.index [:job_class, :created_at]
-      t.index [:created_at]
-      t.index [:success]
+      t.index %i[job_class created_at]
+      t.index [ :created_at ]
+      t.index [ :success ]
     end
   end
 end

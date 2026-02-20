@@ -25,7 +25,8 @@ module Pvp
 
         # rubocop:disable Metrics/MethodLength
         def aggregate_item_popularity
-          rows = ActiveRecord::Base.connection.exec_query(<<~SQL.squish, "ItemPopularity", [season.id, bracket, rating_min])
+          rows = ActiveRecord::Base.connection.exec_query(<<~SQL.squish, "ItemPopularity", 
+[ season.id, bracket, rating_min ])
             SELECT
               e.spec_id,
               ci.slot,
@@ -51,24 +52,24 @@ module Pvp
           return if rows.empty?
 
           # Compute total per spec+slot for usage_pct
-          totals = rows.group_by { |r| [r["spec_id"], r["slot"]] }
+          totals = rows.group_by { |r| [ r["spec_id"], r["slot"] ] }
             .transform_values { |group| group.sum { |r| r["usage_count"] } }
 
           now = Time.current
           records = rows.map do |row|
-            total = totals[[row["spec_id"], row["slot"]]] || 1
+            total = totals[[ row["spec_id"], row["slot"] ]] || 1
             {
-              pvp_season_id: season.id,
-              bracket:       bracket,
-              spec_id:       row["spec_id"],
-              slot:          row["slot"],
-              item_id:       row["item_id"],
-              usage_count:   row["usage_count"],
-              usage_pct:     (row["usage_count"].to_f / total * 100).round(2),
+              pvp_season_id:  season.id,
+              bracket:        bracket,
+              spec_id:        row["spec_id"],
+              slot:           row["slot"],
+              item_id:        row["item_id"],
+              usage_count:    row["usage_count"],
+              usage_pct:      (row["usage_count"].to_f / total * 100).round(2),
               avg_item_level: row["avg_item_level"]&.to_f&.round(2),
-              snapshot_at:   snapshot_at,
-              created_at:    now,
-              updated_at:    now
+              snapshot_at:    snapshot_at,
+              created_at:     now,
+              updated_at:     now
             }
           end
 
@@ -76,7 +77,7 @@ module Pvp
           PvpMetaItemPopularity.insert_all!(records)
           # rubocop:enable Rails/SkipsModelValidations
         end
-        # rubocop:enable Metrics/MethodLength
+      # rubocop:enable Metrics/MethodLength
     end
   end
 end

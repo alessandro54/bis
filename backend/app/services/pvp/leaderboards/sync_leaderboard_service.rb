@@ -59,7 +59,7 @@ module Pvp
               character_attrs
             end
 
-            unique_character_records = character_records.uniq { |c| [c[:blizzard_id], c[:region]] }
+            unique_character_records = character_records.uniq { |c| [ c[:blizzard_id], c[:region] ] }
 
             # rubocop:disable Rails/SkipsModelValidations
             upsert_result = Character.upsert_all(
@@ -69,7 +69,7 @@ module Pvp
             )
             # rubocop:enable Rails/SkipsModelValidations
 
-            char_id_map = upsert_result.rows.to_h { |row| [row[0].to_s, row[1]] }
+            char_id_map = upsert_result.rows.to_h { |row| [ row[0].to_s, row[1] ] }
 
             ActiveRecord::Base.transaction do
               entry_records = entries.map do |entry_json|

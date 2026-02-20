@@ -72,6 +72,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     end
 
     context "when a reusable snapshot exists" do
+      # A previously processed entry serves as the metadata source
       let(:snapshot_entry) do
         create(
           :pvp_leaderboard_entry,
@@ -83,8 +84,6 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
             region:     character.region
           ),
           snapshot_at:                 Time.current - 2.hours,
-          raw_equipment:               { "foo" => "bar" },
-          raw_specialization:          { "spec" => "data" },
           item_level:                  540,
           tier_set_id:                 999,
           tier_set_name:               "Gladiator Set",
@@ -96,19 +95,16 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
       end
 
       before do
-        allow(Pvp::Characters::LastEquipmentSnapshotFinderService)
-          .to receive(:call)
-          .with(character_id: character.id, ttl_hours: ttl_hours)
-          .and_return(snapshot_entry)
+        snapshot_entry  # force creation before service call
+        character.update_columns(last_equipment_snapshot_at: 2.hours.ago)
       end
 
       it "reuses the snapshot for the latest entries" do
         result = call_service
 
         expect(result).to be_success
-        expect(result.context[:status]).to eq(:reused_snapshot)
+        expect(result.context[:status]).to eq(:reused_cache)
 
-        # Structured data is copied, blobs are not (freed after processing)
         expect(entry_2v2.reload.item_level).to eq(snapshot_entry.item_level)
         expect(entry_3v3.reload.item_level).to eq(snapshot_entry.item_level)
         expect(entry_2v2.reload.spec_id).to eq(snapshot_entry.spec_id)
@@ -121,8 +117,8 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
         call_service
       end
 
-      it "does not enqueue processing jobs" do
-        expect { call_service }.not_to have_enqueued_job(Pvp::ProcessLeaderboardEntryJob)
+      it "does not enqueue any background jobs" do
+        expect { call_service }.not_to have_enqueued_job
       end
     end
 
@@ -136,18 +132,13 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
       end
 
       before do
-        allow(Pvp::Characters::LastEquipmentSnapshotFinderService)
-          .to receive(:call)
-          .with(character_id: character.id, ttl_hours: ttl_hours)
-          .and_return(nil)
-
         allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
           .to receive(:fetch)
           .with(
             region: character.region,
             realm:  character.realm,
             name:   character.name,
-            locale: locale
+            locale: Blizzard::Client.default_locale_for(character.region)
           )
           .and_return(equipment_json)
 
@@ -157,34 +148,39 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
             region: character.region,
             realm:  character.realm,
             name:   character.name,
-            locale: locale
+            locale: Blizzard::Client.default_locale_for(character.region)
           )
           .and_return(talents_json)
+
+        allow(Pvp::Entries::ProcessEquipmentService).to receive(:call).and_return(
+          ServiceResult.success(nil, context: {
+            entry_attrs: { equipment_processed_at: Time.current, item_level: 540 }
+          })
+        )
+
+        allow(Pvp::Entries::ProcessSpecializationService).to receive(:call).and_return(
+          ServiceResult.success(nil, context: {
+            entry_attrs: { specialization_processed_at: Time.current, spec_id: 71 }
+          })
+        )
       end
 
-      it "updates all latest entries with fresh raw data" do
+      it "fetches data and processes inline" do
         result = call_service
 
         expect(result).to be_success
-        expect(result.context[:status]).to eq(:applied_fresh_snapshot)
+        expect(result.context[:status]).to eq(:synced)
 
-        expect(entry_2v2.reload.raw_equipment).to eq(equipment_json)
-        expect(entry_3v3.reload.raw_equipment).to eq(equipment_json)
-        expect(entry_2v2.raw_specialization).to eq(talents_json)
-        expect(entry_3v3.raw_specialization).to eq(talents_json)
+        expect(entry_2v2.reload.equipment_processed_at).to be_present
+        expect(entry_3v3.reload.equipment_processed_at).to be_present
+        expect(entry_2v2.reload.spec_id).to eq(71)
+        expect(entry_3v3.reload.spec_id).to eq(71)
       end
 
-      it "enqueues processing jobs for each entry" do
+      it "updates character last_equipment_snapshot_at" do
         expect { call_service }
-          .to have_enqueued_job(Pvp::ProcessLeaderboardEntryBatchJob).exactly(1).times
-      end
-
-      it "assigns processing jobs to deterministic queues" do
-        call_service
-
-        expect(Pvp::ProcessLeaderboardEntryBatchJob)
-          .to have_been_enqueued
-          .with(entry_ids: [ entry_2v2.id, entry_3v3.id ], locale: locale)
+          .to change { character.reload.last_equipment_snapshot_at }
+          .from(nil)
       end
     end
   end

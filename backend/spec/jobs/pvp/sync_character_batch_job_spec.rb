@@ -24,16 +24,16 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
   end
 
   describe "#perform" do
-    it "processes each character directly using SyncCharacterService with enqueue_processing: false" do
+    it "processes each character directly using SyncCharacterService" do
       perform_job
 
       expect(Pvp::Characters::SyncCharacterService)
         .to have_received(:call)
-        .with(character: character1, locale: locale, enqueue_processing: false)
+        .with(character: character1, locale: locale)
 
       expect(Pvp::Characters::SyncCharacterService)
         .to have_received(:call)
-        .with(character: character2, locale: locale, enqueue_processing: false)
+        .with(character: character2, locale: locale)
     end
 
     it "preloads all characters in a single query" do
@@ -44,32 +44,6 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
       perform_job
     end
 
-    context "when characters have entries to process" do
-      before do
-        allow(Pvp::Characters::SyncCharacterService).to receive(:call)
-          .and_return(ServiceResult.success(nil,
-context: { status: :applied_fresh_snapshot, entry_ids_to_process: [ 1, 2 ] }))
-      end
-
-      it "batches all entry IDs and enqueues a single ProcessLeaderboardEntryBatchJob" do
-        expect { perform_job }
-          .to have_enqueued_job(Pvp::ProcessLeaderboardEntryBatchJob)
-          .exactly(:once)
-      end
-    end
-
-    context "when no characters have entries to process" do
-      before do
-        allow(Pvp::Characters::SyncCharacterService).to receive(:call)
-          .and_return(ServiceResult.success(nil, context: { status: :reused_snapshot }))
-      end
-
-      it "does not enqueue ProcessLeaderboardEntryBatchJob" do
-        expect { perform_job }
-          .not_to have_enqueued_job(Pvp::ProcessLeaderboardEntryBatchJob)
-      end
-    end
-
     context "with a single character" do
       let(:character_ids) { [ character1.id ] }
 
@@ -78,7 +52,7 @@ context: { status: :applied_fresh_snapshot, entry_ids_to_process: [ 1, 2 ] }))
 
         expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call)
-          .with(character: character1, locale: locale, enqueue_processing: false)
+          .with(character: character1, locale: locale)
           .once
       end
     end
@@ -113,11 +87,11 @@ context: { status: :applied_fresh_snapshot, entry_ids_to_process: [ 1, 2 ] }))
 
         expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call)
-          .with(character: character1, locale: locale, enqueue_processing: false)
+          .with(character: character1, locale: locale)
 
         expect(Pvp::Characters::SyncCharacterService)
           .not_to have_received(:call)
-          .with(character: private_character, locale: anything, enqueue_processing: anything)
+          .with(character: private_character, locale: anything)
       end
     end
 
@@ -129,14 +103,13 @@ context: { status: :applied_fresh_snapshot, entry_ids_to_process: [ 1, 2 ] }))
           if call_count == 1
             ServiceResult.failure("API error")
           else
-            ServiceResult.success(nil, context: { status: :applied_fresh_snapshot, entry_ids_to_process: [ 3 ] })
+            ServiceResult.success(nil, context: { status: :synced })
           end
         end
       end
 
-      it "continues processing other characters and batches successful entries" do
-        expect { perform_job }
-          .to have_enqueued_job(Pvp::ProcessLeaderboardEntryBatchJob)
+      it "continues processing other characters" do
+        perform_job
 
         expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call).twice
@@ -156,11 +129,10 @@ context: { status: :applied_fresh_snapshot, entry_ids_to_process: [ 1, 2 ] }))
         call_count = 0
         allow(Pvp::Characters::SyncCharacterService).to receive(:call) do
           call_count += 1
-          if call_count == 1
-            raise Blizzard::Client::Error, "Server error"
-          else
-            ServiceResult.success(nil, context: { status: :no_entries })
-          end
+          raise Blizzard::Client::Error, "Server error" if call_count == 1
+
+
+          ServiceResult.success(nil, context: { status: :no_entries })
         end
       end
 

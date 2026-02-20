@@ -23,8 +23,8 @@ require 'rails_helper'
 
 RSpec.describe Item, type: :model do
   describe 'associations' do
-    it { should have_many(:pvp_leaderboard_entry_items).dependent(:destroy) }
-    it { should have_many(:pvp_leaderboard_entries).through(:pvp_leaderboard_entry_items) }
+    it { should have_many(:character_items).dependent(:destroy) }
+    it { should have_many(:characters).through(:character_items) }
   end
 
   describe 'validations' do

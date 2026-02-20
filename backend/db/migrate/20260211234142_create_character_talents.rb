@@ -9,10 +9,10 @@ class CreateCharacterTalents < ActiveRecord::Migration[8.0]
       t.timestamps
     end
     add_index :character_talents,
-      [:character_id, :talent_id],
+      %i[character_id talent_id],
       unique: true, name: "idx_character_talents_on_char_and_talent"
     add_index :character_talents,
-      [:character_id, :talent_type],
+      %i[character_id talent_type],
       name: "idx_character_talents_on_char_and_type"
   end
 end

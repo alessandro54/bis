@@ -13,7 +13,7 @@ class CreatePvpMetaItemPopularity < ActiveRecord::Migration[8.0]
       t.timestamps
     end
     add_index :pvp_meta_item_popularity,
-      [:pvp_season_id, :bracket, :spec_id, :slot],
+      %i[pvp_season_id bracket spec_id slot],
       name: "idx_item_popularity_lookup"
   end
 end

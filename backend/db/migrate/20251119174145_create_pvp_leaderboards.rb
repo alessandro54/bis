@@ -9,6 +9,6 @@ class CreatePvpLeaderboards < ActiveRecord::Migration[8.1]
       t.timestamps
     end
 
-    add_index :pvp_leaderboards, [ :pvp_season_id, :bracket ], unique: true
+    add_index :pvp_leaderboards, %i[pvp_season_id bracket], unique: true
   end
 end

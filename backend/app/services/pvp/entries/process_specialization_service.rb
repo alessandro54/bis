@@ -32,7 +32,7 @@ module Pvp
           end
         end
 
-        talent_upsert    = Blizzard::Data::Talents::UpsertFromRawSpecializationService.call(
+        talent_upsert = Blizzard::Data::Talents::UpsertFromRawSpecializationService.call(
           raw_specialization: spec_service.talents,
           locale:             locale
         )

@@ -10,6 +10,6 @@ class CreatePvpSyncCycles < ActiveRecord::Migration[8.0]
       t.datetime   :completed_at
       t.timestamps
     end
-    add_index :pvp_sync_cycles, [:pvp_season_id, :status]
+    add_index :pvp_sync_cycles, %i[pvp_season_id status]
   end
 end

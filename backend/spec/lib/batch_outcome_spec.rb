@@ -7,7 +7,7 @@ RSpec.describe BatchOutcome do
     it "adds to the successes list" do
       outcome.record_success(id: 1, status: :applied_fresh_snapshot)
 
-      expect(outcome.successes).to eq([{ id: 1, status: :applied_fresh_snapshot }])
+      expect(outcome.successes).to eq([ { id: 1, status: :applied_fresh_snapshot } ])
     end
   end
 
@@ -15,7 +15,7 @@ RSpec.describe BatchOutcome do
     it "adds to the failures list" do
       outcome.record_failure(id: 2, status: :api_error, error: "timeout")
 
-      expect(outcome.failures).to eq([{ id: 2, status: :api_error, error: "timeout" }])
+      expect(outcome.failures).to eq([ { id: 2, status: :api_error, error: "timeout" } ])
     end
   end
 
@@ -70,9 +70,9 @@ RSpec.describe BatchOutcome do
 
       expect(outcome.counts_by_status).to eq(
         applied_fresh_snapshot: 2,
-        reused_snapshot: 1,
-        api_error: 2,
-        rate_limited: 1
+        reused_snapshot:        1,
+        api_error:              2,
+        rate_limited:           1
       )
     end
 

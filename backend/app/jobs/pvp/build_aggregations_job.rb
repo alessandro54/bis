@@ -60,7 +60,7 @@ module Pvp
         "#{PvpMetaItemPopularity.where(pvp_season_id: season.id).count} item popularity records"
       )
     rescue => e
-      cycle&.update(status: :failed) if cycle&.persisted?
+      cycle&.update!(status: :failed) if cycle&.persisted?
       raise
     end
     # rubocop:enable Metrics/MethodLength, Metrics/AbcSize

@@ -35,7 +35,8 @@ module Blizzard
               talent_records << {
                 blizzard_id: blizzard_id,
                 name:        name,
-                talent_type: type
+                talent_type: type,
+                spell_id:    nil
               }
 
               type_records << { blizzard_id: blizzard_id, rank: rank }
@@ -176,7 +177,7 @@ module Blizzard
             return if translation_records.empty?
 
             unique_translations = translation_records.uniq do |r|
-              [r[:translatable_type], r[:translatable_id], r[:locale], r[:key]]
+              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
             end
 
             # rubocop:disable Rails/SkipsModelValidations

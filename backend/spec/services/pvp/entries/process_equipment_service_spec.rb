@@ -90,9 +90,9 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
           expect(created.slot).to eq("HEAD")
           expect(created.item_level).to eq(540)
           expect(created.enchantment_id).to eq(7534)
-          expect(created.enchantment_source_item_id).to eq(226977)
-          expect(created.bonus_list).to eq([ 10397, 9438 ])
-          expect(created.sockets).to eq([ { "type" => "PRISMATIC", "item_id" => 213746 } ])
+          expect(created.enchantment_source_item_id).to eq(enchantment_source_item.id)
+          expect(created.bonus_list).to eq([ 10_397, 9438 ])
+          expect(created.sockets).to eq([ { "type" => "PRISMATIC", "item_id" => 213_746 } ])
         end
 
         it "updates the character's equipment_fingerprint" do

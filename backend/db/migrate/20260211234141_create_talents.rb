@@ -8,6 +8,6 @@ class CreateTalents < ActiveRecord::Migration[8.0]
       t.timestamps
     end
     add_index :talents, :blizzard_id, unique: true
-    add_index :talents, [:talent_type, :blizzard_id]
+    add_index :talents, %i[talent_type blizzard_id]
   end
 end

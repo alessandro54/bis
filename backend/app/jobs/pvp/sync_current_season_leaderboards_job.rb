@@ -16,10 +16,10 @@ module Pvp
 
       snapshot_at = Time.current
       sync_cycle = PvpSyncCycle.create!(
-        pvp_season: season,
-        regions:    REGIONS,
+        pvp_season:  season,
+        regions:     REGIONS,
         snapshot_at: snapshot_at,
-        status:     :syncing_leaderboards
+        status:      :syncing_leaderboards
       )
 
       # Phase 1: Sync all regions x all brackets inline, collect character_ids
@@ -65,7 +65,7 @@ module Pvp
       batches = characters_to_sync.each_slice(batch_size).to_a
 
       sync_cycle.update!(
-        status: :syncing_characters,
+        status:                     :syncing_characters,
         expected_character_batches: batches.size
       )
 
@@ -76,13 +76,13 @@ module Pvp
 
       batches.each do |batch|
         Pvp::SyncCharacterBatchJob.perform_later(
-          character_ids:  batch,
-          locale:         locale,
-          sync_cycle_id:  sync_cycle.id
+          character_ids: batch,
+          locale:        locale,
+          sync_cycle_id: sync_cycle.id
         )
       end
     rescue => e
-      sync_cycle&.update(status: :failed) if sync_cycle&.persisted?
+      sync_cycle&.update!(status: :failed) if sync_cycle&.persisted?
       raise
     end
     # rubocop:enable Metrics/MethodLength, Metrics/AbcSize

@@ -21,41 +21,45 @@ module ServiceSpecHelpers
     {
       "equipped_items" => [
         {
-          "item"       => { "id" => blizzard_item_id },
-          "slot"       => { "type" => "HEAD" },
-          "level"      => { "value" => 540 },
-          "context"    => 26,
-          "name"       => "Test Helm",
-          "quality"    => { "type" => "EPIC" },
-          "bonus_list" => [ 10397, 9438 ],
+          "item" => { "id" => blizzard_item_id },
+          "slot" => { "type" => "HEAD" },
+          "level" => { "value" => 540 },
+          "context" => 26,
+          "name" => "Test Helm",
+          "quality" => { "type" => "EPIC" },
+          "bonus_list" => [ 10_397, 9438 ],
           "enchantments" => [
             {
-              "enchantment_id"   => 7534,
+              "enchantment_id" => 7534,
               "enchantment_slot" => { "type" => "PERMANENT" },
-              "source_item"      => { "id" => 226977 }
+              "source_item" => { "id" => 226_977 }
             }
           ],
-          "sockets" => [ { "socket_type" => { "type" => "PRISMATIC" }, "item" => { "id" => 213746 } } ]
+          "sockets" => [ { "socket_type" => { "type" => "PRISMATIC" }, "item" => { "id" => 213_746 } } ]
         }
       ]
     }
+  end
+
+  def enchantment_source_item
+    @enchantment_source_item ||= create(:item)
   end
 
   def processed_equipment
     {
       "equipped_items" => {
         "head" => {
-          "blizzard_id"                => blizzard_item_id,
-          "item_id"                    => item.id,
-          "item_level"                 => 540,
-          "name"                       => "Test Helm",
-          "quality"                    => "epic",
-          "context"                    => 26,
-          "bonus_list"                 => [ 10397, 9438 ],
-          "enchantment_id"             => 7534,
-          "enchantment_source_item_id" => 226977,
-          "embellishment_spell_id"     => nil,
-          "sockets"                    => [ { "type" => "PRISMATIC", "item_id" => 213746 } ]
+          "blizzard_id" => blizzard_item_id,
+          "item_id" => item.id,
+          "item_level" => 540,
+          "name" => "Test Helm",
+          "quality" => "epic",
+          "context" => 26,
+          "bonus_list" => [ 10_397, 9438 ],
+          "enchantment_id" => 7534,
+          "enchantment_source_item_id" => enchantment_source_item.id,
+          "embellishment_spell_id" => nil,
+          "sockets" => [ { "type" => "PRISMATIC", "item_id" => 213_746 } ]
         }
       }
     }

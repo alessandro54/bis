@@ -14,7 +14,7 @@ class CreatePvpMetaHeroTrees < ActiveRecord::Migration[8.0]
       t.timestamps
     end
     add_index :pvp_meta_hero_trees,
-      [:pvp_season_id, :bracket, :spec_id],
+      %i[pvp_season_id bracket spec_id],
       name: "idx_hero_trees_lookup"
   end
 end

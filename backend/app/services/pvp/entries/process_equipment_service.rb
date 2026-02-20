@@ -20,7 +20,8 @@ module Pvp
         processed = equipment_service.call
 
         new_fingerprint = compute_fingerprint(processed)
-        rebuild_character_items(character, processed, new_fingerprint) if character.equipment_fingerprint != new_fingerprint
+        rebuild_character_items(character, processed,
+new_fingerprint) if character.equipment_fingerprint != new_fingerprint
 
         entry_attrs = { equipment_processed_at: Time.zone.now }
         entry_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
@@ -72,7 +73,7 @@ module Pvp
           character.update_columns(equipment_fingerprint: new_fingerprint)
           # rubocop:enable Rails/SkipsModelValidations
         end
-        # rubocop:enable Metrics/MethodLength
+      # rubocop:enable Metrics/MethodLength
     end
   end
 end

@@ -10,7 +10,7 @@ module Pvp
       end
 
       def call
-        return success(nil, context: { status: :not_found })      unless character
+        return success(nil, context: { status: :not_found }) unless character
         return success(nil, context: { status: :skipped_private }) if character.is_private
 
         entries = latest_entries_per_bracket
@@ -23,7 +23,7 @@ module Pvp
 
         equipment_json, talents_json = fetch_remote_data
         return success(nil, context: { status: :equipment_unavailable }) unless equipment_json
-        return success(nil, context: { status: :talents_unavailable })  unless talents_json
+        return success(nil, context: { status: :talents_unavailable }) unless talents_json
 
         process_inline(entries, equipment_json, talents_json)
         success(entries, context: { status: :synced })

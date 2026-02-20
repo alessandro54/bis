@@ -15,18 +15,19 @@ module Blizzard
           # Enchantment source items (scrolls/reagents) are referenced by FK in
           # character_items but are NOT part of the equipped_items list, so they must
           # be upserted separately before the FK insert happens.
-          enchantment_source_records = items.filter_map do |raw_item|
-            blz_id = extract_enchantment_source_blizzard_id(raw_item)
-            blz_id ? { blizzard_id: blz_id } : nil
-          end
-
-          all_records = (item_records + enchantment_source_records).uniq { |r| r[:blizzard_id] }
+          enchantment_source_blizzard_ids = items.filter_map { |raw_item|
+            extract_enchantment_source_blizzard_id(raw_item)
+          }.uniq
 
           # rubocop:disable Rails/SkipsModelValidations
-          Item.upsert_all(all_records, unique_by: :blizzard_id, returning: false)
+          Item.upsert_all(item_records, unique_by: :blizzard_id, returning: false)
+
+          # Insert enchantment sources not already covered by item_records (ON CONFLICT DO NOTHING)
+          new_source_ids = enchantment_source_blizzard_ids - item_records.map { |r| r[:blizzard_id] }
+          Item.insert_all(new_source_ids.map { |id| { blizzard_id: id } }, unique_by: :blizzard_id) if new_source_ids.any?
           # rubocop:enable Rails/SkipsModelValidations
 
-          all_blizzard_ids = all_records.map { |r| r[:blizzard_id] }
+          all_blizzard_ids = (item_records.map { |r| r[:blizzard_id] } + enchantment_source_blizzard_ids).uniq
           items_by_blizzard_id = fetch_item_ids_with_cache(all_blizzard_ids)
 
           # Translations only for equipped items — enchantment sources have no name in raw data
@@ -42,17 +43,17 @@ module Blizzard
             enc_src_blz_id = extract_enchantment_source_blizzard_id(raw_item)
 
             equipped_items[slot] = {
-              "blizzard_id"                => blizzard_id,
-              "item_id"                    => items_by_blizzard_id[blizzard_id],
-              "item_level"                 => raw_item.dig("level", "value"),
-              "name"                       => raw_item["name"],
-              "quality"                    => raw_item.dig("quality", "type")&.downcase,
-              "context"                    => raw_item["context"],
-              "bonus_list"                 => raw_item["bonus_list"] || [],
-              "enchantment_id"             => extract_enchantment_id(raw_item),
+              "blizzard_id" => blizzard_id,
+              "item_id" => items_by_blizzard_id[blizzard_id],
+              "item_level" => raw_item.dig("level", "value"),
+              "name" => raw_item["name"],
+              "quality" => raw_item.dig("quality", "type")&.downcase,
+              "context" => raw_item["context"],
+              "bonus_list" => raw_item["bonus_list"] || [],
+              "enchantment_id" => extract_enchantment_id(raw_item),
               "enchantment_source_item_id" => enc_src_blz_id ? items_by_blizzard_id[enc_src_blz_id] : nil,
-              "embellishment_spell_id"     => extract_embellishment_spell_id(raw_item),
-              "sockets"                    => extract_sockets(raw_item)
+              "embellishment_spell_id" => extract_embellishment_spell_id(raw_item),
+              "sockets" => extract_sockets(raw_item)
             }
           end
 
@@ -164,7 +165,7 @@ module Blizzard
           def extract_sockets(raw_item)
             Array(raw_item["sockets"]).map do |socket|
               {
-                "type"    => socket.dig("socket_type", "type"),
+                "type" => socket.dig("socket_type", "type"),
                 "item_id" => socket.dig("item", "id")
               }
             end
