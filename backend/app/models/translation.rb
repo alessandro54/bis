@@ -31,24 +31,4 @@ class Translation < ApplicationRecord
     where(translatable_type: translatable.class.name, translatable_id: translatable.id)
   }
 
-  # Class methods for bulk operations
-  def self.set_translation(translatable, key, locale, value, meta: {})
-    find_or_initialize_by(
-      translatable: translatable,
-      locale:       locale.to_s,
-      key:          key.to_s
-    ).tap do |record|
-      record.value = value
-      record.meta = meta if meta.present?
-      record.save!
-    end
-  end
-
-  def self.get_translation(translatable, key, locale: I18n.locale)
-    find_by(
-      translatable: translatable,
-      locale:       locale.to_s,
-      key:          key.to_s
-    )&.value
-  end
 end

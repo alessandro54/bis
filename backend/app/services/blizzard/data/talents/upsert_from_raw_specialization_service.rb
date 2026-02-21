@@ -29,16 +29,14 @@ module Blizzard
               blizzard_id = talent[:id] || talent["id"]
               next unless blizzard_id
 
-              name = talent[:name] || talent["name"]
-              rank = talent[:rank] || talent["rank"] || 1
-
               talent_records << {
                 blizzard_id: blizzard_id,
-                name:        name,
+                name:        talent[:name] || talent["name"],
                 talent_type: type,
                 spell_id:    nil
               }
 
+              rank = talent[:rank] || talent["rank"] || 1
               type_records << { blizzard_id: blizzard_id, rank: rank }
             end
 
@@ -57,14 +55,11 @@ module Blizzard
             blizzard_id = talent_info["id"]
             next unless blizzard_id
 
-            name     = talent_info["name"]
-            spell_id = selected.dig("spell_tooltip", "spell", "id")
-
             talent_records << {
               blizzard_id: blizzard_id,
-              name:        name,
+              name:        talent_info["name"],
               talent_type: "pvp",
-              spell_id:    spell_id
+              spell_id:    selected.dig("spell_tooltip", "spell", "id")
             }
 
             pvp_records << { blizzard_id: blizzard_id, rank: 1, slot_number: index + 2 }
@@ -77,10 +72,10 @@ module Blizzard
           # Deduplicate by blizzard_id
           unique_records = talent_records.uniq { |r| r[:blizzard_id] }
 
-          # Bulk upsert talent entities
+          # Bulk upsert talent entities (name lives in translations, not in the talents table)
           # rubocop:disable Rails/SkipsModelValidations
           Talent.upsert_all(
-            unique_records,
+            unique_records.map { |r| r.except(:name) },
             unique_by: :blizzard_id,
             returning: false
           )

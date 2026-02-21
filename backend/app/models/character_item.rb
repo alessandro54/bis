@@ -13,7 +13,7 @@
 #  updated_at                 :datetime         not null
 #  character_id               :bigint           not null
 #  embellishment_spell_id     :integer
-#  enchantment_id             :integer
+#  enchantment_id             :bigint
 #  enchantment_source_item_id :bigint
 #  item_id                    :bigint           not null
 #
@@ -26,12 +26,14 @@
 # Foreign Keys
 #
 #  fk_rails_...  (character_id => characters.id)
+#  fk_rails_...  (enchantment_id => enchantments.id)
 #  fk_rails_...  (enchantment_source_item_id => items.id)
 #  fk_rails_...  (item_id => items.id)
 #
 class CharacterItem < ApplicationRecord
   belongs_to :character
   belongs_to :item
+  belongs_to :enchantment, optional: true
   belongs_to :enchantment_source_item,
              class_name:  "Item",
              foreign_key: :enchantment_source_item_id,

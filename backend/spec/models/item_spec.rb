@@ -9,7 +9,7 @@
 #  item_class        :string
 #  item_subclass     :string
 #  meta_synced_at    :datetime
-#  quality           :integer
+#  quality           :string
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  blizzard_id       :bigint           not null
@@ -65,7 +65,4 @@ RSpec.describe Item, type: :model do
     end
   end
 
-  describe 'accepts_nested_attributes_for' do
-    it { should accept_nested_attributes_for(:translations) }
-  end
 end

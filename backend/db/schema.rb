@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_20_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_20_000006) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -20,7 +20,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000002) do
     t.integer "context"
     t.datetime "created_at", null: false
     t.integer "embellishment_spell_id"
-    t.integer "enchantment_id"
+    t.bigint "enchantment_id"
     t.bigint "enchantment_source_item_id"
     t.bigint "item_id", null: false
     t.integer "item_level"
@@ -72,6 +72,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000002) do
     t.index ["talent_loadout_code"], name: "index_characters_on_talent_loadout_code"
   end
 
+  create_table "enchantments", force: :cascade do |t|
+    t.bigint "blizzard_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["blizzard_id"], name: "index_enchantments_on_blizzard_id", unique: true
+  end
+
   create_table "items", force: :cascade do |t|
     t.bigint "blizzard_id", null: false
     t.bigint "blizzard_media_id"
@@ -81,7 +88,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000002) do
     t.string "item_class"
     t.string "item_subclass"
     t.datetime "meta_synced_at"
-    t.integer "quality"
+    t.string "quality"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id"], name: "index_items_on_blizzard_id", unique: true
   end
@@ -146,7 +153,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000002) do
     t.index ["pvp_season_id"], name: "index_pvp_leaderboards_on_pvp_season_id"
   end
 
-
   create_table "pvp_seasons", force: :cascade do |t|
     t.integer "blizzard_id"
     t.datetime "created_at", null: false
@@ -177,7 +183,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000002) do
   create_table "talents", force: :cascade do |t|
     t.bigint "blizzard_id", null: false
     t.datetime "created_at", null: false
-    t.string "name"
     t.integer "spell_id"
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
@@ -201,6 +206,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000002) do
   end
 
   add_foreign_key "character_items", "characters"
+  add_foreign_key "character_items", "enchantments"
   add_foreign_key "character_items", "items"
   add_foreign_key "character_items", "items", column: "enchantment_source_item_id"
   add_foreign_key "character_talents", "characters"
@@ -208,6 +214,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000002) do
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"
-
   add_foreign_key "pvp_sync_cycles", "pvp_seasons"
 end

@@ -4,7 +4,6 @@
 # Database name: primary
 #
 #  id          :bigint           not null, primary key
-#  name        :string
 #  talent_type :string           not null
 #  created_at  :datetime         not null
 #  updated_at  :datetime         not null
@@ -19,7 +18,6 @@
 FactoryBot.define do
   factory :talent do
     blizzard_id { Faker::Number.unique.number(digits: 6) }
-    name        { Faker::Lorem.word }
     talent_type { %w[class spec hero pvp].sample }
   end
 end

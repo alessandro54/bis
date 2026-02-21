@@ -55,8 +55,8 @@ RSpec.describe PvpLeaderboardEntry, type: :model do
   end
 
   describe 'included modules' do
-    it 'includes Translatable module' do
-      expect(described_class.included_modules).to include(Translatable)
+    it 'includes CompressedJson module' do
+      expect(described_class.included_modules).to include(CompressedJson)
     end
   end
 

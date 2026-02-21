@@ -47,7 +47,6 @@
 #  fk_rails_...  (pvp_leaderboard_id => pvp_leaderboards.id)
 #
 class PvpLeaderboardEntry < ApplicationRecord
-  include Translatable
   include CompressedJson
 
   compressed_json :raw_equipment, :raw_specialization

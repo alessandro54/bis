@@ -9,7 +9,7 @@
 #  item_class        :string
 #  item_subclass     :string
 #  meta_synced_at    :datetime
-#  quality           :integer
+#  quality           :string
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  blizzard_id       :bigint           not null
@@ -26,8 +26,6 @@ class Item < ApplicationRecord
   has_many :characters, through: :character_items
 
   validates :blizzard_id, presence: true, uniqueness: true
-
-  accepts_nested_attributes_for :translations
 
   def meta_synced?
     meta_synced_at.present? && meta_synced_at > 1.week.ago

@@ -9,7 +9,7 @@
 #  item_class        :string
 #  item_subclass     :string
 #  meta_synced_at    :datetime
-#  quality           :integer
+#  quality           :string
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  blizzard_id       :bigint           not null
@@ -25,6 +25,6 @@ FactoryBot.define do
     item_class { "MyString" }
     item_subclass { "MyString" }
     inventory_type { "MyString" }
-    quality { 1 }
+    quality { "epic" }
   end
 end

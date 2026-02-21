@@ -3,16 +3,16 @@
 # Table name: pvp_sync_cycles
 # Database name: primary
 #
-#  id                             :bigint           not null, primary key
-#  completed_at                   :datetime
-#  completed_character_batches    :integer          default(0), not null
-#  expected_character_batches     :integer          default(0), not null
-#  regions                        :string           default([]), not null, is an Array
-#  snapshot_at                    :datetime         not null
-#  status                         :string           default("syncing_leaderboards"), not null
-#  created_at                     :datetime         not null
-#  updated_at                     :datetime         not null
-#  pvp_season_id                  :bigint           not null
+#  id                          :bigint           not null, primary key
+#  completed_at                :datetime
+#  completed_character_batches :integer          default(0), not null
+#  expected_character_batches  :integer          default(0), not null
+#  regions                     :string           default([]), not null, is an Array
+#  snapshot_at                 :datetime         not null
+#  status                      :string           default("syncing_leaderboards"), not null
+#  created_at                  :datetime         not null
+#  updated_at                  :datetime         not null
+#  pvp_season_id               :bigint           not null
 #
 # Indexes
 #

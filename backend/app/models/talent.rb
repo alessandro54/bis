@@ -4,7 +4,6 @@
 # Database name: primary
 #
 #  id          :bigint           not null, primary key
-#  name        :string
 #  talent_type :string           not null
 #  created_at  :datetime         not null
 #  updated_at  :datetime         not null
@@ -17,6 +16,8 @@
 #  index_talents_on_talent_type_and_blizzard_id  (talent_type,blizzard_id)
 #
 class Talent < ApplicationRecord
+  include Translatable
+
   has_many :character_talents, dependent: :restrict_with_exception
 
   validates :blizzard_id, presence: true, uniqueness: true

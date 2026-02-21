@@ -89,10 +89,10 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
           expect(created.item).to eq(item)
           expect(created.slot).to eq("HEAD")
           expect(created.item_level).to eq(540)
-          expect(created.enchantment_id).to eq(7534)
+          expect(created.enchantment_id).to eq(enchantment.id)
           expect(created.enchantment_source_item_id).to eq(enchantment_source_item.id)
           expect(created.bonus_list).to eq([ 10_397, 9438 ])
-          expect(created.sockets).to eq([ { "type" => "PRISMATIC", "item_id" => 213_746 } ])
+          expect(created.sockets).to eq([ { "type" => "PRISMATIC", "item_id" => socket_gem_item.id } ])
         end
 
         it "updates the character's equipment_fingerprint" do
@@ -103,7 +103,7 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
       context "when equipment fingerprint is already current" do
         before do
           # Fingerprint computed from raw data: slot:blizzard_id:ilvl:enchantment_id
-          character.update_columns(equipment_fingerprint: "head:#{blizzard_item_id}:540:7534")
+          character.update_columns(equipment_fingerprint: "head:#{blizzard_item_id}:540:#{enchantment_blizzard_id}")
         end
 
         it "does not call UpsertFromRawEquipmentService" do
