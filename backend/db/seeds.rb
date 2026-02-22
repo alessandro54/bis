@@ -32,9 +32,9 @@ end
 # One leaderboard per bracket + region combination.
 # The entry will live inside this leaderboard.
 leaderboard = PvpLeaderboard.create!(
-  pvp_season:    season,
-  bracket:       "2v2",
-  region:        "us",
+  pvp_season:     season,
+  bracket:        "2v2",
+  region:         "us",
   last_synced_at: Time.current
 )
 
@@ -46,21 +46,21 @@ puts "── Items ────────────────────�
 
 SLOT_ITEMS = {
   #  slot key      blizzard_id   name                                  quality    inventory_type  item_class   item_subclass  ilvl
-  head:      [225_001, "Voidbound Helm",                   "epic",  "head",     "armor",   "plate",  639],
-  neck:      [225_002, "Chain of Endless Conquest",        "epic",  "neck",     "armor",   "misc",   639],
-  shoulder:  [225_003, "Pauldrons of Shattered Will",      "epic",  "shoulder", "armor",   "plate",  639],
-  back:      [225_004, "Cloak of Darkened Skies",          "epic",  "back",     "armor",   "cloth",  639],
-  chest:     [225_005, "Breastplate of the Warlord",       "epic",  "chest",    "armor",   "plate",  639],
-  wrist:     [225_006, "Vambraces of the Fallen",          "epic",  "wrist",    "armor",   "plate",  639],
-  hands:     [225_007, "Gauntlets of Ruin",                "epic",  "hands",    "armor",   "plate",  639],
-  waist:     [225_008, "Girdle of the Warmonger",          "epic",  "waist",    "armor",   "plate",  639],
-  legs:      [225_009, "Greaves of Undying Fury",          "epic",  "legs",     "armor",   "plate",  639],
-  feet:      [225_010, "Sabatons of the Vanguard",         "epic",  "feet",     "armor",   "plate",  639],
-  finger_1:  [225_011, "Ring of Blazing Conquest",         "epic",  "finger",   "armor",   "misc",   639],
-  finger_2:  [225_012, "Band of the Endless Storm",        "epic",  "finger",   "armor",   "misc",   639],
-  trinket_1: [225_013, "Sigil of Undying Resolve",         "epic",  "trinket",  "armor",   "misc",   639],
-  trinket_2: [225_014, "Emblem of Furious Strikes",        "epic",  "trinket",  "armor",   "misc",   639],
-  main_hand: [225_015, "Greatsword of Rampant Fury",       "epic",  "two_hand", "weapon",  "sword",  639]
+  head:      [ 225_001, "Voidbound Helm",                   "epic",  "head",     "armor",   "plate",  639 ],
+  neck:      [ 225_002, "Chain of Endless Conquest",        "epic",  "neck",     "armor",   "misc",   639 ],
+  shoulder:  [ 225_003, "Pauldrons of Shattered Will",      "epic",  "shoulder", "armor",   "plate",  639 ],
+  back:      [ 225_004, "Cloak of Darkened Skies",          "epic",  "back",     "armor",   "cloth",  639 ],
+  chest:     [ 225_005, "Breastplate of the Warlord",       "epic",  "chest",    "armor",   "plate",  639 ],
+  wrist:     [ 225_006, "Vambraces of the Fallen",          "epic",  "wrist",    "armor",   "plate",  639 ],
+  hands:     [ 225_007, "Gauntlets of Ruin",                "epic",  "hands",    "armor",   "plate",  639 ],
+  waist:     [ 225_008, "Girdle of the Warmonger",          "epic",  "waist",    "armor",   "plate",  639 ],
+  legs:      [ 225_009, "Greaves of Undying Fury",          "epic",  "legs",     "armor",   "plate",  639 ],
+  feet:      [ 225_010, "Sabatons of the Vanguard",         "epic",  "feet",     "armor",   "plate",  639 ],
+  finger_1:  [ 225_011, "Ring of Blazing Conquest",         "epic",  "finger",   "armor",   "misc",   639 ],
+  finger_2:  [ 225_012, "Band of the Endless Storm",        "epic",  "finger",   "armor",   "misc",   639 ],
+  trinket_1: [ 225_013, "Sigil of Undying Resolve",         "epic",  "trinket",  "armor",   "misc",   639 ],
+  trinket_2: [ 225_014, "Emblem of Furious Strikes",        "epic",  "trinket",  "armor",   "misc",   639 ],
+  main_hand: [ 225_015, "Greatsword of Rampant Fury",       "epic",  "two_hand", "weapon",  "sword",  639 ]
 }.freeze
 
 items = SLOT_ITEMS.transform_values do |blizzard_id, name, quality, inv_type, item_class, item_subclass, _ilvl|
@@ -106,12 +106,12 @@ puts "── Enchantments ──────────────────
 # Enchantments are spell effects (enchantment_id from Blizzard API), NOT items.
 # They live in their own table so they can carry translations separately.
 ENCHANTMENT_DEFS = {
-  weapon: [7_534, "Authority of Radiant Power"],
-  cloak:  [7_358, "Chant of Winged Grace"],
-  chest:  [7_364, "Crystalline Radiance"],
-  wrist:  [7_384, "Chant of Armored Speed"],
-  legs:   [7_400, "Stormrider's Agility"],
-  ring:   [7_340, "Radiant Mastery"]
+  weapon: [ 7_534, "Authority of Radiant Power" ],
+  cloak:  [ 7_358, "Chant of Winged Grace" ],
+  chest:  [ 7_364, "Crystalline Radiance" ],
+  wrist:  [ 7_384, "Chant of Armored Speed" ],
+  legs:   [ 7_400, "Stormrider's Agility" ],
+  ring:   [ 7_340, "Radiant Mastery" ]
 }.freeze
 
 enchantments = ENCHANTMENT_DEFS.transform_values do |blizzard_id, name|
@@ -138,50 +138,50 @@ end
 
 # Arms Warrior class tree
 class_talents = seed_talents([
-  [188_076, "Heroic Leap",       6_544],
-  [197_930, "Battle Stance",     2_457],
-  [188_082, "Spell Reflection",  23_920],
-  [262_161, "War Machine",       262_232],
-  [206_333, "Enduring Alacrity", 201_900]
+  [ 188_076, "Heroic Leap",       6_544 ],
+  [ 197_930, "Battle Stance",     2_457 ],
+  [ 188_082, "Spell Reflection",  23_920 ],
+  [ 262_161, "War Machine",       262_232 ],
+  [ 206_333, "Enduring Alacrity", 201_900 ]
 ], "class")
 
 # Arms Warrior spec tree
 spec_talents = seed_talents([
-  [260_708, "Mortal Strike",   12_294],
-  [260_709, "Overpower",        7_384],
-  [260_710, "Slam",             1_464],
-  [260_711, "Bladestorm",     227_847],
-  [260_712, "Colossus Smash", 167_105],
-  [260_713, "Warbreaker",     262_161]
+  [ 260_708, "Mortal Strike", 12_294 ],
+  [ 260_709, "Overpower",        7_384 ],
+  [ 260_710, "Slam",             1_464 ],
+  [ 260_711, "Bladestorm",     227_847 ],
+  [ 260_712, "Colossus Smash", 167_105 ],
+  [ 260_713, "Warbreaker",     262_161 ]
 ], "spec")
 
 # Colossus hero talent tree
 hero_talents = seed_talents([
-  [453_288, "Colossal Might", 440_989],
-  [453_289, "Boneshaker",     440_892],
-  [453_290, "Mountain Thane", 440_999]
+  [ 453_288, "Colossal Might", 440_989 ],
+  [ 453_289, "Boneshaker",     440_892 ],
+  [ 453_290, "Mountain Thane", 440_999 ]
 ], "hero")
 
 # PvP talents (slot_number starts at 2 per Blizzard convention)
 pvp_talents = seed_talents([
-  [202_751, "Sharpen Blade",  202_751],
-  [202_573, "Death Sentence",  12_294],
-  [236_289, "Disarm",         236_077]
+  [ 202_751, "Sharpen Blade",  202_751 ],
+  [ 202_573, "Death Sentence", 12_294 ],
+  [ 236_289, "Disarm", 236_077 ]
 ], "pvp")
 
 puts "── Character ────────────────────────────────────────────────"
 
 character = Character.create!(
-  blizzard_id:  234_567_890,
-  region:       "us",
-  realm:        "tichondrius",
-  name:         "Valdris",
-  faction:      :horde,
-  class_id:     1,         # Warrior
-  class_slug:   "warrior",
-  race_id:      2,
-  race:         "orc",
-  is_private:   false,
+  blizzard_id:    234_567_890,
+  region:         "us",
+  realm:          "tichondrius",
+  name:           "Valdris",
+  faction:        :horde,
+  class_id:       1, # Warrior
+  class_slug:     "warrior",
+  race_id:        2,
+  race:           "orc",
+  is_private:     false,
   meta_synced_at: Time.current
 )
 puts "  #{character.display_name} (#{character.region.upcase})"
@@ -199,9 +199,9 @@ CharacterItem.create!(
   slot:       "head",
   item_level: 639,
   context:    11,
-  bonus_list: [10_299, 1_588],
+  bonus_list: [ 10_299, 1_588 ],
   # Head has one prismatic socket — gem item_id is the DB id, not Blizzard id.
-  sockets:    [{ "type" => "PRISMATIC", "item_id" => socket_gem.id }]
+  sockets:    [ { "type" => "PRISMATIC", "item_id" => socket_gem.id } ]
 )
 
 CharacterItem.create!(
@@ -209,7 +209,7 @@ CharacterItem.create!(
   item:       items[:neck],
   slot:       "neck",
   item_level: 639,
-  bonus_list: [10_299]
+  bonus_list: [ 10_299 ]
 )
 
 CharacterItem.create!(
@@ -217,14 +217,14 @@ CharacterItem.create!(
   item:       items[:shoulder],
   slot:       "shoulder",
   item_level: 639,
-  bonus_list: [10_299]
+  bonus_list: [ 10_299 ]
 )
 
 CharacterItem.create!(
-  character:  character,
-  item:       items[:back],
-  slot:       "back",
-  item_level: 639,
+  character:   character,
+  item:        items[:back],
+  slot:        "back",
+  item_level:  639,
   # Cloak enchant — no source item tracked for this slot
   enchantment: enchantments[:cloak]
 )
@@ -250,7 +250,7 @@ CharacterItem.create!(
   item:       items[:hands],
   slot:       "hands",
   item_level: 639,
-  bonus_list: [10_299]
+  bonus_list: [ 10_299 ]
 )
 
 CharacterItem.create!(
@@ -259,7 +259,7 @@ CharacterItem.create!(
   slot:       "waist",
   item_level: 639,
   # Belt has a prismatic socket
-  sockets:    [{ "type" => "PRISMATIC", "item_id" => socket_gem.id }]
+  sockets:    [ { "type" => "PRISMATIC", "item_id" => socket_gem.id } ]
 )
 
 CharacterItem.create!(
@@ -275,7 +275,7 @@ CharacterItem.create!(
   item:       items[:feet],
   slot:       "feet",
   item_level: 639,
-  bonus_list: [10_299]
+  bonus_list: [ 10_299 ]
 )
 
 CharacterItem.create!(
@@ -299,7 +299,7 @@ CharacterItem.create!(
   item:       items[:trinket_1],
   slot:       "trinket_1",
   item_level: 639,
-  bonus_list: [10_299]
+  bonus_list: [ 10_299 ]
 )
 
 CharacterItem.create!(
@@ -307,7 +307,7 @@ CharacterItem.create!(
   item:       items[:trinket_2],
   slot:       "trinket_2",
   item_level: 639,
-  bonus_list: [10_299]
+  bonus_list: [ 10_299 ]
 )
 
 CharacterItem.create!(
@@ -319,7 +319,7 @@ CharacterItem.create!(
   # source_item is the scroll used — tracked from the raw Blizzard API enchantment block
   enchantment_source_item: enc_source,
   embellishment_spell_id:  441_494,
-  bonus_list:              [10_299]
+  bonus_list:              [ 10_299 ]
 )
 
 puts "  #{character.character_items.count} slots equipped"
@@ -348,7 +348,7 @@ pvp_talents.each_with_index do |talent, idx|
     talent:      talent,
     talent_type: "pvp",
     rank:        1,
-    slot_number: idx + 2  # Blizzard pvp slots start at 2
+    slot_number: idx + 2 # Blizzard pvp slots start at 2
   )
 end
 
@@ -363,31 +363,31 @@ puts "── PvP Leaderboard Entry ───────────────
 raw_equipment = {
   "equipped_items" => SLOT_ITEMS.map do |slot, (blizzard_id, name, quality, inv_type, item_class, item_subclass)|
     {
-      "item"           => { "id" => blizzard_id },
-      "slot"           => { "type" => slot.to_s.upcase },
-      "level"          => { "value" => 639 },
-      "name"           => name,
-      "quality"        => { "type" => quality.upcase },
-      "context"        => 11,
-      "bonus_list"     => [10_299],
+      "item" => { "id" => blizzard_id },
+      "slot" => { "type" => slot.to_s.upcase },
+      "level" => { "value" => 639 },
+      "name" => name,
+      "quality" => { "type" => quality.upcase },
+      "context" => 11,
+      "bonus_list" => [ 10_299 ],
       "inventory_type" => { "type" => inv_type.upcase },
-      "item_class"     => { "name" => item_class },
-      "item_subclass"  => { "name" => item_subclass },
-      "media"          => { "id" => blizzard_id }
+      "item_class" => { "name" => item_class },
+      "item_subclass" => { "name" => item_subclass },
+      "media" => { "id" => blizzard_id }
     }
   end
 }
 
 raw_specialization = {
   "class_talents" => [
-    { "id" => 188_076, "name" => "Heroic Leap",       "rank" => 1 },
+    { "id" => 188_076, "name" => "Heroic Leap", "rank" => 1 },
     { "id" => 197_930, "name" => "Battle Stance",      "rank" => 1 },
     { "id" => 188_082, "name" => "Spell Reflection",   "rank" => 1 },
     { "id" => 262_161, "name" => "War Machine",         "rank" => 1 },
     { "id" => 206_333, "name" => "Enduring Alacrity",   "rank" => 1 }
   ],
   "spec_talents" => [
-    { "id" => 260_708, "name" => "Mortal Strike",   "rank" => 1 },
+    { "id" => 260_708, "name" => "Mortal Strike", "rank" => 1 },
     { "id" => 260_709, "name" => "Overpower",        "rank" => 1 },
     { "id" => 260_710, "name" => "Slam",             "rank" => 1 },
     { "id" => 260_711, "name" => "Bladestorm",       "rank" => 1 },
@@ -401,9 +401,12 @@ raw_specialization = {
   ],
   # pvp_talents use the nested selected/spell_tooltip structure from the Blizzard API
   "pvp_talents" => [
-    { "selected" => { "talent" => { "id" => 202_751, "name" => "Sharpen Blade"  }, "spell_tooltip" => { "spell" => { "id" => 202_751 } } } },
-    { "selected" => { "talent" => { "id" => 202_573, "name" => "Death Sentence" }, "spell_tooltip" => { "spell" => { "id" =>  12_294 } } } },
-    { "selected" => { "talent" => { "id" => 236_289, "name" => "Disarm"         }, "spell_tooltip" => { "spell" => { "id" => 236_077 } } } }
+    { "selected" => { "talent" => { "id" => 202_751, "name" => "Sharpen Blade"  },
+                      "spell_tooltip" => { "spell" => { "id" => 202_751 } } } },
+    { "selected" => { "talent" => { "id" => 202_573, "name" => "Death Sentence" },
+                      "spell_tooltip" => { "spell" => { "id" => 12_294 } } } },
+    { "selected" => { "talent" => { "id" => 236_289, "name" => "Disarm"         },
+                      "spell_tooltip" => { "spell" => { "id" => 236_077 } } } }
   ]
 }
 
@@ -414,7 +417,7 @@ entry = PvpLeaderboardEntry.create!(
   rating:                      2_847,
   wins:                        312,
   losses:                      198,
-  spec_id:                     71,    # Arms Warrior spec ID
+  spec_id:                     71, # Arms Warrior spec ID
   item_level:                  639,
   hero_talent_tree_id:         2_860,
   hero_talent_tree_name:       "Colossus",

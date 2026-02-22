@@ -12,6 +12,17 @@
 #  character_id :bigint           not null
 #  talent_id    :bigint           not null
 #
+# Indexes
+#
+#  idx_character_talents_on_char_and_talent  (character_id,talent_id) UNIQUE
+#  idx_character_talents_on_char_and_type    (character_id,talent_type)
+#  index_character_talents_on_talent_id      (talent_id)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (character_id => characters.id)
+#  fk_rails_...  (talent_id => talents.id)
+#
 FactoryBot.define do
   factory :character_talent do
     association :character

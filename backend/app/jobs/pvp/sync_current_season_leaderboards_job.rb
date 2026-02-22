@@ -127,7 +127,7 @@ module Pvp
         character_ids_by_region = Hash.new { |h, k| h[k] = [] }
         return character_ids_by_region if tasks.empty?
 
-        concurrency = [tasks.size, MAX_LEADERBOARD_CONCURRENCY].min
+        concurrency = [ tasks.size, MAX_LEADERBOARD_CONCURRENCY ].min
 
         run_concurrently(tasks, concurrency: concurrency) do |task|
           result = Pvp::Leaderboards::SyncLeaderboardService.call(
@@ -164,6 +164,7 @@ module Pvp
 
         # Only keep brackets that have a known config
         bracket_names.select { |name| Pvp::BracketConfig.for(name) }
+        ["2v2"]
       rescue Blizzard::Client::Error => e
         Rails.logger.error(
           "[SyncCurrentSeasonLeaderboardsJob] Failed to discover brackets for #{region}: #{e.message}"

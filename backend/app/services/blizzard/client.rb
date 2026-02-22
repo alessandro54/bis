@@ -98,7 +98,6 @@ module Blizzard
 
         if response.status == 429
           retry_after = response.headers["retry-after"]&.to_i || 1
-          sleep(retry_after)
           raise RateLimitedError,
                 "Blizzard API rate limited (429). Retry-After: #{retry_after}s"
         end

@@ -36,10 +36,18 @@ class BatchOutcome
 
   def summary_message(job_label:)
     succeeded = @successes.size
-    failed = @failures.size
+    failed    = @failures.size
     breakdown = counts_by_status.map { |status, count| "#{status}: #{count}" }.join(", ")
 
-    "[#{job_label}] Batch complete: #{succeeded}/#{total} succeeded, #{failed} failed. Breakdown: {#{breakdown}}"
+    msg = "[#{job_label}] Batch complete: #{succeeded}/#{total} succeeded, #{failed} failed. Breakdown: {#{breakdown}}"
+
+    if @failures.any?
+      samples = @failures.first(5).map { |f| "#{f[:id]}: #{f[:error]}" }.join("; ")
+      msg += ". Failures: [#{samples}]"
+      msg += " (+#{failed - 5} more)" if failed > 5
+    end
+
+    msg
   end
 
   def raise_if_total_failure!(job_label:)

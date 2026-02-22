@@ -10,21 +10,22 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
     {
       "equipped_items" => [
         {
-          "item"           => { "id" => 12_345 },
-          "slot"           => { "type" => "HEAD" },
-          "level"          => { "value" => 540 },
-          "name"           => "Helm of Valor",
+          "item" => { "id" => 12_345 },
+          "slot" => { "type" => "HEAD" },
+          "level" => { "value" => 540 },
+          "name" => "Helm of Valor",
           "inventory_type" => { "type" => "HEAD" },
-          "item_class"     => { "name" => "Armor" },
-          "item_subclass"  => { "name" => "Plate" },
-          "media"          => { "id" => 111 },
-          "quality"        => { "type" => "EPIC" },
-          "context"        => "raid-normal",
-          "enchantments"   => [
+          "item_class" => { "name" => "Armor" },
+          "item_subclass" => { "name" => "Plate" },
+          "media" => { "id" => 111 },
+          "quality" => { "type" => "EPIC" },
+          "context" => "raid-normal",
+          "enchantments" => [
             {
-              "enchantment_id"   => 7534,
+              "display_string" => "Enchanted: Chant of Leeching Fangs |A:Professions-ChatIcon-Quality-Tier3:20:20|a",
+              "enchantment_id" => 7534,
               "enchantment_slot" => { "type" => "PERMANENT" },
-              "source_item"      => { "id" => 226_977 }
+              "source_item" => { "id" => 226_977 }
             }
           ],
           "sockets" => [
@@ -32,16 +33,16 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
           ]
         },
         {
-          "item"           => { "id" => 67_890 },
-          "slot"           => { "type" => "CHEST" },
-          "level"          => { "value" => 545 },
-          "name"           => "Chestplate of Might",
+          "item" => { "id" => 67_890 },
+          "slot" => { "type" => "CHEST" },
+          "level" => { "value" => 545 },
+          "name" => "Chestplate of Might",
           "inventory_type" => { "type" => "CHEST" },
-          "item_class"     => { "name" => "Armor" },
-          "item_subclass"  => { "name" => "Plate" },
-          "media"          => { "id" => 222 },
-          "quality"        => { "type" => "EPIC" },
-          "context"        => "raid-heroic"
+          "item_class" => { "name" => "Armor" },
+          "item_subclass" => { "name" => "Plate" },
+          "media" => { "id" => 222 },
+          "quality" => { "type" => "EPIC" },
+          "context" => "raid-heroic"
         }
       ]
     }
@@ -80,7 +81,7 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
 
         gem_db_id = Item.find_by(blizzard_id: 213_746).id
         expect(head_entry["sockets"]).to eq([
-          { "type" => "PRISMATIC", "item_id" => gem_db_id }
+          { "type" => "PRISMATIC", "item_id" => gem_db_id, "display_string" => nil }
         ])
       end
 
@@ -148,7 +149,8 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
     end
 
     it "upserts translations in bulk" do
-      expect { service.call }.to change(Translation, :count).by(2)
+      # 2 item names + 1 enchantment name
+      expect { service.call }.to change(Translation, :count).by(3)
 
       item        = Item.find_by(blizzard_id: 12_345)
       translation = Translation.find_by(
@@ -158,6 +160,20 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
         key:               "name"
       )
       expect(translation.value).to eq("Helm of Valor")
+    end
+
+    it "upserts enchantment name translations from display_string" do
+      service.call
+
+      enchantment = Enchantment.find_by(blizzard_id: 7534)
+      translation = Translation.find_by(
+        translatable_type: "Enchantment",
+        translatable_id:   enchantment.id,
+        locale:            locale,
+        key:               "name"
+      )
+      expect(translation).to be_present
+      expect(translation.value).to eq("Chant of Leeching Fangs")
     end
 
     it "does not create translations for gem or enchantment source stubs" do
@@ -194,7 +210,8 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
       end
 
       it "updates existing translations" do
-        expect { service.call }.to change(Translation, :count).by(1)
+        # +1 Chestplate name, +1 enchantment name (Helm name upserted, no new row)
+        expect { service.call }.to change(Translation, :count).by(2)
 
         existing_translation.reload
         expect(existing_translation.value).to eq("Helm of Valor")
@@ -205,18 +222,20 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
       let(:raw_equipment) do
         {
           "equipped_items" => [
-            { "item" => { "id" => 99_001 }, "slot" => { "type" => "TABARD" }, "level" => { "value" => 1 }, "name" => "Guild Tabard" },
-            { "item" => { "id" => 99_002 }, "slot" => { "type" => "SHIRT" },  "level" => { "value" => 1 }, "name" => "Fancy Shirt" },
+            { "item" => { "id" => 99_001 }, "slot" => { "type" => "TABARD" }, "level" => { "value" => 1 },
+"name" => "Guild Tabard" },
+            { "item" => { "id" => 99_002 }, "slot" => { "type" => "SHIRT" },  "level" => { "value" => 1 },
+"name" => "Fancy Shirt" },
             {
-              "item"           => { "id" => 11_111 },
-              "slot"           => { "type" => "HEAD" },
-              "level"          => { "value" => 540 },
-              "name"           => "Helm of Valor",
+              "item" => { "id" => 11_111 },
+              "slot" => { "type" => "HEAD" },
+              "level" => { "value" => 540 },
+              "name" => "Helm of Valor",
               "inventory_type" => { "type" => "HEAD" },
-              "item_class"     => { "name" => "Armor" },
-              "item_subclass"  => { "name" => "Plate" },
-              "media"          => { "id" => 111 },
-              "quality"        => { "type" => "EPIC" }
+              "item_class" => { "name" => "Armor" },
+              "item_subclass" => { "name" => "Plate" },
+              "media" => { "id" => 111 },
+              "quality" => { "type" => "EPIC" }
             }
           ]
         }
@@ -265,18 +284,18 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
       {
         "equipped_items" => [
           {
-            "item"           => { "id" => 12_345 },
-            "slot"           => { "type" => "HEAD" },
-            "level"          => { "value" => 540 },
-            "name"           => "Tier Helm",
+            "item" => { "id" => 12_345 },
+            "slot" => { "type" => "HEAD" },
+            "level" => { "value" => 540 },
+            "name" => "Tier Helm",
             "inventory_type" => { "type" => "HEAD" },
-            "item_class"     => { "name" => "Armor" },
-            "item_subclass"  => { "name" => "Plate" },
-            "media"          => { "id" => 111 },
-            "quality"        => { "type" => "EPIC" },
-            "set"            => {
+            "item_class" => { "name" => "Armor" },
+            "item_subclass" => { "name" => "Plate" },
+            "media" => { "id" => 111 },
+            "quality" => { "type" => "EPIC" },
+            "set" => {
               "item_set" => { "id" => 999, "name" => "Gladiator Set" },
-              "items"    => [
+              "items" => [
                 { "is_equipped" => true },
                 { "is_equipped" => true },
                 { "is_equipped" => true },
@@ -307,10 +326,10 @@ RSpec.describe Blizzard::Data::Items::UpsertFromRawEquipmentService do
         {
           "equipped_items" => [
             {
-              "item"  => { "id" => 12_345 },
-              "slot"  => { "type" => "HEAD" },
+              "item" => { "id" => 12_345 },
+              "slot" => { "type" => "HEAD" },
               "level" => { "value" => 540 },
-              "name"  => "Regular Helm",
+              "name" => "Regular Helm",
               "quality" => { "type" => "EPIC" }
             }
           ]

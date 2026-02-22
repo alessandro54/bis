@@ -18,7 +18,13 @@ module Blizzard
         def call
           return { "equipped_items" => {} } if items.empty?
 
+          # Deduplicate by blizzard_id before upsert_all: a character can equip the
+          # same item in two slots (e.g. identical rings). The items table stores the
+          # template only — per-slot data (enchantment, gems) lives in character_items.
+          # upsert_all uses ON CONFLICT DO UPDATE, which Postgres rejects when two
+          # input rows target the same existing row.
           item_records = items.filter_map { |raw_item| build_item_record(raw_item) }
+                              .uniq { |r| r[:blizzard_id] }
           return { "equipped_items" => {} } if item_records.empty?
 
           enchantment_source_blizzard_ids = items.filter_map { |raw_item|
@@ -58,8 +64,13 @@ module Blizzard
           items_by_blizzard_id        = fetch_item_ids_with_cache(all_item_blizzard_ids)
           enchantments_by_blizzard_id = fetch_enchantment_ids_with_cache(enchantment_blizzard_ids)
 
-          # Translations only for equipped items — stubs have no name in raw data.
+          # Equipped item names come from the item-level raw data.
+          # Socket gem names come from each socket's nested item block.
+          # Enchantment names come from the display_string on each enchantment block.
+          # All translations upserted in one pass each.
           upsert_translations(items_by_blizzard_id)
+          upsert_socket_gem_translations(items, items_by_blizzard_id)
+          upsert_enchantment_translations(enchantments_by_blizzard_id)
 
           equipped_items = {}
           items.each do |raw_item|
@@ -71,17 +82,18 @@ module Blizzard
             enc_blz_id     = extract_enchantment_blizzard_id(raw_item)
 
             equipped_items[slot] = {
-              "blizzard_id"                => blizzard_id,
-              "item_id"                    => items_by_blizzard_id[blizzard_id],
-              "item_level"                 => raw_item.dig("level", "value"),
-              "name"                       => raw_item["name"],
-              "quality"                    => raw_item.dig("quality", "type")&.downcase,
-              "context"                    => raw_item["context"],
-              "bonus_list"                 => raw_item["bonus_list"] || [],
-              "enchantment_id"             => enchantments_by_blizzard_id[enc_blz_id],
+              "blizzard_id" => blizzard_id,
+              "item_id" => items_by_blizzard_id[blizzard_id],
+              "item_level" => raw_item.dig("level", "value"),
+              "name" => raw_item["name"],
+              "quality" => raw_item.dig("quality", "type")&.downcase,
+              "context" => raw_item["context"],
+              "bonus_list" => raw_item["bonus_list"] || [],
+              "enchantment_id" => enchantments_by_blizzard_id[enc_blz_id],
               "enchantment_source_item_id" => enc_src_blz_id ? items_by_blizzard_id[enc_src_blz_id] : nil,
-              "embellishment_spell_id"     => extract_embellishment_spell_id(raw_item),
-              "sockets"                    => extract_sockets_with_ids(raw_item, items_by_blizzard_id)
+              "embellishment_spell_id" => extract_embellishment_spell_id(raw_item),
+              "sockets" => extract_sockets_with_ids(raw_item, items_by_blizzard_id),
+              "crafting_stats" => extract_crafting_stats(raw_item)
             }
           end
 
@@ -217,19 +229,24 @@ module Blizzard
             Array(raw_item["sockets"]).filter_map { |s| s.dig("item", "id") }
           end
 
-          # Returns sockets with resolved DB item IDs instead of raw Blizzard IDs.
+          # Returns sockets with resolved DB item IDs and the gem's display string.
           def extract_sockets_with_ids(raw_item, items_by_blizzard_id)
             Array(raw_item["sockets"]).map do |socket|
               blizzard_gem_id = socket.dig("item", "id")
               {
-                "type"    => socket.dig("socket_type", "type"),
-                "item_id" => blizzard_gem_id ? items_by_blizzard_id[blizzard_gem_id] : nil
+                "type"           => socket.dig("socket_type", "type"),
+                "item_id"        => blizzard_gem_id ? items_by_blizzard_id[blizzard_gem_id] : nil,
+                "display_string" => socket["display_string"]
               }
             end
           end
 
           def extract_embellishment_spell_id(raw_item)
             Array(raw_item["spells"]).first&.dig("spell", "id")
+          end
+
+          def extract_crafting_stats(raw_item)
+            Array(raw_item["modified_crafting_stat"]).map { |s| s["type"] }
           end
 
           # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -270,7 +287,106 @@ module Blizzard
             )
             # rubocop:enable Rails/SkipsModelValidations
           end
-          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+          # Socket gem names live inside each socket block (socket.item.name).
+          # Stubs were inserted with no name, so we fill translations here
+          # while the data is already in memory.
+          def upsert_socket_gem_translations(raw_items, items_by_blizzard_id)
+            now     = Time.current
+            records = raw_items.flat_map do |raw_item|
+              Array(raw_item["sockets"]).filter_map do |socket|
+                blizzard_gem_id = socket.dig("item", "id")
+                gem_name        = socket.dig("item", "name")
+                item_id         = items_by_blizzard_id[blizzard_gem_id]
+
+                next unless blizzard_gem_id && gem_name.present? && item_id
+
+                {
+                  translatable_type: "Item",
+                  translatable_id:   item_id,
+                  key:               "name",
+                  locale:            locale,
+                  value:             gem_name,
+                  meta:              { source: "blizzard" },
+                  created_at:        now,
+                  updated_at:        now
+                }
+              end
+            end
+
+            return if records.empty?
+
+            unique_records = records.uniq do |r|
+              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
+            end
+
+            # rubocop:disable Rails/SkipsModelValidations
+            Translation.upsert_all(
+              unique_records,
+              unique_by: %i[translatable_type translatable_id locale key]
+            )
+            # rubocop:enable Rails/SkipsModelValidations
+          end
+
+          # Enchantment names come from the display_string on each permanent
+          # enchantment block: "Enchanted: {Name} |A:icon:markup|a".
+          # Stubs were inserted with no name; fill translations while raw data
+          # is still in memory.
+          def upsert_enchantment_translations(enchantments_by_blizzard_id)
+            return if enchantments_by_blizzard_id.empty?
+
+            now     = Time.current
+            records = items.filter_map do |raw_item|
+              enc_blz_id = extract_enchantment_blizzard_id(raw_item)
+              next unless enc_blz_id
+
+              enc_id = enchantments_by_blizzard_id[enc_blz_id]
+              next unless enc_id
+
+              permanent = Array(raw_item["enchantments"])
+                .find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
+              raw_name = permanent&.dig("display_string")
+              next unless raw_name.present?
+
+              name = clean_enchantment_display_string(raw_name)
+              next unless name.present?
+
+              {
+                translatable_type: "Enchantment",
+                translatable_id:   enc_id,
+                key:               "name",
+                locale:            locale,
+                value:             name,
+                meta:              { source: "blizzard" },
+                created_at:        now,
+                updated_at:        now
+              }
+            end
+
+            return if records.empty?
+
+            unique_records = records.uniq do |r|
+              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
+            end
+
+            # rubocop:disable Rails/SkipsModelValidations
+            Translation.upsert_all(
+              unique_records,
+              unique_by: %i[translatable_type translatable_id locale key]
+            )
+            # rubocop:enable Rails/SkipsModelValidations
+          end
+
+          # Strip Blizzard icon markup (|A:...|a) and the "Enchanted: " prefix.
+          # "Enchanted: Chant of Leeching Fangs |A:Professions-...|a"
+          #   → "Chant of Leeching Fangs"
+          def clean_enchantment_display_string(display_string)
+            display_string
+              .gsub(/\|A:[^|]*\|a/i, "")
+              .delete_prefix("Enchanted: ")
+              .strip
+          end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
       end
     end
   end

@@ -95,7 +95,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
       end
 
       before do
-        snapshot_entry  # force creation before service call
+        snapshot_entry # force creation before service call
         character.update_columns(last_equipment_snapshot_at: 2.hours.ago)
       end
 

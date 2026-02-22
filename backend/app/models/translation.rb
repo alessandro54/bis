@@ -30,5 +30,4 @@ class Translation < ApplicationRecord
   scope :for_translatable, ->(translatable) {
     where(translatable_type: translatable.class.name, translatable_id: translatable.id)
   }
-
 end

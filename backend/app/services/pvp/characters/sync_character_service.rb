@@ -14,19 +14,23 @@ module Pvp
         return success(nil, context: { status: :not_found }) unless character
         return success(nil, context: { status: :skipped_private }) if character.is_private
 
-        entries = latest_entries_per_bracket
+        # DB read — checked out briefly, then returned to the pool.
+        entries = ApplicationRecord.connection_pool.with_connection { latest_entries_per_bracket }
         return success(nil, context: { status: :no_entries }) if entries.empty?
 
         if recently_synced?
-          reuse_character_data_for_entries(entries)
+          ApplicationRecord.connection_pool.with_connection { reuse_character_data_for_entries(entries) }
           return success(entries, context: { status: :reused_cache })
         end
 
+        # No connection held here — releases the slot back to the pool so other
+        # fibers can do DB work while this one waits on network I/O (~600ms).
         equipment_json, talents_json = fetch_remote_data
         return success(nil, context: { status: :equipment_unavailable }) unless equipment_json
         return success(nil, context: { status: :talents_unavailable }) unless talents_json
 
-        process_inline(entries, equipment_json, talents_json)
+        # Re-acquire for all DB writes (equipment, talents, fingerprint, entries).
+        ApplicationRecord.connection_pool.with_connection { process_inline(entries, equipment_json, talents_json) }
         success(entries, context: { status: :synced })
       rescue => e
         failure(e)
@@ -96,7 +100,7 @@ module Pvp
           )
 
           unless eq_result.success?
-            logger.error("[SyncCharacterService] Equipment processing failed for character #{character.id}: #{eq_result.error}")
+            log_service_failure("Equipment", character, eq_result.error)
             return
           end
 
@@ -107,7 +111,7 @@ module Pvp
           )
 
           unless spec_result.success?
-            logger.error("[SyncCharacterService] Specialization processing failed for character #{character.id}: #{spec_result.error}")
+            log_service_failure("Specialization", character, spec_result.error)
             return
           end
 
@@ -206,6 +210,18 @@ module Pvp
               "pvp_leaderboards.bracket, pvp_leaderboard_entries.snapshot_at DESC, " \
               "pvp_leaderboard_entries.id DESC"
             )
+        end
+
+        def log_service_failure(stage, character, error)
+          label = "[SyncCharacterService] #{stage} processing failed " \
+                  "for character #{character.id} (#{character.display_name})"
+
+          if error.is_a?(Exception)
+            backtrace = error.backtrace&.first(8)&.join("\n  ")
+            logger.error("#{label}: #{error.class}: #{error.message}\n  #{backtrace}")
+          else
+            logger.error("#{label}: #{error}")
+          end
         end
 
         def logger

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_20_000006) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_22_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -18,6 +18,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000006) do
     t.integer "bonus_list", default: [], array: true
     t.bigint "character_id", null: false
     t.integer "context"
+    t.string "crafting_stats", default: [], array: true
     t.datetime "created_at", null: false
     t.integer "embellishment_spell_id"
     t.bigint "enchantment_id"
@@ -153,6 +154,58 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000006) do
     t.index ["pvp_season_id"], name: "index_pvp_leaderboards_on_pvp_season_id"
   end
 
+  create_table "pvp_meta_enchant_popularity", force: :cascade do |t|
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "enchantment_id", null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "slot", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["enchantment_id"], name: "index_pvp_meta_enchant_popularity_on_enchantment_id"
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "enchantment_id"], name: "idx_meta_enchant_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_enchant_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_enchant_popularity_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_gem_popularity", force: :cascade do |t|
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "item_id", null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "slot", null: false
+    t.datetime "snapshot_at", null: false
+    t.string "socket_type", null: false
+    t.integer "spec_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["item_id"], name: "index_pvp_meta_gem_popularity_on_item_id"
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "socket_type", "item_id"], name: "idx_meta_gem_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_gem_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_gem_popularity_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_item_popularity", force: :cascade do |t|
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "item_id", null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "slot", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["item_id"], name: "index_pvp_meta_item_popularity_on_item_id"
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "item_id"], name: "idx_meta_item_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_item_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_item_popularity_on_pvp_season_id"
+  end
+
   create_table "pvp_seasons", force: :cascade do |t|
     t.integer "blizzard_id"
     t.datetime "created_at", null: false
@@ -214,5 +267,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_20_000006) do
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"
+  add_foreign_key "pvp_meta_enchant_popularity", "enchantments"
+  add_foreign_key "pvp_meta_enchant_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_gem_popularity", "items"
+  add_foreign_key "pvp_meta_gem_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_item_popularity", "items"
+  add_foreign_key "pvp_meta_item_popularity", "pvp_seasons"
   add_foreign_key "pvp_sync_cycles", "pvp_seasons"
 end

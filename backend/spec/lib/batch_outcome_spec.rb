@@ -96,6 +96,34 @@ RSpec.describe BatchOutcome do
       expect(message).to include("reused_snapshot: 1")
       expect(message).to include("api_error: 1")
     end
+
+    it "includes failure details when failures exist" do
+      outcome.record_success(id: 1, status: :processed)
+      outcome.record_failure(id: 42, status: :api_error, error: "timeout")
+
+      message = outcome.summary_message(job_label: "TestJob")
+
+      expect(message).to include("Failures: [42: timeout]")
+    end
+
+    it "omits failure details when all items succeeded" do
+      outcome.record_success(id: 1, status: :processed)
+
+      message = outcome.summary_message(job_label: "TestJob")
+
+      expect(message).not_to include("Failures:")
+    end
+
+    it "shows at most 5 failure samples and appends overflow count" do
+      6.times { |i| outcome.record_failure(id: i, status: :api_error, error: "err#{i}") }
+
+      message = outcome.summary_message(job_label: "TestJob")
+
+      expect(message).to include("0: err0")
+      expect(message).to include("4: err4")
+      expect(message).not_to include("5: err5")
+      expect(message).to include("(+1 more)")
+    end
   end
 
   describe "#raise_if_total_failure!" do

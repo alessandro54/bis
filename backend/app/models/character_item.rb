@@ -6,6 +6,7 @@
 #  id                         :bigint           not null, primary key
 #  bonus_list                 :integer          default([]), is an Array
 #  context                    :integer
+#  crafting_stats             :string           default([]), is an Array
 #  item_level                 :integer
 #  slot                       :string           not null
 #  sockets                    :jsonb

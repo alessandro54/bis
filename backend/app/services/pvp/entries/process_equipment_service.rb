@@ -29,6 +29,12 @@ module Pvp
         )
         processed = equipment_service.call
 
+        equipped_items = processed.dig("equipped_items")
+        if equipped_items.blank?
+          return failure("UpsertFromRawEquipmentService returned no equipped items for character #{character.id} " \
+                         "(raw had #{Array(raw_equipment['equipped_items']).size} slots)")
+        end
+
         rebuild_character_items(character, processed, new_fingerprint)
 
         entry_attrs = { equipment_processed_at: Time.zone.now }
@@ -62,7 +68,8 @@ module Pvp
               enc    = Array(item["enchantments"])
                          .find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
                          &.dig("enchantment_id")
-              "#{slot}:#{blz_id}:#{ilvl}:#{enc}"
+              crafting = Array(item["modified_crafting_stat"]).map { |s| s["type"] }.sort.join("+")
+              "#{slot}:#{blz_id}:#{ilvl}:#{enc}:#{crafting}"
             }
             .sort
             .join(",")
@@ -71,8 +78,6 @@ module Pvp
         # rubocop:disable Metrics/MethodLength
         def rebuild_character_items(character, processed, new_fingerprint)
           equipped_items = processed.is_a?(Hash) ? processed["equipped_items"] : {}
-
-          character.character_items.delete_all
 
           now = Time.current
           records = equipped_items.filter_map do |slot, item_data|
@@ -89,14 +94,18 @@ module Pvp
               embellishment_spell_id:     item_data["embellishment_spell_id"],
               bonus_list:                 item_data["bonus_list"] || [],
               sockets:                    item_data["sockets"] || [],
+              crafting_stats:             item_data["crafting_stats"] || [],
               created_at:                 now,
               updated_at:                 now
             }
           end
 
           # rubocop:disable Rails/SkipsModelValidations
-          CharacterItem.insert_all!(records) if records.any?
-          character.update_columns(equipment_fingerprint: new_fingerprint)
+          ApplicationRecord.transaction do
+            character.character_items.delete_all
+            CharacterItem.insert_all!(records) if records.any?
+            character.update_columns(equipment_fingerprint: new_fingerprint)
+          end
           # rubocop:enable Rails/SkipsModelValidations
         end
       # rubocop:enable Metrics/MethodLength

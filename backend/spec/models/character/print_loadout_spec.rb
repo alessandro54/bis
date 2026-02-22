@@ -35,11 +35,11 @@ RSpec.describe Character, type: :model do
 
     before do
       equip("head",      helm,  item_level: 639,
-        sockets: [{ "type" => "PRISMATIC", "item_id" => gem.id }])
+                                sockets:    [ { "type" => "PRISMATIC", "item_id" => gem.id } ])
       equip("chest",     chest, item_level: 639)
-      equip("main_hand", sword, item_level: 639,
-        enchantment:             enchantment,
-        enchantment_source_item: scroll)
+      equip("main_hand", sword, item_level:              639,
+                                enchantment:             enchantment,
+                                enchantment_source_item: scroll)
     end
 
     it "includes the character display name and region" do
@@ -79,16 +79,21 @@ RSpec.describe Character, type: :model do
   end
 
   describe "#print_talents" do
-    let(:warrior_slam)   { create(:talent, talent_type: "class", spell_id: 1_464).tap  { |t| t.set_translation("name", "en_US", "Slam",          meta: { source: "test" }) } }
-    let(:mortal_strike)  { create(:talent, talent_type: "spec",  spell_id: 12_294).tap { |t| t.set_translation("name", "en_US", "Mortal Strike", meta: { source: "test" }) } }
-    let(:colossal_might) { create(:talent, talent_type: "hero",  spell_id: 440_989).tap { |t| t.set_translation("name", "en_US", "Colossal Might", meta: { source: "test" }) } }
-    let(:sharpen_blade)  { create(:talent, talent_type: "pvp",   spell_id: 202_751).tap { |t| t.set_translation("name", "en_US", "Sharpen Blade", meta: { source: "test" }) } }
+    let(:warrior_slam)   { create(:talent, talent_type: "class", spell_id: 1_464).tap  { |t|
+ t.set_translation("name", "en_US", "Slam",          meta: { source: "test" }) } }
+    let(:mortal_strike)  { create(:talent, talent_type: "spec",  spell_id: 12_294).tap { |t|
+ t.set_translation("name", "en_US", "Mortal Strike", meta: { source: "test" }) } }
+    let(:colossal_might) { create(:talent, talent_type: "hero",  spell_id: 440_989).tap { |t|
+ t.set_translation("name", "en_US", "Colossal Might", meta: { source: "test" }) } }
+    let(:sharpen_blade)  { create(:talent, talent_type: "pvp",   spell_id: 202_751).tap { |t|
+ t.set_translation("name", "en_US", "Sharpen Blade", meta: { source: "test" }) } }
 
     before do
       create(:character_talent, character: character, talent: warrior_slam,   talent_type: "class", rank: 1)
       create(:character_talent, character: character, talent: mortal_strike,  talent_type: "spec",  rank: 1)
       create(:character_talent, character: character, talent: colossal_might, talent_type: "hero",  rank: 1)
-      create(:character_talent, character: character, talent: sharpen_blade,  talent_type: "pvp",   rank: 1, slot_number: 2)
+      create(:character_talent, character: character, talent: sharpen_blade,  talent_type: "pvp",   rank: 1,
+slot_number: 2)
     end
 
     it "includes the character display name and region" do

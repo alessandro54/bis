@@ -22,4 +22,6 @@
 #
 class PvpLeaderboard < ApplicationRecord
   belongs_to :pvp_season
+
+  has_many :entries, class_name: "PvpLeaderboardEntry", dependent: :destroy
 end

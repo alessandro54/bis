@@ -26,11 +26,20 @@ class ApplicationJob < ActiveJob::Base
 
   private
 
-    # Cap fiber concurrency to available DB pool connections.
-    # Leaves 1 connection free for the main fiber.
-    def safe_concurrency(desired, work_size)
-      available = ActiveRecord::Base.connection_pool.size - 1
-      [ desired, work_size, [ available, 1 ].max ].min
+    # Cap fiber concurrency so the pool is shared safely across all SolidQueue
+    # threads in this process.
+    #
+    # Every thread can run one job at a time; each job's async fibers check out
+    # one connection each via with_connection.  The pool must cover all threads:
+    #
+    #   safe fibers per job = floor(DB_POOL / threads) - 1
+    #
+    # Pass threads: matching the worker's SOLID_QUEUE_THREADS / PVP_SYNC_THREADS
+    # so the math is accurate.  Defaults to 1 (safe for one-off callers).
+    def safe_concurrency(desired, work_size, threads: 1)
+      pool_size  = ActiveRecord::Base.connection_pool.size
+      per_thread = [ (pool_size / threads) - 1, 1 ].max
+      [ desired, work_size, per_thread ].min
     end
 
     # Run block for each item using Async fibers with bounded concurrency.
@@ -55,6 +64,35 @@ class ApplicationJob < ActiveJob::Base
       ensure
         barrier.stop
       end
+
+      results
+    end
+
+    # Thread-based bounded concurrency for I/O-heavy work where the HTTP
+    # client does not yield to the Async fiber scheduler (e.g. HTTPX runs its
+    # own blocking event loop). Threads release Ruby's GIL during network I/O,
+    # so N threads truly run N requests in parallel.
+    #
+    # Each thread pops items off a shared queue until empty, then exits.
+    # Returns collected non-nil results.
+    def run_with_threads(items, concurrency:)
+      return [] if items.empty?
+
+      results = []
+      mutex   = Mutex.new
+      work    = items.dup
+
+      [concurrency, items.size].min.times.map do
+        Thread.new do
+          loop do
+            item = mutex.synchronize { work.shift }
+            break unless item
+
+            result = yield(item)
+            mutex.synchronize { results << result } unless result.nil?
+          end
+        end
+      end.each(&:join)
 
       results
     end

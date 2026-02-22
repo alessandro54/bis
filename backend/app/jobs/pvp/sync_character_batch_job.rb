@@ -1,9 +1,14 @@
 module Pvp
   class SyncCharacterBatchJob < ApplicationJob
     self.enqueue_after_transaction_commit = :always
-    queue_as :character_sync_us  # overridden per-region via .set(queue:) when enqueued
+    queue_as :character_sync_us # overridden per-region via .set(queue:) when enqueued
 
-    CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 10).to_i
+    CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 15).to_i
+    # Threads dedicated to character_sync queues — NOT the total worker thread
+    # count. In production each region queue has its own worker (default 3
+    # threads). Set PVP_SYNC_THREADS to match that worker's thread count so
+    # safe_concurrency divides the pool correctly.
+    THREADS     = ENV.fetch("PVP_SYNC_THREADS", 3).to_i
 
     retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
@@ -44,9 +49,9 @@ module Pvp
         # DISTINCT ON query — eliminates N per-character queries in the service.
         entries_by_character_id = batch_load_entries(characters.map(&:id))
 
-        concurrency = safe_concurrency(CONCURRENCY, characters.size)
+        concurrency = safe_concurrency(CONCURRENCY, characters.size, threads: THREADS)
 
-        run_concurrently(characters, concurrency: concurrency) do |character|
+        run_with_threads(characters, concurrency: concurrency) do |character|
           sync_one(
             character: character,
             locale:    locale,
@@ -75,18 +80,16 @@ module Pvp
       def sync_one(character:, locale:, outcome:, entries: nil)
         return unless character
 
-        ActiveRecord::Base.connection_pool.with_connection do
-          result = Pvp::Characters::SyncCharacterService.call(
-            character: character,
-            locale:    locale,
-            entries:   entries
-          )
+        result = Pvp::Characters::SyncCharacterService.call(
+          character: character,
+          locale:    locale,
+          entries:   entries
+        )
 
-          if result.success?
-            outcome.record_success(id: character.id, status: result.context[:status])
-          else
-            outcome.record_failure(id: character.id, status: :failed, error: result.error.to_s)
-          end
+        if result.success?
+          outcome.record_success(id: character.id, status: result.context[:status])
+        else
+          outcome.record_failure(id: character.id, status: :failed, error: result.error.to_s)
         end
       rescue Blizzard::Client::RateLimitedError => e
         Rails.logger.warn(
@@ -112,7 +115,11 @@ module Pvp
         return unless cycle
 
         cycle.increment_completed_character_batches!
-        cycle.update!(status: :completed) if cycle.all_character_batches_done?
+
+        if cycle.all_character_batches_done?
+          cycle.update!(status: :completed)
+          Pvp::BuildAggregationsJob.perform_later(pvp_season_id: cycle.pvp_season_id)
+        end
       rescue => e
         Rails.logger.error(
           "[SyncCharacterBatchJob] Failed to track sync cycle #{@sync_cycle_id}: #{e.message}"
