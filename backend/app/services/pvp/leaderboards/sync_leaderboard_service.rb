@@ -32,6 +32,38 @@ module Pvp
 
         character_ids = []
 
+        # Upsert characters BEFORE acquiring the leaderboard lock so concurrent
+        # bracket syncs (2v2 + 3v3 running in parallel) don't hold the row lock
+        # while waiting on each other's character upserts.  Characters are
+        # independent of the leaderboard row so no lock is needed here.
+        character_records = entries.map do |entry_json|
+          character_data  = entry_json.fetch("character")
+          character_attrs = {
+            blizzard_id: character_data["id"].to_s,
+            region:      region,
+            name:        character_data["name"],
+            realm:       character_data.dig("realm", "slug")
+          }
+
+          if Character.new.respond_to?(:faction=)
+            character_attrs[:faction] = faction_enum(entry_json.dig("faction", "type"))
+          end
+
+          character_attrs
+        end
+
+        unique_character_records = character_records.uniq { |c| [ c[:blizzard_id], c[:region] ] }
+
+        # rubocop:disable Rails/SkipsModelValidations
+        upsert_result = Character.upsert_all(
+          unique_character_records,
+          unique_by: %i[blizzard_id region],
+          returning: %i[blizzard_id id]
+        )
+        # rubocop:enable Rails/SkipsModelValidations
+
+        char_id_map = upsert_result.rows.to_h { |row| [ row[0].to_s, row[1] ] }
+
         with_deadlock_retry do
           leaderboard = PvpLeaderboard.find_or_create_by!(
             pvp_season_id: season.id,
@@ -40,55 +72,25 @@ module Pvp
           )
 
           leaderboard.with_lock do
-            now = Time.current
-
-            # Prepare bulk character data for upsert
-            character_records = entries.map do |entry_json|
+            now          = Time.current
+            entry_records = entries.map do |entry_json|
               character_data = entry_json.fetch("character")
-              character_attrs = {
-                blizzard_id: character_data["id"].to_s,
-                region:      region,
-                name:        character_data["name"],
-                realm:       character_data.dig("realm", "slug")
+              stats          = entry_json.fetch("season_match_statistics")
+
+              {
+                pvp_leaderboard_id: leaderboard.id,
+                character_id:       char_id_map[character_data["id"].to_s],
+                rank:               entry_json["rank"],
+                rating:             entry_json["rating"],
+                wins:               stats["won"],
+                losses:             stats["lost"],
+                snapshot_at:        snapshot_at,
+                created_at:         now,
+                updated_at:         now
               }
-
-              if Character.new.respond_to?(:faction=)
-                character_attrs[:faction] = faction_enum(entry_json.dig("faction", "type"))
-              end
-
-              character_attrs
             end
 
-            unique_character_records = character_records.uniq { |c| [ c[:blizzard_id], c[:region] ] }
-
-            # rubocop:disable Rails/SkipsModelValidations
-            upsert_result = Character.upsert_all(
-              unique_character_records,
-              unique_by: %i[blizzard_id region],
-              returning: %i[blizzard_id id]
-            )
-            # rubocop:enable Rails/SkipsModelValidations
-
-            char_id_map = upsert_result.rows.to_h { |row| [ row[0].to_s, row[1] ] }
-
             ActiveRecord::Base.transaction do
-              entry_records = entries.map do |entry_json|
-                character_data = entry_json.fetch("character")
-                stats = entry_json.fetch("season_match_statistics")
-
-                {
-                  pvp_leaderboard_id: leaderboard.id,
-                  character_id:       char_id_map[character_data["id"].to_s],
-                  rank:               entry_json["rank"],
-                  rating:             entry_json["rating"],
-                  wins:               stats["won"],
-                  losses:             stats["lost"],
-                  snapshot_at:        snapshot_at,
-                  created_at:         now,
-                  updated_at:         now
-                }
-              end
-
               # rubocop:disable Rails/SkipsModelValidations
               PvpLeaderboardEntry.insert_all!(entry_records)
               # rubocop:enable Rails/SkipsModelValidations

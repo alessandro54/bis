@@ -77,17 +77,19 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
         expect(attrs[:specialization_processed_at]).to be_present
       end
 
-      it "normalizes and updates character class_slug and class_id" do
-        expect { result; character.reload }
-          .to change(character, :class_slug).to("shaman")
-          .and change(character, :class_id).to(7)
+      it "returns char_attrs with normalized class_slug and class_id" do
+        char_attrs = result.context[:char_attrs]
+
+        expect(char_attrs[:class_slug]).to eq("shaman")
+        expect(char_attrs[:class_id]).to eq(7)
       end
 
-      it "does not update class fields when class_slug is blank" do
+      it "does not include class fields in char_attrs when class_slug is blank" do
         allow(spec_service_double).to receive(:class_slug).and_return(nil)
 
-        expect { result; character.reload }
-          .not_to change { [ character.class_slug, character.class_id ] }
+        char_attrs = result.context[:char_attrs]
+        expect(char_attrs).not_to have_key(:class_slug)
+        expect(char_attrs).not_to have_key(:class_id)
       end
 
       context "when talent_loadout_code has changed" do
@@ -108,10 +110,9 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
           expect(pvp.pluck(:slot_number).compact).not_to be_empty
         end
 
-        it "updates talent_loadout_code on the character" do
-          expect { result }
-            .to change { character.reload.talent_loadout_code }
-            .to(fixture_talents["talent_loadout_code"])
+        it "returns talent_loadout_code in char_attrs" do
+          expect(result.context[:char_attrs][:talent_loadout_code])
+            .to eq(fixture_talents["talent_loadout_code"])
         end
 
         it "replaces stale character_talents" do
@@ -131,8 +132,8 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
           expect { result }.not_to change { character.character_talents.count }
         end
 
-        it "does not update talent_loadout_code" do
-          expect { result }.not_to change { character.reload.talent_loadout_code }
+        it "does not include talent_loadout_code in char_attrs" do
+          expect(result.context[:char_attrs]).not_to have_key(:talent_loadout_code)
         end
       end
     end

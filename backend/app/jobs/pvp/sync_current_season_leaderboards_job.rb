@@ -34,6 +34,12 @@ module Pvp
         status:      :syncing_leaderboards
       )
 
+      Pvp::SyncLogger.start_cycle(
+        cycle_id:    sync_cycle.id,
+        season_name: season.display_name,
+        regions:     REGIONS
+      )
+
       # Phase 1: Discover brackets for all regions concurrently (parallel HTTP).
       brackets_by_region = discover_all_brackets_concurrently(season, locale)
 
@@ -67,6 +73,12 @@ module Pvp
           "#{char_ids.size} total, #{to_sync.size} to sync " \
           "(#{char_ids.size - to_sync.size} recently synced)"
         )
+        Pvp::SyncLogger.leaderboards_synced(
+          region:  region,
+          total:   char_ids.size,
+          to_sync: to_sync.size,
+          skipped: char_ids.size - to_sync.size
+        )
 
         region_batch_map[region] = to_sync.each_slice(batch_size).to_a
         total_batches += region_batch_map[region].size
@@ -79,6 +91,7 @@ module Pvp
 
       if total_batches.zero?
         sync_cycle.update!(status: :completed)
+        Pvp::SyncLogger.end_cycle(cycle_id: sync_cycle.id, elapsed_seconds: Time.current - snapshot_at)
         return
       end
 
@@ -105,8 +118,11 @@ module Pvp
     private
 
       # Discover brackets for all regions concurrently via parallel HTTP calls.
+      # Uses threads (not Async fibers) because HTTPX runs its own blocking event
+      # loop and does not yield to the Async scheduler — threads release the GIL
+      # during network I/O so both region requests truly run in parallel.
       def discover_all_brackets_concurrently(season, locale)
-        results = run_concurrently(REGIONS, concurrency: REGIONS.size) do |region|
+        results = run_with_threads(REGIONS, concurrency: REGIONS.size) do |region|
           region_locale = REGION_LOCALES.fetch(region, locale)
           brackets      = discover_brackets(season, region, region_locale)
           { region: region, brackets: brackets, locale: region_locale }
@@ -117,6 +133,7 @@ module Pvp
 
       # Sync every bracket across every region concurrently.
       # Returns Hash[region => [character_id, ...]] (not yet deduped).
+      # Uses threads for the same reason as discover_all_brackets_concurrently.
       def sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at)
         tasks = REGIONS.flat_map do |region|
           info          = brackets_by_region.fetch(region, { brackets: [], locale: REGION_LOCALES[region] })
@@ -129,7 +146,7 @@ module Pvp
 
         concurrency = [ tasks.size, MAX_LEADERBOARD_CONCURRENCY ].min
 
-        run_concurrently(tasks, concurrency: concurrency) do |task|
+        results = run_with_threads(tasks, concurrency: concurrency) do |task|
           result = Pvp::Leaderboards::SyncLeaderboardService.call(
             season:      season,
             bracket:     task[:bracket],
@@ -143,7 +160,9 @@ module Pvp
             "[SyncCurrentSeasonLeaderboardsJob] #{task[:region]}/#{task[:bracket]} failed: #{e.message}"
           )
           nil
-        end.each do |r|
+        end
+
+        results.each do |r|
           next unless r
 
           character_ids_by_region[r[:region]].concat(r[:ids] || [])
@@ -162,9 +181,11 @@ module Pvp
         leaderboards  = response.fetch("leaderboards", [])
         bracket_names = leaderboards.map { |lb| lb.dig("name") }.compact
 
-        # Only keep brackets that have a known config
-        bracket_names.select { |name| Pvp::BracketConfig.for(name) }
-        ["2v2"]
+        # Accept 2v2, 3v3, and all shuffle-like brackets; reject RBG/blitz.
+        bracket_names.select do |name|
+          config = Pvp::BracketConfig.for(name)
+          config.present? && config[:job_queue] != :pvp_sync_rbg
+        end
       rescue Blizzard::Client::Error => e
         Rails.logger.error(
           "[SyncCurrentSeasonLeaderboardsJob] Failed to discover brackets for #{region}: #{e.message}"

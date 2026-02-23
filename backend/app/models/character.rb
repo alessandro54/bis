@@ -38,6 +38,8 @@ class Character < ApplicationRecord
   has_many :character_items, dependent: :delete_all
   has_many :items, through: :character_items
 
+  has_many :pvp_leaderboard_entries, dependent: :delete_all
+
   validates :name, :realm, :region, presence: true
   validates :name, uniqueness: { scope: %i[realm region] }
 
@@ -68,6 +70,20 @@ class Character < ApplicationRecord
 
   def display_name
     "#{name.capitalize}-#{realm.capitalize}"
+  end
+
+  def spec
+    entry = pvp_leaderboard_entries
+      .where.not(spec_id: nil)
+      .order(snapshot_at: :desc)
+      .pick(:spec_id)
+
+    return nil unless entry
+
+    data = Wow::Catalog::SPECS[entry]
+    return nil unless data
+
+    "#{data[:spec_slug]} #{data[:class_slug].tr('_', ' ')}"
   end
 
   def meta_synced?

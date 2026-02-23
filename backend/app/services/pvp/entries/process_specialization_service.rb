@@ -24,11 +24,14 @@ module Pvp
           return failure("Unknown spec id: #{active_spec["id"].inspect}")
         end
 
+        char_attrs = {}
+
         # rubocop:disable Rails/SkipsModelValidations
         if spec_service.class_slug.present?
           normalized_slug = spec_service.class_slug.to_s.downcase.strip.gsub(" ", "_")
           if character.class_slug != normalized_slug || character.class_id != class_id
-            character.update_columns(class_slug: normalized_slug, class_id: class_id)
+            char_attrs[:class_slug] = normalized_slug
+            char_attrs[:class_id]   = class_id
           end
         end
 
@@ -39,7 +42,7 @@ module Pvp
         new_loadout_code = spec_service.talents["talent_loadout_code"]
 
         if character.talent_loadout_code != new_loadout_code
-          character.update_columns(talent_loadout_code: new_loadout_code)
+          char_attrs[:talent_loadout_code] = new_loadout_code
           rebuild_character_talents(talent_upsert)
         end
         # rubocop:enable Rails/SkipsModelValidations
@@ -51,7 +54,7 @@ module Pvp
           hero_talent_tree_id:         hero_tree&.fetch("id", nil)
         }
 
-        success(nil, context: { entry_attrs: entry_attrs })
+        success(nil, context: { entry_attrs: entry_attrs, char_attrs: char_attrs })
       rescue => e
         failure(e)
       end

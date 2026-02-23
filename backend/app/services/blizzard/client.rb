@@ -58,18 +58,29 @@ module Blizzard
     end
 
     def get(path, namespace:, params: {})
-      url = build_url(path)
+      attempts = 0
 
-      query = {
-        namespace: namespace,
-        locale:    locale
-      }.merge(params)
+      begin
+        attempts += 1
+        rate_limiter.acquire
 
-      headers = auth_header
+        response = HTTP_CLIENT.get(
+          build_url(path),
+          params:  { namespace: namespace, locale: locale }.merge(params),
+          headers: auth_header
+        )
 
-      response = HTTP_CLIENT.get(url, params: query, headers: headers)
+        parse_response(response)
+      rescue RateLimitedError => e
+        # Retry once after sleeping the Retry-After period.
+        # A second consecutive 429 means something is wrong — propagate.
+        raise if attempts >= 2
 
-      parse_response(response)
+        retry_after = e.message[/Retry-After: (\d+)s/, 1]&.to_i || 5
+        Rails.logger.warn("[Blizzard::Client] 429 on #{region}, sleeping #{retry_after}s before retry")
+        sleep(retry_after)
+        retry
+      end
     end
 
     def profile_namespace = "profile-#{region}"
@@ -78,6 +89,9 @@ module Blizzard
 
     private
 
+      def rate_limiter
+        RateLimiter.for_region(region)
+      end
 
       def build_url(path)
         "https://#{API_HOST_TEMPLATE % { region: region }}#{path}"

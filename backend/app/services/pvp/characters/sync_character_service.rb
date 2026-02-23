@@ -127,8 +127,15 @@ module Pvp
             # rubocop:enable Rails/SkipsModelValidations
           end
 
+          # Merge character column updates from both services (class_slug, class_id,
+          # talent_loadout_code) with last_equipment_snapshot_at into a single
+          # update_columns call instead of 3 separate DB round-trips.
+          char_attrs = {}
+          char_attrs.merge!(spec_result.context[:char_attrs]) if spec_result.context[:char_attrs]
+          char_attrs[:last_equipment_snapshot_at] = Time.current
+
           # rubocop:disable Rails/SkipsModelValidations
-          character.update_columns(last_equipment_snapshot_at: Time.current)
+          character.update_columns(char_attrs)
           # rubocop:enable Rails/SkipsModelValidations
 
           logger.info(
@@ -142,15 +149,21 @@ module Pvp
         # Blizzard API fetch
         # ------------------------------------------------------------------
 
+        # Fetch equipment and talents concurrently via two threads.
+        # Async { } does not work here because run_with_threads gives each
+        # character its own Ruby thread with no shared Async reactor — each
+        # Async block would run sequentially in its own mini-reactor.
+        # Plain threads release the GIL during HTTPX network I/O, so both
+        # requests truly happen in parallel, halving per-character latency.
         def fetch_remote_data
           equipment_json = nil
           talents_json   = nil
 
-          equipment_task = Async { equipment_json = safe_fetch { fetch_equipment_json } }
-          talents_task   = Async { talents_json   = safe_fetch { fetch_talents_json } }
-
-          equipment_task.wait
-          talents_task.wait
+          threads = [
+            Thread.new { equipment_json = safe_fetch { fetch_equipment_json } },
+            Thread.new { talents_json   = safe_fetch { fetch_talents_json } }
+          ]
+          threads.each(&:join)
 
           [ equipment_json, talents_json ]
         end

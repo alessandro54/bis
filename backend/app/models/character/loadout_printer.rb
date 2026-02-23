@@ -19,6 +19,7 @@ class Character::LoadoutPrinter
     slot_w = [ slots.map { |ci| ci.slot.upcase.length }.max || 4, 4 ].max
 
     puts "#{dim}┌─#{reset} #{bold}#{@character.display_name}#{reset} #{dim}(#{@character.region.upcase}) ─ Loadout#{reset}"
+    puts "#{dim}│#{reset} #{@character.class_slug.upcase}: #{bold}#{@character.class_slug.upcase}#{reset}"
     puts "#{dim}│#{reset} #{slots.size} slots  ·  avg ilvl #{bold}#{avg_ilvl}#{reset}"
     puts dim("├" + "─" * 64)
 

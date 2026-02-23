@@ -5,10 +5,10 @@ module Pvp
 
     CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 15).to_i
     # Threads dedicated to character_sync queues — NOT the total worker thread
-    # count. In production each region queue has its own worker (default 3
+    # count. In production each region queue has its own worker (default 8
     # threads). Set PVP_SYNC_THREADS to match that worker's thread count so
     # safe_concurrency divides the pool correctly.
-    THREADS     = ENV.fetch("PVP_SYNC_THREADS", 3).to_i
+    THREADS     = ENV.fetch("PVP_SYNC_THREADS", 8).to_i
 
     retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
@@ -35,6 +35,7 @@ module Pvp
       process_characters_concurrently(characters_by_id.values, locale, outcome)
 
       Rails.logger.info(outcome.summary_message(job_label: "SyncCharacterBatchJob"))
+      Pvp::SyncLogger.batch_complete(outcome: outcome)
       outcome.raise_if_total_failure!(job_label: "SyncCharacterBatchJob")
     ensure
       track_sync_cycle_completion
@@ -118,7 +119,11 @@ module Pvp
 
         if cycle.all_character_batches_done?
           cycle.update!(status: :completed)
-          Pvp::BuildAggregationsJob.perform_later(pvp_season_id: cycle.pvp_season_id)
+          Pvp::BuildAggregationsJob.perform_later(
+            pvp_season_id:  cycle.pvp_season_id,
+            sync_cycle_id:  cycle.id,
+            cycle_started_at: cycle.snapshot_at.iso8601
+          )
         end
       rescue => e
         Rails.logger.error(

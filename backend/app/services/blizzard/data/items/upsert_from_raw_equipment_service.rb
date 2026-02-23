@@ -64,13 +64,9 @@ module Blizzard
           items_by_blizzard_id        = fetch_item_ids_with_cache(all_item_blizzard_ids)
           enchantments_by_blizzard_id = fetch_enchantment_ids_with_cache(enchantment_blizzard_ids)
 
-          # Equipped item names come from the item-level raw data.
-          # Socket gem names come from each socket's nested item block.
-          # Enchantment names come from the display_string on each enchantment block.
-          # All translations upserted in one pass each.
-          upsert_translations(items_by_blizzard_id)
-          upsert_socket_gem_translations(items, items_by_blizzard_id)
-          upsert_enchantment_translations(enchantments_by_blizzard_id)
+          # Equipped item names, socket gem names, and enchantment names are all
+          # upserted in a single round-trip instead of three separate calls.
+          upsert_all_translations(items_by_blizzard_id, enchantments_by_blizzard_id)
 
           equipped_items = {}
           items.each do |raw_item|
@@ -171,10 +167,12 @@ module Blizzard
             end
 
             if uncached_ids.any?
-              Item.where(blizzard_id: uncached_ids).pluck(:blizzard_id, :id).each do |blz_id, id|
-                result[blz_id] = id
-                Rails.cache.write("item:blz:#{blz_id}", id, expires_in: CACHE_TTL)
-              end
+              db_rows = Item.where(blizzard_id: uncached_ids).pluck(:blizzard_id, :id).to_h
+              result.merge!(db_rows)
+              Rails.cache.write_multi(
+                db_rows.transform_keys { |blz_id| "item:blz:#{blz_id}" },
+                expires_in: CACHE_TTL
+              )
             end
 
             result
@@ -199,10 +197,12 @@ module Blizzard
             end
 
             if uncached_ids.any?
-              Enchantment.where(blizzard_id: uncached_ids).pluck(:blizzard_id, :id).each do |blz_id, id|
-                result[blz_id] = id
-                Rails.cache.write("enchantment:blz:#{blz_id}", id, expires_in: CACHE_TTL)
-              end
+              db_rows = Enchantment.where(blizzard_id: uncached_ids).pluck(:blizzard_id, :id).to_h
+              result.merge!(db_rows)
+              Rails.cache.write_multi(
+                db_rows.transform_keys { |blz_id| "enchantment:blz:#{blz_id}" },
+                expires_in: CACHE_TTL
+              )
             end
 
             result
@@ -249,94 +249,41 @@ module Blizzard
             Array(raw_item["modified_crafting_stat"]).map { |s| s["type"] }
           end
 
+          # Collect translations for equipped items, socket gems, and enchantments
+          # then upsert them all in a single DB round-trip.
           # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-          def upsert_translations(items_by_blizzard_id)
-            return if items_by_blizzard_id.empty?
+          def upsert_all_translations(items_by_blizzard_id, enchantments_by_blizzard_id)
+            now     = Time.current
+            records = []
 
-            now = Time.current
-
-            translation_records = items.filter_map do |raw_item|
+            # Equipped item names
+            items.each do |raw_item|
               blizzard_id = extract_blizzard_id(raw_item)
               name        = raw_item.dig("name")
               item_id     = items_by_blizzard_id[blizzard_id]
-
               next unless blizzard_id && name.present? && item_id
 
-              {
-                translatable_type: "Item",
-                translatable_id:   item_id,
-                key:               "name",
-                locale:            locale,
-                value:             name,
-                meta:              { source: "blizzard" },
-                created_at:        now,
-                updated_at:        now
-              }
+              records << { translatable_type: "Item", translatable_id: item_id,
+                           key: "name", locale: locale, value: name,
+                           meta: { source: "blizzard" }, created_at: now, updated_at: now }
             end
 
-            return if translation_records.empty?
-
-            unique_records = translation_records.uniq do |r|
-              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
-            end
-
-            # rubocop:disable Rails/SkipsModelValidations
-            Translation.upsert_all(
-              unique_records,
-              unique_by: %i[translatable_type translatable_id locale key]
-            )
-            # rubocop:enable Rails/SkipsModelValidations
-          end
-
-          # Socket gem names live inside each socket block (socket.item.name).
-          # Stubs were inserted with no name, so we fill translations here
-          # while the data is already in memory.
-          def upsert_socket_gem_translations(raw_items, items_by_blizzard_id)
-            now     = Time.current
-            records = raw_items.flat_map do |raw_item|
-              Array(raw_item["sockets"]).filter_map do |socket|
+            # Socket gem names (from socket.item.name on each socket block)
+            items.each do |raw_item|
+              Array(raw_item["sockets"]).each do |socket|
                 blizzard_gem_id = socket.dig("item", "id")
                 gem_name        = socket.dig("item", "name")
                 item_id         = items_by_blizzard_id[blizzard_gem_id]
-
                 next unless blizzard_gem_id && gem_name.present? && item_id
 
-                {
-                  translatable_type: "Item",
-                  translatable_id:   item_id,
-                  key:               "name",
-                  locale:            locale,
-                  value:             gem_name,
-                  meta:              { source: "blizzard" },
-                  created_at:        now,
-                  updated_at:        now
-                }
+                records << { translatable_type: "Item", translatable_id: item_id,
+                             key: "name", locale: locale, value: gem_name,
+                             meta: { source: "blizzard" }, created_at: now, updated_at: now }
               end
             end
 
-            return if records.empty?
-
-            unique_records = records.uniq do |r|
-              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
-            end
-
-            # rubocop:disable Rails/SkipsModelValidations
-            Translation.upsert_all(
-              unique_records,
-              unique_by: %i[translatable_type translatable_id locale key]
-            )
-            # rubocop:enable Rails/SkipsModelValidations
-          end
-
-          # Enchantment names come from the display_string on each permanent
-          # enchantment block: "Enchanted: {Name} |A:icon:markup|a".
-          # Stubs were inserted with no name; fill translations while raw data
-          # is still in memory.
-          def upsert_enchantment_translations(enchantments_by_blizzard_id)
-            return if enchantments_by_blizzard_id.empty?
-
-            now     = Time.current
-            records = items.filter_map do |raw_item|
+            # Enchantment names (from display_string on PERMANENT enchantment blocks)
+            items.each do |raw_item|
               enc_blz_id = extract_enchantment_blizzard_id(raw_item)
               next unless enc_blz_id
 
@@ -351,29 +298,17 @@ module Blizzard
               name = clean_enchantment_display_string(raw_name)
               next unless name.present?
 
-              {
-                translatable_type: "Enchantment",
-                translatable_id:   enc_id,
-                key:               "name",
-                locale:            locale,
-                value:             name,
-                meta:              { source: "blizzard" },
-                created_at:        now,
-                updated_at:        now
-              }
+              records << { translatable_type: "Enchantment", translatable_id: enc_id,
+                           key: "name", locale: locale, value: name,
+                           meta: { source: "blizzard" }, created_at: now, updated_at: now }
             end
 
             return if records.empty?
 
-            unique_records = records.uniq do |r|
-              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
-            end
+            unique_records = records.uniq { |r| [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ] }
 
             # rubocop:disable Rails/SkipsModelValidations
-            Translation.upsert_all(
-              unique_records,
-              unique_by: %i[translatable_type translatable_id locale key]
-            )
+            Translation.upsert_all(unique_records, unique_by: %i[translatable_type translatable_id locale key])
             # rubocop:enable Rails/SkipsModelValidations
           end
 

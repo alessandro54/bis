@@ -4,6 +4,7 @@ default: &base
       batch_size: 100
 
   # Single worker for development — both region queues + everything else.
+  # Set SOLID_QUEUE_THREADS >= PVP_SYNC_THREADS so safe_concurrency math is correct.
   workers:
     - queues:
         - character_sync_us
@@ -14,7 +15,7 @@ default: &base
         - pvp_sync_shuffle
         - pvp_processing
         - "*"
-      threads: <%= ENV.fetch("SOLID_QUEUE_THREADS", 5) %>
+      threads: <%= ENV.fetch("SOLID_QUEUE_THREADS", 10) %>
       processes: 1
       polling_interval: 0.25
 
@@ -28,15 +29,18 @@ production: &production
 
   workers:
     # US characters — dedicated worker so a Blizzard US rate-limit never stalls EU.
-    # Batch jobs handle internal concurrency with async fibers (PVP_SYNC_CONCURRENCY).
+    # PVP_SYNC_THREADS controls both SolidQueue parallelism AND safe_concurrency math
+    # inside SyncCharacterBatchJob. Must stay in sync. With DB_POOL=100:
+    #   per_thread = floor(100 / PVP_SYNC_THREADS) - 1
+    #   8 threads → 11 chars/batch → 88 peak connections (safe under pool of 100)
     - queues: [character_sync_us]
-      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 3) %>
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 8) %>
       processes: 1
       polling_interval: 0.25
 
     # EU characters — independent from US, separate Blizzard rate-limit bucket.
     - queues: [character_sync_eu]
-      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 3) %>
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 8) %>
       processes: 1
       polling_interval: 0.25
 

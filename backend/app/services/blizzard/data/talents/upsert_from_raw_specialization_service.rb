@@ -136,10 +136,12 @@ module Blizzard
             end
 
             if uncached_ids.any?
-              Talent.where(blizzard_id: uncached_ids).pluck(:blizzard_id, :id).each do |blz_id, id|
-                result[blz_id] = id
-                Rails.cache.write("talent:blz:#{blz_id}", id, expires_in: TALENT_CACHE_TTL)
-              end
+              db_rows = Talent.where(blizzard_id: uncached_ids).pluck(:blizzard_id, :id).to_h
+              result.merge!(db_rows)
+              Rails.cache.write_multi(
+                db_rows.transform_keys { |blz_id| "talent:blz:#{blz_id}" },
+                expires_in: TALENT_CACHE_TTL
+              )
             end
 
             result
