@@ -9,6 +9,7 @@ module Pvp
     # threads). Set PVP_SYNC_THREADS to match that worker's thread count so
     # safe_concurrency divides the pool correctly.
     THREADS     = ENV.fetch("PVP_SYNC_THREADS", 8).to_i
+    TTL_HOURS   = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
 
     retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
@@ -23,6 +24,11 @@ module Pvp
       characters_by_id = Character
         .where(id: ids)
         .where(is_private: false)
+        .where("unavailable_until IS NULL OR unavailable_until < ?", Time.current)
+        .where(
+          "last_equipment_snapshot_at IS NULL OR last_equipment_snapshot_at < ?",
+          TTL_HOURS.hours.ago
+        )
         .index_by(&:id)
 
       return if characters_by_id.empty?
@@ -46,20 +52,49 @@ module Pvp
       def process_characters_concurrently(characters, locale, outcome)
         return if characters.empty?
 
-        # Pre-load all latest entries per bracket for every character in one
-        # DISTINCT ON query — eliminates N per-character queries in the service.
-        entries_by_character_id = batch_load_entries(characters.map(&:id))
+        character_ids = characters.map(&:id)
+
+        # Three bulk queries replace up to 3N per-character queries:
+        #   1. Latest entry per bracket (for entries passed to service)
+        #   2. Latest processed entry for equipment 304 fallback attrs
+        #   3. Latest processed entry for spec 304 fallback attrs
+        entries_by_character_id      = batch_load_entries(character_ids)
+        eq_fallbacks_by_character_id = batch_load_eq_fallbacks(character_ids)
+        sp_fallbacks_by_character_id = batch_load_spec_fallbacks(character_ids)
 
         concurrency = safe_concurrency(CONCURRENCY, characters.size, threads: THREADS)
 
         run_with_threads(characters, concurrency: concurrency) do |character|
           sync_one(
-            character: character,
-            locale:    locale,
-            outcome:   outcome,
-            entries:   entries_by_character_id[character.id] || []
+            character:            character,
+            locale:               locale,
+            outcome:              outcome,
+            entries:              entries_by_character_id[character.id] || [],
+            eq_fallback_source:   eq_fallbacks_by_character_id[character.id],
+            spec_fallback_source: sp_fallbacks_by_character_id[character.id]
           )
         end
+      end
+
+      # Latest entry with equipment attrs set — used when Blizzard returns 304
+      # (unchanged) so we can propagate existing attrs without re-processing.
+      def batch_load_eq_fallbacks(character_ids)
+        PvpLeaderboardEntry
+          .where(character_id: character_ids)
+          .where.not(equipment_processed_at: nil)
+          .select("DISTINCT ON (character_id) pvp_leaderboard_entries.*")
+          .order("character_id, equipment_processed_at DESC")
+          .index_by(&:character_id)
+      end
+
+      # Same for specialization attrs.
+      def batch_load_spec_fallbacks(character_ids)
+        PvpLeaderboardEntry
+          .where(character_id: character_ids)
+          .where.not(specialization_processed_at: nil)
+          .select("DISTINCT ON (character_id) pvp_leaderboard_entries.*")
+          .order("character_id, specialization_processed_at DESC")
+          .index_by(&:character_id)
       end
 
       # Single DISTINCT ON query for all characters; groups results by character_id.
@@ -78,13 +113,15 @@ module Pvp
           .group_by(&:character_id)
       end
 
-      def sync_one(character:, locale:, outcome:, entries: nil)
+      def sync_one(character:, locale:, outcome:, entries: nil, eq_fallback_source: nil, spec_fallback_source: nil)
         return unless character
 
         result = Pvp::Characters::SyncCharacterService.call(
-          character: character,
-          locale:    locale,
-          entries:   entries
+          character:            character,
+          locale:               locale,
+          entries:              entries,
+          eq_fallback_source:   eq_fallback_source,
+          spec_fallback_source: spec_fallback_source
         )
 
         if result.success?

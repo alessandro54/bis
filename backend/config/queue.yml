@@ -30,9 +30,9 @@ production: &production
   workers:
     # US characters — dedicated worker so a Blizzard US rate-limit never stalls EU.
     # PVP_SYNC_THREADS controls both SolidQueue parallelism AND safe_concurrency math
-    # inside SyncCharacterBatchJob. Must stay in sync. With DB_POOL=100:
-    #   per_thread = floor(100 / PVP_SYNC_THREADS) - 1
-    #   8 threads → 11 chars/batch → 88 peak connections (safe under pool of 100)
+    # inside SyncCharacterBatchJob. Must stay in sync. With DB_POOL=130:
+    #   per_thread = floor(130 / PVP_SYNC_THREADS) - 1
+    #   8 threads → 15 chars/batch → 120 peak connections (safe under pool of 130)
     - queues: [character_sync_us]
       threads: <%= ENV.fetch("PVP_SYNC_THREADS", 8) %>
       processes: 1

@@ -29,11 +29,11 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
       expect(Pvp::Characters::SyncCharacterService)
         .to have_received(:call)
-        .with(character: character1, locale: locale, entries: anything)
+        .with(hash_including(character: character1, locale: locale))
 
       expect(Pvp::Characters::SyncCharacterService)
         .to have_received(:call)
-        .with(character: character2, locale: locale, entries: anything)
+        .with(hash_including(character: character2, locale: locale))
     end
 
     it "preloads all characters in a single query" do
@@ -52,7 +52,7 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
         expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call)
-          .with(character: character1, locale: locale, entries: anything)
+          .with(hash_including(character: character1, locale: locale))
           .once
       end
     end
@@ -78,6 +78,74 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
       end
     end
 
+    context "when a character is within unavailability cooldown" do
+      before { character1.update!(unavailable_until: 1.week.from_now) }
+
+      it "skips the unavailable character without calling the service" do
+        perform_job
+
+        expect(Pvp::Characters::SyncCharacterService)
+          .not_to have_received(:call)
+          .with(hash_including(character: character1))
+
+        expect(Pvp::Characters::SyncCharacterService)
+          .to have_received(:call)
+          .with(hash_including(character: character2, locale: locale))
+      end
+    end
+
+    context "when a character's unavailability cooldown has expired" do
+      before { character1.update!(unavailable_until: 1.day.ago) }
+
+      it "processes the character again" do
+        perform_job
+
+        expect(Pvp::Characters::SyncCharacterService)
+          .to have_received(:call)
+          .with(hash_including(character: character1, locale: locale))
+      end
+    end
+
+    context "when a character was recently synced (within TTL)" do
+      before { character1.update!(last_equipment_snapshot_at: 1.hour.ago) }
+
+      it "skips the recently synced character without calling the service" do
+        perform_job
+
+        expect(Pvp::Characters::SyncCharacterService)
+          .not_to have_received(:call)
+          .with(hash_including(character: character1))
+
+        expect(Pvp::Characters::SyncCharacterService)
+          .to have_received(:call)
+          .with(hash_including(character: character2, locale: locale))
+      end
+    end
+
+    context "when a character's last sync is beyond TTL" do
+      before { character1.update!(last_equipment_snapshot_at: 25.hours.ago) }
+
+      it "processes the character" do
+        perform_job
+
+        expect(Pvp::Characters::SyncCharacterService)
+          .to have_received(:call)
+          .with(hash_including(character: character1, locale: locale))
+      end
+    end
+
+    context "when a character has never been synced (nil last_equipment_snapshot_at)" do
+      before { character1.update!(last_equipment_snapshot_at: nil) }
+
+      it "processes the character" do
+        perform_job
+
+        expect(Pvp::Characters::SyncCharacterService)
+          .to have_received(:call)
+          .with(hash_including(character: character1, locale: locale))
+      end
+    end
+
     context "with private characters" do
       let!(:private_character) { create(:character, is_private: true) }
       let(:character_ids) { [ character1.id, private_character.id ] }
@@ -87,11 +155,11 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
         expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call)
-          .with(character: character1, locale: locale, entries: anything)
+          .with(hash_including(character: character1, locale: locale))
 
         expect(Pvp::Characters::SyncCharacterService)
           .not_to have_received(:call)
-          .with(character: private_character, locale: anything, entries: anything)
+          .with(hash_including(character: private_character))
       end
     end
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_22_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_23_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -52,6 +52,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_22_000001) do
     t.bigint "class_id"
     t.string "class_slug"
     t.datetime "created_at", null: false
+    t.string "equipment_etag"
     t.string "equipment_fingerprint"
     t.integer "faction"
     t.string "inset_url"
@@ -65,12 +66,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_22_000001) do
     t.string "realm"
     t.string "region"
     t.string "talent_loadout_code"
+    t.string "talents_etag"
+    t.datetime "unavailable_until"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
     t.index ["equipment_fingerprint"], name: "index_characters_on_equipment_fingerprint"
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
     t.index ["talent_loadout_code"], name: "index_characters_on_talent_loadout_code"
+    t.index ["unavailable_until"], name: "index_characters_on_unavailable_until_active", where: "(unavailable_until IS NOT NULL)"
   end
 
   create_table "enchantments", force: :cascade do |t|

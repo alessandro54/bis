@@ -52,7 +52,7 @@ RSpec.describe Blizzard::Auth do
   end
 
   describe "#access_token" do
-    let(:cache_key) { Blizzard::Auth::CACHE_KEY }
+    let(:cache_key) { Blizzard::Auth.cache_key_for(client_id) }
 
     context "when there is a valid cached token" do
       let(:cached_token) { "cached-token" }

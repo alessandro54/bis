@@ -9,25 +9,27 @@ module Pvp
         return
       end
 
-      results = {}
-
-      [
+      aggregations = [
         [ :items,    Pvp::Meta::ItemAggregationService ],
         [ :enchants, Pvp::Meta::EnchantAggregationService ],
         [ :gems,     Pvp::Meta::GemAggregationService ]
-      ].each do |key, service_class|
+      ]
+
+      # Run all three aggregations concurrently — each is an independent bulk
+      # upsert with no shared state, so parallelism is safe.
+      results = run_with_threads(aggregations, concurrency: aggregations.size) do |(key, service_class)|
         result = service_class.call(season: season)
 
         if result.success?
-          results[key] = result.context[:count]
+          [ key, result.context[:count] ]
         else
           Rails.logger.error(
             "[BuildAggregationsJob] #{service_class} failed for season #{pvp_season_id}: #{result.error}"
           )
           Pvp::SyncLogger.error("#{service_class} failed for season #{pvp_season_id}: #{result.error}")
-          results[key] = :failed
+          [ key, :failed ]
         end
-      end
+      end.to_h
 
       Rails.logger.info(
         "[BuildAggregationsJob] Season #{pvp_season_id} done — " \

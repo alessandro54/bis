@@ -6,6 +6,7 @@
 #  id                         :bigint           not null, primary key
 #  avatar_url                 :string
 #  class_slug                 :string
+#  equipment_etag             :string
 #  equipment_fingerprint      :string
 #  faction                    :integer
 #  inset_url                  :string
@@ -18,6 +19,8 @@
 #  realm                      :string
 #  region                     :string
 #  talent_loadout_code        :string
+#  talents_etag               :string
+#  unavailable_until          :datetime
 #  created_at                 :datetime         not null
 #  updated_at                 :datetime         not null
 #  blizzard_id                :bigint
@@ -31,6 +34,7 @@
 #  index_characters_on_is_private                 (is_private) WHERE (is_private = true)
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
 #  index_characters_on_talent_loadout_code        (talent_loadout_code)
+#  index_characters_on_unavailable_until_active   (unavailable_until) WHERE (unavailable_until IS NOT NULL)
 #
 FactoryBot.define do
   factory :character do
