@@ -9,13 +9,13 @@ module Blizzard
                      params:    params)
         end
 
-        # Returns [body_or_nil, etag, changed] — see Client#get_with_etag.
-        def self.fetch_with_etag(region:, name:, realm:, locale: "en_US", etag: nil, params: {})
+        # Returns [body_or_nil, last_modified, changed] — see Client#get_with_last_modified.
+        def self.fetch_with_last_modified(region:, name:, realm:, locale: "en_US", last_modified: nil, params: {})
           client = client(region:, locale:)
-          client.get_with_etag(path(realm, name),
-                               namespace: client.profile_namespace,
-                               params:    params,
-                               etag:      etag)
+          client.get_with_last_modified(path(realm, name),
+                                        namespace:     client.profile_namespace,
+                                        params:        params,
+                                        last_modified: last_modified)
         end
 
         def self.path(realm, name)

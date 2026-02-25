@@ -131,8 +131,8 @@ region: character.region),
       end
 
       it "does not call the Blizzard API" do
-        expect(Blizzard::Api::Profile::CharacterEquipmentSummary).not_to receive(:fetch_with_etag)
-        expect(Blizzard::Api::Profile::CharacterSpecializationSummary).not_to receive(:fetch_with_etag)
+        expect(Blizzard::Api::Profile::CharacterEquipmentSummary).not_to receive(:fetch_with_last_modified)
+        expect(Blizzard::Api::Profile::CharacterSpecializationSummary).not_to receive(:fetch_with_last_modified)
 
         call_service
       end
@@ -150,33 +150,35 @@ region: character.region),
       JSON.parse(File.read("spec/fixtures/files/manongauz_specializations.json"))
     end
 
-    let(:eq_etag_new)   { "etag-equipment-new" }
-    let(:spec_etag_new) { "etag-talents-new" }
+    let(:eq_last_modified_new)   { "Wed, 25 Feb 2026 03:31:52 GMT" }
+    let(:spec_last_modified_new) { "Wed, 25 Feb 2026 04:00:00 GMT" }
+    let(:eq_last_modified_new_utc)   { Time.httpdate(eq_last_modified_new).utc }
+    let(:spec_last_modified_new_utc) { Time.httpdate(spec_last_modified_new).utc }
 
-    # Stubs fetch_with_etag for equipment to return a 200 with a new ETag.
+    # Stubs fetch_with_last_modified for equipment to return a 200 with new Last-Modified.
     def stub_equipment_changed
       allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
-        .to receive(:fetch_with_etag)
-        .and_return([ equipment_json, eq_etag_new, true ])
+        .to receive(:fetch_with_last_modified)
+        .and_return([ equipment_json, eq_last_modified_new, true ])
     end
 
-    # Stubs fetch_with_etag for equipment to return a 304 (unchanged).
+    # Stubs fetch_with_last_modified for equipment to return a 304 (unchanged).
     def stub_equipment_unchanged
       allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
-        .to receive(:fetch_with_etag)
-        .and_return([ nil, character.equipment_etag, false ])
+        .to receive(:fetch_with_last_modified)
+        .and_return([ nil, character.equipment_last_modified&.httpdate, false ])
     end
 
     def stub_talents_changed
       allow(Blizzard::Api::Profile::CharacterSpecializationSummary)
-        .to receive(:fetch_with_etag)
-        .and_return([ talents_json, spec_etag_new, true ])
+        .to receive(:fetch_with_last_modified)
+        .and_return([ talents_json, spec_last_modified_new, true ])
     end
 
     def stub_talents_unchanged
       allow(Blizzard::Api::Profile::CharacterSpecializationSummary)
-        .to receive(:fetch_with_etag)
-        .and_return([ nil, character.talents_etag, false ])
+        .to receive(:fetch_with_last_modified)
+        .and_return([ nil, character.talents_last_modified&.httpdate, false ])
     end
 
     # Shared service stubs (used when the service is expected to be called).
@@ -221,14 +223,14 @@ region: character.region),
         call_service
       end
 
-      it "saves the new equipment ETag on the character" do
+      it "saves the new equipment Last-Modified on the character as UTC" do
         call_service
-        expect(character.reload.equipment_etag).to eq(eq_etag_new)
+        expect(character.reload.equipment_last_modified).to be_within(1.second).of(eq_last_modified_new_utc)
       end
 
-      it "saves the new talents ETag on the character" do
+      it "saves the new talents Last-Modified on the character as UTC" do
         call_service
-        expect(character.reload.talents_etag).to eq(spec_etag_new)
+        expect(character.reload.talents_last_modified).to be_within(1.second).of(spec_last_modified_new_utc)
       end
 
       it "sets last_equipment_snapshot_at" do
@@ -275,15 +277,15 @@ region: character.region),
         expect(entry_2v2.reload.equipment_processed_at).to be_present
       end
 
-      it "does not overwrite the stored equipment ETag" do
-        original_etag = character.equipment_etag
+      it "does not overwrite the stored equipment Last-Modified" do
+        original_etag = character.equipment_last_modified
         call_service
-        expect(character.reload.equipment_etag).to eq(original_etag)
+        expect(character.reload.equipment_last_modified).to eq(original_etag)
       end
 
-      it "saves the new talents ETag" do
+      it "saves the new talents Last-Modified" do
         call_service
-        expect(character.reload.talents_etag).to eq(spec_etag_new)
+        expect(character.reload.talents_last_modified).to be_within(1.second).of(spec_last_modified_new_utc)
       end
     end
 
@@ -316,15 +318,15 @@ region: character.region),
         expect(entry_2v2.reload.specialization_processed_at).to be_present
       end
 
-      it "saves the new equipment ETag" do
+      it "saves the new equipment Last-Modified" do
         call_service
-        expect(character.reload.equipment_etag).to eq(eq_etag_new)
+        expect(character.reload.equipment_last_modified).to be_within(1.second).of(eq_last_modified_new_utc)
       end
 
-      it "does not overwrite the stored talents ETag" do
-        original_etag = character.talents_etag
+      it "does not overwrite the stored talents Last-Modified" do
+        original_etag = character.talents_last_modified
         call_service
-        expect(character.reload.talents_etag).to eq(original_etag)
+        expect(character.reload.talents_last_modified).to eq(original_etag)
       end
     end
 
@@ -372,7 +374,7 @@ region: character.region),
     context "when equipment fetch fails" do
       before do
         allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
-          .to receive(:fetch_with_etag)
+          .to receive(:fetch_with_last_modified)
           .and_raise(Blizzard::Client::Error, "timeout")
 
         stub_talents_changed
@@ -391,7 +393,7 @@ region: character.region),
     context "when equipment fetch returns 404" do
       before do
         allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
-          .to receive(:fetch_with_etag)
+          .to receive(:fetch_with_last_modified)
           .and_raise(Blizzard::Client::Error, "Blizzard API error: HTTP 404")
 
         stub_talents_changed
@@ -414,7 +416,7 @@ region: character.region),
         stub_equipment_changed
 
         allow(Blizzard::Api::Profile::CharacterSpecializationSummary)
-          .to receive(:fetch_with_etag)
+          .to receive(:fetch_with_last_modified)
           .and_raise(Blizzard::Client::Error, "timeout")
       end
 

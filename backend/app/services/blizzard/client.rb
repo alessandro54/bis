@@ -63,15 +63,16 @@ module Blizzard
       end
     end
 
-    # ETag-aware GET. Sends If-None-Match when etag is present.
-    # Returns [body, response_etag, changed]:
-    #   changed = true  → 200 OK, body contains parsed JSON, response_etag is new
-    #   changed = false → 304 Not Modified, body is nil, response_etag is the original
-    def get_with_etag(path, namespace:, params: {}, etag: nil)
-      extra_headers = etag.present? ? { "If-None-Match": etag } : {}
+    # Last-Modified-aware GET. Sends If-Modified-Since when a previous value is present.
+    # Blizzard profile endpoints return Last-Modified but not ETag.
+    # Returns [body, last_modified, changed]:
+    #   changed = true  → 200 OK, body contains parsed JSON, last_modified is new value
+    #   changed = false → 304 Not Modified, body is nil, last_modified is the original
+    def get_with_last_modified(path, namespace:, params: {}, last_modified: nil)
+      extra_headers = last_modified.present? ? { "If-Modified-Since": last_modified } : {}
 
       perform_request(path, namespace: namespace, params: params, extra_headers: extra_headers) do |response|
-        parse_etag_response(response, etag)
+        parse_last_modified_response(response, last_modified)
       end
     end
 
@@ -114,19 +115,19 @@ module Blizzard
         end
       end
 
-      # Parses a response for ETag-aware requests.
-      # Returns [body_or_nil, etag, changed].
-      def parse_etag_response(response, original_etag)
+      # Parses a response for Last-Modified-aware requests.
+      # Returns [body_or_nil, last_modified, changed].
+      def parse_last_modified_response(response, original_last_modified)
         if response.is_a?(HTTPX::ErrorResponse)
           raise Error, "Network/Transport error: #{response.error}"
         end
 
         case response.status
         when 304
-          [ nil, original_etag, false ]
+          [ nil, original_last_modified, false ]
         when 200
           body = Oj.load(response.body.to_s, mode: :compat)
-          [ body, response.headers["etag"], true ]
+          [ body, response.headers["last-modified"], true ]
         when 429
           retry_after = response.headers["retry-after"]&.to_i || 1
           raise RateLimitedError,

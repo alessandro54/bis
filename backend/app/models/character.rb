@@ -6,8 +6,8 @@
 #  id                         :bigint           not null, primary key
 #  avatar_url                 :string
 #  class_slug                 :string
-#  equipment_etag             :string
 #  equipment_fingerprint      :string
+#  equipment_last_modified    :datetime
 #  faction                    :integer
 #  inset_url                  :string
 #  is_private                 :boolean          default(FALSE)
@@ -19,7 +19,7 @@
 #  realm                      :string
 #  region                     :string
 #  talent_loadout_code        :string
-#  talents_etag               :string
+#  talents_last_modified      :datetime
 #  unavailable_until          :datetime
 #  created_at                 :datetime         not null
 #  updated_at                 :datetime         not null
@@ -55,6 +55,8 @@ class Character < ApplicationRecord
     alliance: 0,
     horde:    1
   }
+
+  self.filter_attributes += [:equipment_fingerprint]
 
   def print_loadout     = Character::LoadoutPrinter.call(self)
   def print_talents     = Character::TalentPrinter.call(self)

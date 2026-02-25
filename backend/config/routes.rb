@@ -18,10 +18,12 @@ Rails.application.routes.draw do
           resources :enchants, only: [ :index ]
           resources :gems, only: [ :index ]
           resources :specs, only: [ :index, :show ]
+          get :class_distribution, to: "class_distributions#show"
         end
       end
     end
   end
 
   mount MissionControl::Jobs::Engine, at: "/jobs"
+  mount_avo
 end

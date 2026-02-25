@@ -7,7 +7,7 @@ module Pvp
       #   json    — parsed response body (nil on 304)
       #   etag    — ETag to store on the character after this fetch
       #   changed — true = 200 (new data), false = 304 (unchanged)
-      FetchResult = Struct.new(:json, :etag, :changed, keyword_init: true) do
+      FetchResult = Struct.new(:json, :last_modified, :changed, keyword_init: true) do
         def changed?   = changed
         def unchanged? = !changed
       end
@@ -123,7 +123,7 @@ module Pvp
             end
 
             entry_attrs.merge!(eq_result.context[:entry_attrs]) if eq_result.context[:entry_attrs]
-            char_attrs[:equipment_etag] = eq_fetch.etag if eq_fetch.etag.present?
+            char_attrs[:equipment_last_modified] = eq_fetch.last_modified if eq_fetch.last_modified.present?
           else
             # 304: equipment unchanged — propagate attrs from latest processed entry
             entry_attrs.merge!(equipment_entry_attrs_from_latest)
@@ -144,7 +144,7 @@ module Pvp
 
             entry_attrs.merge!(spec_result.context[:entry_attrs]) if spec_result.context[:entry_attrs]
             char_attrs.merge!(spec_result.context[:char_attrs])   if spec_result.context[:char_attrs]
-            char_attrs[:talents_etag] = spec_fetch.etag if spec_fetch.etag.present?
+            char_attrs[:talents_last_modified] = spec_fetch.last_modified if spec_fetch.last_modified.present?
           else
             # 304: talents unchanged — propagate attrs from latest processed entry
             entry_attrs.merge!(spec_entry_attrs_from_latest)
@@ -221,34 +221,40 @@ module Pvp
           spec_fetch = nil
 
           threads = [
-            Thread.new { eq_fetch   = safe_fetch { fetch_equipment_with_etag } },
-            Thread.new { spec_fetch = safe_fetch { fetch_talents_with_etag } }
+            Thread.new { eq_fetch   = safe_fetch { fetch_equipment_with_last_modified } },
+            Thread.new { spec_fetch = safe_fetch { fetch_talents_with_last_modified } }
           ]
           threads.each(&:join)
 
           [ eq_fetch, spec_fetch ]
         end
 
-        def fetch_equipment_with_etag
-          json, etag, changed = Blizzard::Api::Profile::CharacterEquipmentSummary.fetch_with_etag(
-            region: character.region,
-            realm:  character.realm,
-            name:   character.name,
-            locale: region_locale,
-            etag:   character.equipment_etag
+        def fetch_equipment_with_last_modified
+          json, last_modified_str, changed = Blizzard::Api::Profile::CharacterEquipmentSummary.fetch_with_last_modified(
+            region:        character.region,
+            realm:         character.realm,
+            name:          character.name,
+            locale:        region_locale,
+            last_modified: character.equipment_last_modified&.httpdate
           )
-          FetchResult.new(json: json, etag: etag, changed: changed)
+          FetchResult.new(json: json, last_modified: parse_last_modified(last_modified_str), changed: changed)
         end
 
-        def fetch_talents_with_etag
-          json, etag, changed = Blizzard::Api::Profile::CharacterSpecializationSummary.fetch_with_etag(
-            region: character.region,
-            realm:  character.realm,
-            name:   character.name,
-            locale: region_locale,
-            etag:   character.talents_etag
+        def fetch_talents_with_last_modified
+          json, last_modified_str, changed = Blizzard::Api::Profile::CharacterSpecializationSummary.fetch_with_last_modified(
+            region:        character.region,
+            realm:         character.realm,
+            name:          character.name,
+            locale:        region_locale,
+            last_modified: character.talents_last_modified&.httpdate
           )
-          FetchResult.new(json: json, etag: etag, changed: changed)
+          FetchResult.new(json: json, last_modified: parse_last_modified(last_modified_str), changed: changed)
+        end
+
+        def parse_last_modified(value)
+          return nil if value.blank?
+
+          Time.httpdate(value).utc
         end
 
         # Character profile endpoints don't carry translation-sensitive text —

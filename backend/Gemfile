@@ -1,5 +1,7 @@
 source "https://rubygems.org"
 
+gem "avo"
+
 # Main Rails framework (API, ActiveRecord, ActionPack)
 gem "rails", "~> 8.1.1"
 
