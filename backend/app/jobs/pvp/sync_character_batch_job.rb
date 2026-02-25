@@ -157,8 +157,8 @@ module Pvp
         if cycle.all_character_batches_done?
           cycle.update!(status: :completed)
           Pvp::BuildAggregationsJob.perform_later(
-            pvp_season_id:  cycle.pvp_season_id,
-            sync_cycle_id:  cycle.id,
+            pvp_season_id:    cycle.pvp_season_id,
+            sync_cycle_id:    cycle.id,
             cycle_started_at: cycle.snapshot_at.iso8601
           )
         end

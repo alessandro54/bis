@@ -33,7 +33,7 @@ module Blizzard
     def initialize(rps: DEFAULT_RPS, hourly_quota: DEFAULT_HOURLY_QUOTA)
       @rps          = rps.to_f
       @hourly_quota = hourly_quota.to_f
-      @hourly_rps   = @hourly_quota / 3600.0   # 10.0 tokens/s at default quota
+      @hourly_rps   = @hourly_quota / 3600.0 # 10.0 tokens/s at default quota
 
       # Start both buckets full so the first burst isn't throttled.
       @tokens        = @rps

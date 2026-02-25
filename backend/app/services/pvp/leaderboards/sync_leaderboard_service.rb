@@ -72,7 +72,7 @@ module Pvp
           )
 
           leaderboard.with_lock do
-            now          = Time.current
+            now = Time.current
             entry_records = entries.map do |entry_json|
               character_data = entry_json.fetch("character")
               stats          = entry_json.fetch("season_match_statistics")

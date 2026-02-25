@@ -30,7 +30,8 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     create(
       :pvp_leaderboard_entry,
       character:          character,
-      pvp_leaderboard:    create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "2v2", region: character.region),
+      pvp_leaderboard:    create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "2v2",
+region: character.region),
       raw_equipment:      nil,
       raw_specialization: nil
     )
@@ -42,7 +43,8 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     create(
       :pvp_leaderboard_entry,
       character:          character,
-      pvp_leaderboard:    create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "3v3", region: character.region),
+      pvp_leaderboard:    create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "3v3",
+region: character.region),
       raw_equipment:      nil,
       raw_specialization: nil
     )
@@ -55,7 +57,8 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     create(
       :pvp_leaderboard_entry,
       character:                   character,
-      pvp_leaderboard:             create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "shuffle", region: character.region),
+      pvp_leaderboard:             create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "shuffle",
+region: character.region),
       snapshot_at:                 2.hours.ago,
       item_level:                  540,
       tier_set_id:                 999,
@@ -128,7 +131,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
       end
 
       it "does not call the Blizzard API" do
-        expect(Blizzard::Api::Profile::CharacterEquipmentSummary).not_to     receive(:fetch_with_etag)
+        expect(Blizzard::Api::Profile::CharacterEquipmentSummary).not_to receive(:fetch_with_etag)
         expect(Blizzard::Api::Profile::CharacterSpecializationSummary).not_to receive(:fetch_with_etag)
 
         call_service
@@ -211,7 +214,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
       end
 
       it "calls both processing services" do
-        expect(Pvp::Entries::ProcessEquipmentService).to       receive(:call).once.and_call_original rescue nil
+        expect(Pvp::Entries::ProcessEquipmentService).to receive(:call).once.and_call_original rescue nil
         expect(Pvp::Entries::ProcessSpecializationService).to receive(:call).once.and_call_original rescue nil
         stub_equipment_service_success
         stub_spec_service_success
@@ -307,7 +310,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
       it "copies spec attrs from the latest processed entry" do
         call_service
 
-        expect(entry_2v2.reload.spec_id).to               eq(processed_entry.spec_id)
+        expect(entry_2v2.reload.spec_id).to eq(processed_entry.spec_id)
         expect(entry_2v2.reload.hero_talent_tree_id).to    eq(processed_entry.hero_talent_tree_id)
         expect(entry_2v2.reload.hero_talent_tree_name).to  eq(processed_entry.hero_talent_tree_name)
         expect(entry_2v2.reload.specialization_processed_at).to be_present

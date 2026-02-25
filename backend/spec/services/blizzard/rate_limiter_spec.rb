@@ -33,7 +33,7 @@ RSpec.describe Blizzard::RateLimiter do
       subject(:limiter) { described_class.new(rps: 2.0, hourly_quota: 1_000_000.0) }
 
       it "blocks until the per-second bucket refills" do
-        2.times { limiter.acquire }   # drain per-second bucket
+        2.times { limiter.acquire } # drain per-second bucket
 
         # Must sleep — verify it doesn't return within a tiny window.
         expect {
@@ -47,7 +47,7 @@ RSpec.describe Blizzard::RateLimiter do
       subject(:limiter) { described_class.new(rps: 1_000_000.0, hourly_quota: 2.0) }
 
       it "blocks until the hourly bucket refills" do
-        2.times { limiter.acquire }   # drain the hourly quota
+        2.times { limiter.acquire } # drain the hourly quota
 
         # hourly_rps = 2/3600 ≈ 0.00056 tokens/s → refill takes ~1800s.
         # Verify it doesn't return within a short window, proving it's throttling.

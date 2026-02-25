@@ -1,6 +1,5 @@
 # ======================================================================
 #  RuboCop config – Rails 8 / Ruby 3.4.x
-#  Base: rubocop-rails-omakase + ajustes profesionales
 # ======================================================================
 
 inherit_gem:
@@ -135,7 +134,7 @@ Style/BlockDelimiters:
   EnforcedStyle: line_count_based
 
 # ----------------------------------------------------------------------
-# Metrics – razonables, no tóxicos
+# Metrics
 # ----------------------------------------------------------------------
 Metrics/MethodLength:
   Enabled: true
@@ -166,7 +165,6 @@ Metrics/AbcSize:
 
 # ----------------------------------------------------------------------
 # Rails
-# (rubocop-rails-omakase ya activa muchas; aquí sólo ajustes suaves)
 # ----------------------------------------------------------------------
 Rails/SkipsModelValidations:
   Enabled: true
@@ -178,7 +176,7 @@ Rails/FindEach:
   Enabled: true
 
 Rails/Output:
-  Enabled: false  # permitir puts/pp en desarrollo
+  Enabled: false
 
 Rails/TimeZone:
   Enabled: true
@@ -190,7 +188,7 @@ Rails/Delegate:
   Enabled: true
 
 # ----------------------------------------------------------------------
-# Performance (ya viene como dependencia de omakase)
+# Performance
 # ----------------------------------------------------------------------
 Performance/TimesMap:
   Enabled: true
@@ -203,25 +201,3 @@ Performance/FixedSize:
 
 Performance/CollectionLiteralInLoop:
   Enabled: true
-
-# ----------------------------------------------------------------------
-# RSpec (si agregas `gem "rubocop-rspec"`)
-# ----------------------------------------------------------------------
-# require:
-#   - rubocop-rspec
-#
-# RSpec:
-#   AllCops:
-#     TargetRubyVersion: 3.4
-#
-# RSpec/ExampleLength:
-#   Enabled: true
-#   Max: 15
-#
-# RSpec/MultipleExpectations:
-#   Enabled: true
-#   Max: 5
-#
-# RSpec/NestedGroups:
-#   Enabled: true
-#   Max: 4

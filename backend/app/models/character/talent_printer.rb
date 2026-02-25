@@ -1,9 +1,9 @@
 class Character::TalentPrinter
   TALENT_TYPE_COLORS = {
-    "class" => "\e[33m",  # yellow
-    "spec"  => "\e[36m",  # cyan
-    "hero"  => "\e[35m",  # magenta
-    "pvp"   => "\e[31m"   # red
+    "class" => "\e[33m", # yellow
+    "spec" => "\e[36m",  # cyan
+    "hero" => "\e[35m",  # magenta
+    "pvp" => "\e[31m" # red
   }.freeze
 
   def self.call(character) = new(character).call

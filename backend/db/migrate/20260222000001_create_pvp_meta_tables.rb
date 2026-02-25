@@ -18,7 +18,7 @@ class CreatePvpMetaTables < ActiveRecord::Migration[8.1]
     add_index :pvp_meta_item_popularity,
               %i[pvp_season_id bracket spec_id slot item_id],
               unique: true,
-              name: "idx_meta_item_unique"
+              name:   "idx_meta_item_unique"
 
     create_table :pvp_meta_enchant_popularity do |t|
       t.references :pvp_season,     null: false, foreign_key: true
@@ -38,7 +38,7 @@ class CreatePvpMetaTables < ActiveRecord::Migration[8.1]
     add_index :pvp_meta_enchant_popularity,
               %i[pvp_season_id bracket spec_id slot enchantment_id],
               unique: true,
-              name: "idx_meta_enchant_unique"
+              name:   "idx_meta_enchant_unique"
 
     create_table :pvp_meta_gem_popularity do |t|
       t.references :pvp_season,   null: false, foreign_key: true
@@ -59,6 +59,6 @@ class CreatePvpMetaTables < ActiveRecord::Migration[8.1]
     add_index :pvp_meta_gem_popularity,
               %i[pvp_season_id bracket spec_id slot socket_type item_id],
               unique: true,
-              name: "idx_meta_gem_unique"
+              name:   "idx_meta_gem_unique"
   end
 end

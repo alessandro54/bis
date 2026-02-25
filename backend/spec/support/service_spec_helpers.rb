@@ -37,7 +37,8 @@ module ServiceSpecHelpers
             }
           ],
           "sockets" => [
-            { "socket_type" => { "type" => "PRISMATIC" }, "item" => { "id" => socket_gem_blizzard_id, "name" => "Versatile Onyx" }, "display_string" => "+10 Mastery and +3 Versatility" }
+            { "socket_type" => { "type" => "PRISMATIC" },
+"item" => { "id" => socket_gem_blizzard_id, "name" => "Versatile Onyx" }, "display_string" => "+10 Mastery and +3 Versatility" }
           ],
           "modified_crafting_stat" => [
             { "id" => 36, "type" => "HASTE_RATING",   "name" => "Haste" },
@@ -62,7 +63,8 @@ module ServiceSpecHelpers
           "enchantment_id" => enchantment.id,
           "enchantment_source_item_id" => enchantment_source_item.id,
           "embellishment_spell_id" => nil,
-          "sockets" => [ { "type" => "PRISMATIC", "item_id" => socket_gem_item.id, "display_string" => "+10 Mastery and +3 Versatility" } ],
+          "sockets" => [ { "type" => "PRISMATIC", "item_id" => socket_gem_item.id,
+"display_string" => "+10 Mastery and +3 Versatility" } ],
           "crafting_stats" => [ "HASTE_RATING", "MASTERY_RATING" ]
         }
       }

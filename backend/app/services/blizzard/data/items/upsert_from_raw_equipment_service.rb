@@ -234,8 +234,8 @@ module Blizzard
             Array(raw_item["sockets"]).map do |socket|
               blizzard_gem_id = socket.dig("item", "id")
               {
-                "type"           => socket.dig("socket_type", "type"),
-                "item_id"        => blizzard_gem_id ? items_by_blizzard_id[blizzard_gem_id] : nil,
+                "type" => socket.dig("socket_type", "type"),
+                "item_id" => blizzard_gem_id ? items_by_blizzard_id[blizzard_gem_id] : nil,
                 "display_string" => socket["display_string"]
               }
             end

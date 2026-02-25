@@ -82,7 +82,7 @@ class ApplicationJob < ActiveJob::Base
       mutex   = Mutex.new
       work    = items.dup
 
-      [concurrency, items.size].min.times.map do
+      Array.new([ concurrency, items.size ].min) do
         Thread.new do
           loop do
             item = mutex.synchronize { work.shift }

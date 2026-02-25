@@ -21,7 +21,8 @@ class Character::SyncStatusPrinter
     # Identity
     row "ID",          c.id
     row "Private",     c.is_private ? "#{red}yes#{reset}" : "no"
-    row "Fingerprint", c.equipment_fingerprint.present? ? dim(c.equipment_fingerprint[0, 40] + "…") : "#{red}none#{reset}"
+    row "Fingerprint",
+c.equipment_fingerprint.present? ? dim(c.equipment_fingerprint[0, 40] + "…") : "#{red}none#{reset}"
 
     # Snapshot timestamps
     puts "#{dim}│#{reset}"
@@ -33,7 +34,7 @@ class Character::SyncStatusPrinter
     item_count   = c.character_items.count
     talent_count = c.character_talents.count
     row "character_items",   item_count.zero?   ? "#{red}0 ← never processed#{reset}" : item_count
-    row "character_talents", talent_count.zero? ? "#{yellow}0#{reset}"                 : talent_count
+    row "character_talents", talent_count.zero? ? "#{yellow}0#{reset}" : talent_count
 
     # PvP entries
     puts "#{dim}│#{reset}"

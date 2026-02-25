@@ -92,7 +92,8 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
           expect(created.enchantment_id).to eq(enchantment.id)
           expect(created.enchantment_source_item_id).to eq(enchantment_source_item.id)
           expect(created.bonus_list).to eq([ 10_397, 9438 ])
-          expect(created.sockets).to eq([ { "type" => "PRISMATIC", "item_id" => socket_gem_item.id, "display_string" => "+10 Mastery and +3 Versatility" } ])
+          expect(created.sockets).to eq([ { "type" => "PRISMATIC", "item_id" => socket_gem_item.id,
+"display_string" => "+10 Mastery and +3 Versatility" } ])
           expect(created.crafting_stats).to eq([ "HASTE_RATING", "MASTERY_RATING" ])
         end
 

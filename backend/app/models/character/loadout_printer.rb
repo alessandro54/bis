@@ -46,7 +46,8 @@ class Character::LoadoutPrinter
 
       if ci.enchantment
         enc_name = ci.enchantment.t("name", locale: "en_US") || "?"
-        source   = ci.enchantment_source_item ? " #{dim}(#{ci.enchantment_source_item.t('name', locale: 'en_US')})#{reset}" : ""
+        source   = ci.enchantment_source_item ? " #{dim}(#{ci.enchantment_source_item.t('name',
+locale: 'en_US')})#{reset}" : ""
         children << "#{teal}✦ #{enc_name}#{reset}#{source}"
       end
 
@@ -66,11 +67,11 @@ class Character::LoadoutPrinter
 
     QUALITY_COLORS = {
       "legendary" => "\e[38;5;208m",
-      "epic"      => "\e[35m",
-      "rare"      => "\e[34m",
-      "uncommon"  => "\e[32m",
-      "common"    => "\e[37m",
-      "poor"      => "\e[90m"
+      "epic" => "\e[35m",
+      "rare" => "\e[34m",
+      "uncommon" => "\e[32m",
+      "common" => "\e[37m",
+      "poor" => "\e[90m"
     }.freeze
 
     def quality_color(quality)

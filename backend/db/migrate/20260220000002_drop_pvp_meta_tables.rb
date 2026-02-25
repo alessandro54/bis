@@ -24,8 +24,8 @@ class DropPvpMetaTables < ActiveRecord::Migration[8.1]
       t.integer  "usage_count",           default: 0, null: false
       t.decimal  "usage_pct",             precision: 5, scale: 2
       t.timestamps
-      t.index ["pvp_season_id", "bracket", "spec_id"], name: "idx_hero_trees_lookup"
-      t.index ["pvp_season_id"]
+      t.index [ "pvp_season_id", "bracket", "spec_id" ], name: "idx_hero_trees_lookup"
+      t.index [ "pvp_season_id" ]
     end
     add_foreign_key :pvp_meta_hero_trees, :pvp_seasons
 
@@ -40,9 +40,9 @@ class DropPvpMetaTables < ActiveRecord::Migration[8.1]
       t.integer  "usage_count",     default: 0, null: false
       t.decimal  "usage_pct",       precision: 5, scale: 2
       t.timestamps
-      t.index ["item_id"]
-      t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_item_popularity_lookup"
-      t.index ["pvp_season_id"]
+      t.index [ "item_id" ]
+      t.index [ "pvp_season_id", "bracket", "spec_id", "slot" ], name: "idx_item_popularity_lookup"
+      t.index [ "pvp_season_id" ]
     end
     add_foreign_key :pvp_meta_item_popularity, :items
     add_foreign_key :pvp_meta_item_popularity, :pvp_seasons
@@ -59,8 +59,8 @@ class DropPvpMetaTables < ActiveRecord::Migration[8.1]
       t.integer  "usage_count",          default: 0, null: false
       t.decimal  "usage_pct",            precision: 5, scale: 2
       t.timestamps
-      t.index ["pvp_season_id", "bracket", "spec_id"], name: "idx_talent_builds_lookup"
-      t.index ["pvp_season_id"]
+      t.index [ "pvp_season_id", "bracket", "spec_id" ], name: "idx_talent_builds_lookup"
+      t.index [ "pvp_season_id" ]
     end
     add_foreign_key :pvp_meta_talent_builds, :pvp_seasons
 
@@ -75,9 +75,9 @@ class DropPvpMetaTables < ActiveRecord::Migration[8.1]
       t.string   "talent_type",    null: false
       t.integer  "usage_count",    default: 0, null: false
       t.timestamps
-      t.index ["pvp_season_id", "bracket", "spec_id", "talent_type"], name: "idx_talent_picks_lookup"
-      t.index ["pvp_season_id"]
-      t.index ["talent_id"]
+      t.index [ "pvp_season_id", "bracket", "spec_id", "talent_type" ], name: "idx_talent_picks_lookup"
+      t.index [ "pvp_season_id" ]
+      t.index [ "talent_id" ]
     end
     add_foreign_key :pvp_meta_talent_picks, :pvp_seasons
     add_foreign_key :pvp_meta_talent_picks, :talents
