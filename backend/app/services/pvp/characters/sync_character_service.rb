@@ -1,22 +1,19 @@
 module Pvp
   module Characters
     class SyncCharacterService < BaseService
-      DEFAULT_TTL_HOURS = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
-
       # Carries the result of a single ETag-aware Blizzard API fetch.
       #   json    — parsed response body (nil on 304)
-      #   etag    — ETag to store on the character after this fetch
+      #   last_modified — Last-Modified header to store on the character
       #   changed — true = 200 (new data), false = 304 (unchanged)
       FetchResult = Struct.new(:json, :last_modified, :changed, keyword_init: true) do
         def changed?   = changed
         def unchanged? = !changed
       end
 
-      def initialize(character:, locale: "en_US", ttl_hours: DEFAULT_TTL_HOURS, entries: nil,
+      def initialize(character:, locale: "en_US", entries: nil,
                      eq_fallback_source: nil, spec_fallback_source: nil)
         @character            = character
         @locale               = locale
-        @ttl_hours            = ttl_hours
         @preloaded_entries    = entries
         @eq_fallback_source   = eq_fallback_source
         @spec_fallback_source = spec_fallback_source
@@ -29,11 +26,16 @@ module Pvp
         entries = ApplicationRecord.connection_pool.with_connection { latest_entries_per_bracket }
         return success(nil, context: { status: :no_entries }) if entries.empty?
 
-        if recently_synced?
-          ApplicationRecord.connection_pool.with_connection { reuse_character_data_for_entries(entries) }
-          return success(entries, context: { status: :reused_cache })
-        end
+        # If no processed entries exist, the 304 fallback has no source to
+        # copy from. Clear Last-Modified so Blizzard returns 200 (full data)
+        # instead of 304, ensuring entries get all attrs on first sync or
+        # after a data reset.
+        ApplicationRecord.connection_pool.with_connection { clear_stale_last_modified! }
 
+        # Always hit Blizzard — the API returns 304 when data is unchanged
+        # (cheap), so we don't need a client-side TTL guard. On 304 the
+        # existing processed data is propagated to new entries; on 200 fresh
+        # data is written.
         eq_fetch, spec_fetch = fetch_remote_data
 
         if @profile_not_found
@@ -55,50 +57,7 @@ module Pvp
 
       private
 
-        attr_reader :character, :locale, :ttl_hours, :preloaded_entries
-
-        # ------------------------------------------------------------------
-        # TTL / reuse
-        # ------------------------------------------------------------------
-
-        def recently_synced?
-          character.last_equipment_snapshot_at.present? &&
-            character.last_equipment_snapshot_at > ttl_hours.hours.ago
-        end
-
-        def reuse_character_data_for_entries(entries)
-          entry_ids = entries.map(&:id)
-          return if entry_ids.empty?
-
-          source = PvpLeaderboardEntry
-            .where(character_id: character.id)
-            .where.not(equipment_processed_at: nil, specialization_processed_at: nil)
-            .order(equipment_processed_at: :desc)
-            .first
-
-          return unless source
-
-          # rubocop:disable Rails/SkipsModelValidations
-          PvpLeaderboardEntry.where(id: entry_ids).update_all(
-            item_level:                  source.item_level,
-            tier_set_id:                 source.tier_set_id,
-            tier_set_name:               source.tier_set_name,
-            tier_set_pieces:             source.tier_set_pieces,
-            tier_4p_active:              source.tier_4p_active,
-            equipment_processed_at:      source.equipment_processed_at,
-            spec_id:                     source.spec_id,
-            hero_talent_tree_name:       source.hero_talent_tree_name,
-            hero_talent_tree_id:         source.hero_talent_tree_id,
-            specialization_processed_at: source.specialization_processed_at,
-            updated_at:                  Time.current
-          )
-          # rubocop:enable Rails/SkipsModelValidations
-
-          logger.info(
-            "[SyncCharacterService] Reused cached data from entry #{source.id} " \
-            "for #{entry_ids.size} entries: #{entry_ids.join(', ')}"
-          )
-        end
+        attr_reader :character, :locale, :preloaded_entries
 
         # ------------------------------------------------------------------
         # Inline processing (fresh fetch or 304)
@@ -254,7 +213,7 @@ module Pvp
         def parse_last_modified(value)
           return nil if value.blank?
 
-          Time.httpdate(value).utc
+          Time.parse(value).utc
         end
 
         # Character profile endpoints don't carry translation-sensitive text —
@@ -274,7 +233,7 @@ module Pvp
         UNAVAILABILITY_COOLDOWN = 2.weeks
 
         def handle_blizzard_error(error)
-          if error.message.include?("404")
+          if error.is_a?(Blizzard::Client::NotFoundError)
             logger.warn(
               "[SyncCharacterService] 404 for character #{character.id} — " \
               "profile deleted or transferred, cooling down for 2 weeks"
@@ -284,6 +243,36 @@ module Pvp
             logger.warn("[SyncCharacterService] Rate limited (429), skipping character")
           else
             logger.error("[SyncCharacterService] Error fetching profile: #{error.message}")
+          end
+        end
+
+        # When no processed entries exist for a character (e.g. first sync
+        # or after manual data deletion), clear Last-Modified timestamps so
+        # Blizzard returns 200 instead of 304.  Without this, a 304 fallback
+        # would find no source entry and leave new entries unprocessed.
+        def clear_stale_last_modified!
+          needs_eq_clear   = character.equipment_last_modified.present? &&
+                             !@eq_fallback_source &&
+                             !PvpLeaderboardEntry.where(character_id: character.id)
+                                                 .where.not(equipment_processed_at: nil).exists?
+
+          needs_spec_clear = character.talents_last_modified.present? &&
+                             !@spec_fallback_source &&
+                             !PvpLeaderboardEntry.where(character_id: character.id)
+                                                 .where.not(specialization_processed_at: nil).exists?
+
+          attrs = {}
+          attrs[:equipment_last_modified] = nil if needs_eq_clear
+          attrs[:talents_last_modified]   = nil if needs_spec_clear
+
+          if attrs.any?
+            # rubocop:disable Rails/SkipsModelValidations
+            character.update_columns(attrs)
+            # rubocop:enable Rails/SkipsModelValidations
+            logger.info(
+              "[SyncCharacterService] Cleared stale Last-Modified for character #{character.id} " \
+              "(#{attrs.keys.join(', ')}) — no processed entries to fall back on"
+            )
           end
         end
 

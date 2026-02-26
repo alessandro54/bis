@@ -39,6 +39,7 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
     it "preloads all characters in a single query" do
       expect(Character).to receive(:where)
         .with(id: character_ids)
+        .at_least(:once)
         .and_call_original
 
       perform_job
@@ -92,6 +93,49 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
           .to have_received(:call)
           .with(hash_including(character: character2, locale: locale))
       end
+
+      it "propagates cached data to unprocessed entries for the cooldown character" do
+        leaderboard = create(:pvp_leaderboard)
+
+        # Old processed entry with equipment/spec data
+        create(:pvp_leaderboard_entry,
+          character:                  character1,
+          pvp_leaderboard:            leaderboard,
+          item_level:                 620,
+          spec_id:                    265,
+          hero_talent_tree_id:        3,
+          hero_talent_tree_name:      "voidweaver",
+          tier_set_id:                10,
+          tier_set_name:              "Nerub'ar",
+          tier_set_pieces:            4,
+          tier_4p_active:             true,
+          equipment_processed_at:     2.days.ago,
+          specialization_processed_at: 2.days.ago,
+          snapshot_at:                2.days.ago)
+
+        # New unprocessed entry (from current leaderboard sync)
+        new_entry = create(:pvp_leaderboard_entry,
+          character:              character1,
+          pvp_leaderboard:        leaderboard,
+          equipment_processed_at: nil,
+          specialization_processed_at: nil,
+          item_level:             nil,
+          spec_id:                nil,
+          hero_talent_tree_id:    nil,
+          hero_talent_tree_name:  nil,
+          snapshot_at:            Time.current)
+
+        perform_job
+
+        new_entry.reload
+        expect(new_entry.item_level).to eq(620)
+        expect(new_entry.spec_id).to eq(265)
+        expect(new_entry.hero_talent_tree_name).to eq("voidweaver")
+        expect(new_entry.tier_set_id).to eq(10)
+        expect(new_entry.tier_4p_active).to be(true)
+        expect(new_entry.equipment_processed_at).to be_present
+        expect(new_entry.specialization_processed_at).to be_present
+      end
     end
 
     context "when a character's unavailability cooldown has expired" do
@@ -109,16 +153,12 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
     context "when a character was recently synced (within TTL)" do
       before { character1.update!(last_equipment_snapshot_at: 1.hour.ago) }
 
-      it "skips the recently synced character without calling the service" do
+      it "still sends the character to the service (TTL is the service's concern)" do
         perform_job
 
         expect(Pvp::Characters::SyncCharacterService)
-          .not_to have_received(:call)
-          .with(hash_including(character: character1))
-
-        expect(Pvp::Characters::SyncCharacterService)
           .to have_received(:call)
-          .with(hash_including(character: character2, locale: locale))
+          .with(hash_including(character: character1, locale: locale))
       end
     end
 

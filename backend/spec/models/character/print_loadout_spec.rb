@@ -74,7 +74,9 @@ RSpec.describe Character, type: :model do
     end
 
     it "returns nil" do
-      expect(character.print_loadout).to be_nil
+      result = nil
+      capture_output { result = character.print_loadout }
+      expect(result).to be_nil
     end
   end
 
@@ -137,7 +139,9 @@ slot_number: 2)
     end
 
     it "returns nil" do
-      expect(character.print_talents).to be_nil
+      result = nil
+      capture_output { result = character.print_talents }
+      expect(result).to be_nil
     end
   end
 

@@ -7,8 +7,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
   subject(:call_service) do
     described_class.call(
       character: character,
-      locale:    locale,
-      ttl_hours: ttl_hours
+      locale:    locale
     )
   end
 
@@ -21,8 +20,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     )
   end
 
-  let(:locale)    { "en_US" }
-  let(:ttl_hours) { 24 }
+  let(:locale) { "en_US" }
 
   let!(:entry_2v2) do
     next unless character
@@ -110,50 +108,21 @@ region: character.region),
     end
 
     # -------------------------------------------------------------------------
-    # TTL cache hit
-    # -------------------------------------------------------------------------
-
-    context "when a reusable snapshot exists (TTL hit)" do
-      before do
-        character.update_columns(last_equipment_snapshot_at: 2.hours.ago)
-      end
-
-      it "returns :reused_cache" do
-        expect(call_service.context[:status]).to eq(:reused_cache)
-      end
-
-      it "propagates equipment and spec attrs to current entries" do
-        call_service
-
-        expect(entry_2v2.reload.item_level).to eq(processed_entry.item_level)
-        expect(entry_2v2.reload.spec_id).to    eq(processed_entry.spec_id)
-        expect(entry_3v3.reload.item_level).to eq(processed_entry.item_level)
-      end
-
-      it "does not call the Blizzard API" do
-        expect(Blizzard::Api::Profile::CharacterEquipmentSummary).not_to receive(:fetch_with_last_modified)
-        expect(Blizzard::Api::Profile::CharacterSpecializationSummary).not_to receive(:fetch_with_last_modified)
-
-        call_service
-      end
-    end
-
-    # -------------------------------------------------------------------------
     # Blizzard API fetch helpers
     # -------------------------------------------------------------------------
 
     let(:equipment_json) do
-      JSON.parse(File.read("spec/fixtures/files/manongauz_equipment.json"))
+      JSON.parse(File.read("spec/fixtures/equipment/jw.json"))
     end
 
     let(:talents_json) do
-      JSON.parse(File.read("spec/fixtures/files/manongauz_specializations.json"))
+      JSON.parse(File.read("spec/fixtures/specialization/jw.json"))
     end
 
-    let(:eq_last_modified_new)   { "Wed, 25 Feb 2026 03:31:52 GMT" }
-    let(:spec_last_modified_new) { "Wed, 25 Feb 2026 04:00:00 GMT" }
-    let(:eq_last_modified_new_utc)   { Time.httpdate(eq_last_modified_new).utc }
-    let(:spec_last_modified_new_utc) { Time.httpdate(spec_last_modified_new).utc }
+    let(:eq_last_modified_new)   { "Wed, 4 Feb 2026 03:31:52 GMT" }
+    let(:spec_last_modified_new) { "Wed, 4 Feb 2026 04:00:00 GMT" }
+    let(:eq_last_modified_new_utc)   { Time.parse(eq_last_modified_new).utc }
+    let(:spec_last_modified_new_utc) { Time.parse(spec_last_modified_new).utc }
 
     # Stubs fetch_with_last_modified for equipment to return a 200 with new Last-Modified.
     def stub_equipment_changed
@@ -368,6 +337,55 @@ region: character.region),
     end
 
     # -------------------------------------------------------------------------
+    # Stale Last-Modified clearing (no processed entries to fall back on)
+    # -------------------------------------------------------------------------
+
+    context "when character has Last-Modified but no processed entries exist" do
+      before do
+        # Remove the processed entry so 304 fallback has no source
+        processed_entry.destroy!
+
+        character.update_columns(
+          equipment_last_modified: 1.day.ago,
+          talents_last_modified:   1.day.ago
+        )
+      end
+
+      it "clears Last-Modified timestamps before fetching" do
+        stub_equipment_changed
+        stub_talents_changed
+        stub_equipment_service_success
+        stub_spec_service_success
+
+        call_service
+
+        # After a successful 200 fetch, new Last-Modified values are written
+        character.reload
+        expect(character.equipment_last_modified).to be_within(1.second).of(eq_last_modified_new_utc)
+        expect(character.talents_last_modified).to be_within(1.second).of(spec_last_modified_new_utc)
+      end
+
+      it "sends nil Last-Modified to Blizzard (forces 200)" do
+        stub_equipment_changed
+        stub_talents_changed
+        stub_equipment_service_success
+        stub_spec_service_success
+
+        expect(Blizzard::Api::Profile::CharacterEquipmentSummary)
+          .to receive(:fetch_with_last_modified)
+          .with(hash_including(last_modified: nil))
+          .and_return([ equipment_json, eq_last_modified_new, true ])
+
+        expect(Blizzard::Api::Profile::CharacterSpecializationSummary)
+          .to receive(:fetch_with_last_modified)
+          .with(hash_including(last_modified: nil))
+          .and_return([ talents_json, spec_last_modified_new, true ])
+
+        call_service
+      end
+    end
+
+    # -------------------------------------------------------------------------
     # API errors
     # -------------------------------------------------------------------------
 
@@ -394,7 +412,7 @@ region: character.region),
       before do
         allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
           .to receive(:fetch_with_last_modified)
-          .and_raise(Blizzard::Client::Error, "Blizzard API error: HTTP 404")
+          .and_raise(Blizzard::Client::NotFoundError, "Blizzard API error: HTTP 404")
 
         stub_talents_changed
       end

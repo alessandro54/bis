@@ -3,6 +3,7 @@
 module Blizzard
   class Client
     class Error < StandardError; end
+    class NotFoundError < Error; end
     class RateLimitedError < Error; end
 
     # Shared HTTP client instance with connection pooling
@@ -128,6 +129,9 @@ module Blizzard
         when 200
           body = Oj.load(response.body.to_s, mode: :compat)
           [ body, response.headers["last-modified"], true ]
+        when 404
+          raise NotFoundError,
+                "Blizzard API error: HTTP 404, body=#{response.body}"
         when 429
           retry_after = response.headers["retry-after"]&.to_i || 1
           raise RateLimitedError,
@@ -160,6 +164,11 @@ module Blizzard
 
         if response.status == 200
           return Oj.load(response.body.to_s, mode: :compat)
+        end
+
+        if response.status == 404
+          raise NotFoundError,
+                "Blizzard API error: HTTP 404, body=#{response.body}"
         end
 
         if response.status == 429

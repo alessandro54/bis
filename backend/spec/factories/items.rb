@@ -21,10 +21,10 @@
 #
 FactoryBot.define do
   factory :item do
-    blizzard_id { Faker::Number.number(digits: 8) }
-    item_class { "MyString" }
-    item_subclass { "MyString" }
-    inventory_type { "MyString" }
-    quality { "epic" }
+    blizzard_id    { Faker::Number.unique.number(digits: 8) }
+    item_class     { "armor" }
+    item_subclass  { "cloth" }
+    inventory_type { "head" }
+    quality        { "epic" }
   end
 end

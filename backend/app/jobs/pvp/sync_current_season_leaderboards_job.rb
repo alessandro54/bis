@@ -70,8 +70,8 @@ module Pvp
 
         Rails.logger.info(
           "[SyncCurrentSeasonLeaderboardsJob] #{region}: " \
-          "#{char_ids.size} total, #{to_sync.size} to sync " \
-          "(#{char_ids.size - to_sync.size} recently synced)"
+          "#{char_ids.size} total, #{to_sync.size} need API fetch " \
+          "(#{char_ids.size - to_sync.size} recently synced — entries will reuse cache)"
         )
         Pvp::SyncLogger.leaderboards_synced(
           region:  region,
@@ -80,7 +80,11 @@ module Pvp
           skipped: char_ids.size - to_sync.size
         )
 
-        region_batch_map[region] = to_sync.each_slice(batch_size).to_a
+        # Pass ALL character IDs to the batch job — not just `to_sync`.
+        # Characters filtered out here still have new entries (created by
+        # SyncLeaderboardService) that need equipment/spec data. The batch
+        # job handles TTL/cooldown filtering + cached-data propagation.
+        region_batch_map[region] = char_ids.each_slice(batch_size).to_a
         total_batches += region_batch_map[region].size
       end
 

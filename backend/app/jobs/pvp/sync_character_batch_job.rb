@@ -9,7 +9,6 @@ module Pvp
     # threads). Set PVP_SYNC_THREADS to match that worker's thread count so
     # safe_concurrency divides the pool correctly.
     THREADS     = ENV.fetch("PVP_SYNC_THREADS", 8).to_i
-    TTL_HOURS   = ENV.fetch("PVP_EQUIPMENT_SNAPSHOT_TTL_HOURS", 24).to_i
 
     retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
@@ -21,15 +20,21 @@ module Pvp
       ids = Array(character_ids).compact
       return if ids.empty?
 
+      # No TTL filter here — the service decides whether to fetch from
+      # Blizzard (TTL expired) or reuse cached data (recently synced).
+      # Either way, new entries always get processed.
       characters_by_id = Character
         .where(id: ids)
         .where(is_private: false)
         .where("unavailable_until IS NULL OR unavailable_until < ?", Time.current)
-        .where(
-          "last_equipment_snapshot_at IS NULL OR last_equipment_snapshot_at < ?",
-          TTL_HOURS.hours.ago
-        )
         .index_by(&:id)
+
+      enqueue_meta_sync_for_stale(ids)
+
+      # Characters on cooldown still need their new entries populated
+      # with cached data from the latest processed entry.
+      skipped_ids = ids - characters_by_id.keys
+      propagate_cached_entry_data(skipped_ids) if skipped_ids.any?
 
       return if characters_by_id.empty?
 
@@ -144,6 +149,64 @@ module Pvp
           "[SyncCharacterBatchJob] Unexpected error for character #{character&.id}: #{e.class}: #{e.message}"
         )
         outcome.record_failure(id: character&.id, status: :unexpected_error, error: "#{e.class}: #{e.message}")
+      end
+
+      # Bulk-copy equipment & spec attrs from the latest processed entry to
+      # any unprocessed entries for characters that were skipped (cooldown or
+      # TTL). A single UPDATE … FROM keeps this to one round-trip.
+      def propagate_cached_entry_data(skipped_ids)
+        return if skipped_ids.empty?
+
+        sql = <<~SQL.squish
+          UPDATE pvp_leaderboard_entries AS target
+          SET
+            item_level                  = source.item_level,
+            tier_set_id                 = source.tier_set_id,
+            tier_set_name               = source.tier_set_name,
+            tier_set_pieces             = source.tier_set_pieces,
+            tier_4p_active              = source.tier_4p_active,
+            equipment_processed_at      = source.equipment_processed_at,
+            spec_id                     = source.spec_id,
+            hero_talent_tree_name       = source.hero_talent_tree_name,
+            hero_talent_tree_id         = source.hero_talent_tree_id,
+            specialization_processed_at = source.specialization_processed_at,
+            updated_at                  = NOW()
+          FROM (
+            SELECT DISTINCT ON (character_id)
+              character_id, item_level, tier_set_id, tier_set_name, tier_set_pieces,
+              tier_4p_active, equipment_processed_at, spec_id, hero_talent_tree_name,
+              hero_talent_tree_id, specialization_processed_at
+            FROM pvp_leaderboard_entries
+            WHERE character_id IN (?)
+              AND equipment_processed_at IS NOT NULL
+            ORDER BY character_id, equipment_processed_at DESC
+          ) AS source
+          WHERE target.character_id = source.character_id
+            AND target.equipment_processed_at IS NULL
+        SQL
+
+        sanitized = ApplicationRecord.sanitize_sql_array([sql, skipped_ids])
+        count = ApplicationRecord.connection.exec_update(sanitized, "PropagateCache")
+
+        if count > 0
+          Rails.logger.info(
+            "[SyncCharacterBatchJob] Propagated cached data to #{count} entries " \
+            "for skipped characters (cooldown/TTL)"
+          )
+        end
+      end
+
+      def enqueue_meta_sync_for_stale(character_ids)
+        stale_ids = Character
+          .where(id: character_ids)
+          .where(is_private: false)
+          .where("meta_synced_at IS NULL OR meta_synced_at < ?", 1.week.ago)
+          .pluck(:id)
+
+        return if stale_ids.empty?
+
+        ::Characters::SyncCharacterMetaBatchJob.perform_later(character_ids: stale_ids)
+        Rails.logger.info("[SyncCharacterBatchJob] Enqueued meta batch for #{stale_ids.size} stale characters")
       end
 
       def track_sync_cycle_completion

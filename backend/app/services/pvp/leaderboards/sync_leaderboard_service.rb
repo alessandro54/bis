@@ -97,6 +97,8 @@ module Pvp
 
               character_ids = char_id_map.values
               leaderboard.update!(last_synced_at: snapshot_at)
+
+              prune_old_entries(leaderboard.id, character_ids)
             end
           end
         end
@@ -123,6 +125,29 @@ module Pvp
           when "ALLIANCE" then 0
           when "HORDE"    then 1
           end
+        end
+
+        MAX_SNAPSHOTS_PER_CHARACTER = 3
+
+        # Delete entries older than the N most recent snapshots per character
+        # for the given leaderboard. Keeps the table from growing unbounded
+        # since the real equipment/talent data lives on the characters.
+        def prune_old_entries(leaderboard_id, character_ids)
+          return if character_ids.empty?
+
+          ranked = PvpLeaderboardEntry
+            .select("id, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY snapshot_at DESC) AS rn")
+            .where(pvp_leaderboard_id: leaderboard_id, character_id: character_ids)
+
+          keep_ids = PvpLeaderboardEntry
+            .from(ranked, :ranked)
+            .where("ranked.rn <= ?", MAX_SNAPSHOTS_PER_CHARACTER)
+            .select("ranked.id")
+
+          PvpLeaderboardEntry
+            .where(pvp_leaderboard_id: leaderboard_id, character_id: character_ids)
+            .where.not(id: keep_ids)
+            .delete_all
         end
 
         def with_deadlock_retry(max_retries: 3)
