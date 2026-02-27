@@ -45,7 +45,7 @@ puts "── Items ────────────────────�
 # blizzard_id → unique Blizzard item ID from their API.
 
 SLOT_ITEMS = {
-  #  slot key      blizzard_id   name                                  quality    inventory_type  item_class   item_subclass  ilvl
+  #  slot key      blizzard_id   name                          quality   inventory_type  item_class  item_subclass  ilvl
   head:      [ 225_001, "Voidbound Helm",                   "epic",  "head",     "armor",   "plate",  639 ],
   neck:      [ 225_002, "Chain of Endless Conquest",        "epic",  "neck",     "armor",   "misc",   639 ],
   shoulder:  [ 225_003, "Pauldrons of Shattered Will",      "epic",  "shoulder", "armor",   "plate",  639 ],
@@ -440,7 +440,8 @@ puts "  PvpLeaderboardEntry: #{PvpLeaderboardEntry.count}"
 puts "  Character:         #{Character.count}"
 puts "  Item:              #{Item.count}  (#{SLOT_ITEMS.count} slots + 1 gem + 1 scroll)"
 puts "  Enchantment:       #{Enchantment.count}"
-puts "  Talent:            #{Talent.count}  (#{class_talents.count} class / #{spec_talents.count} spec / #{hero_talents.count} hero / #{pvp_talents.count} pvp)"
+puts "  Talent:            #{Talent.count}  (#{class_talents.count} class / " \
+     "#{spec_talents.count} spec / #{hero_talents.count} hero / #{pvp_talents.count} pvp)"
 puts "  CharacterItem:     #{CharacterItem.count}"
 puts "  CharacterTalent:   #{CharacterTalent.count}"
 puts "  Translation:       #{Translation.count}"

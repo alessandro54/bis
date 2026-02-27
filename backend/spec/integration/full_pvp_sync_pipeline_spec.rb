@@ -74,24 +74,27 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
     {
       "entries" => [
         {
-          "character"               => { "id" => 177_763_085, "name" => "Jw",           "realm" => { "slug" => "malorne"  } },
-          "faction"                 => { "type" => "ALLIANCE" },
-          "rank"                    => 1,
-          "rating"                  => 3100,
+          "character" => { "id" => 177_763_085, "name" => "Jw",
+"realm" => { "slug" => "malorne" } },
+          "faction" => { "type" => "ALLIANCE" },
+          "rank" => 1,
+          "rating" => 3100,
           "season_match_statistics" => { "won" => 300, "lost" => 50 }
         },
         {
-          "character"               => { "id" => 202_523_551, "name" => "Egirlbooster", "realm" => { "slug" => "sargeras" } },
-          "faction"                 => { "type" => "ALLIANCE" },
-          "rank"                    => 2,
-          "rating"                  => 3050,
+          "character" => { "id" => 202_523_551, "name" => "Egirlbooster",
+"realm" => { "slug" => "sargeras" } },
+          "faction" => { "type" => "ALLIANCE" },
+          "rank" => 2,
+          "rating" => 3050,
           "season_match_statistics" => { "won" => 250, "lost" => 60 }
         },
         {
-          "character"               => { "id" => 158_821_778, "name" => "Motívate",     "realm" => { "slug" => "sargeras" } },
-          "faction"                 => { "type" => "ALLIANCE" },
-          "rank"                    => 3,
-          "rating"                  => 3000,
+          "character" => { "id" => 158_821_778, "name" => "Motívate",
+"realm" => { "slug" => "sargeras" } },
+          "faction" => { "type" => "ALLIANCE" },
+          "rank" => 3,
+          "rating" => 3000,
           "season_match_statistics" => { "won" => 200, "lost" => 70 }
         }
       ]
@@ -107,7 +110,7 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
     allow(Blizzard::Api::GameData::PvpSeason::LeaderboardsIndex)
       .to receive(:fetch)
       .with(hash_including(region: "us"))
-      .and_return({ "leaderboards" => [{ "name" => "3v3" }] })
+      .and_return({ "leaderboards" => [ { "name" => "3v3" } ] })
 
     allow(Blizzard::Api::GameData::PvpSeason::LeaderboardsIndex)
       .to receive(:fetch)
@@ -254,7 +257,7 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
 
     it "sets last_equipment_snapshot_at on every character" do
       run_phase2
-      Character.all.each do |char|
+      Character.all.find_each do |char|
         expect(char.reload.last_equipment_snapshot_at).to be_present,
           "expected last_equipment_snapshot_at on #{char.name}"
       end
@@ -329,7 +332,7 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
       end
 
       # ── Entries fully processed ──────────────────────────────────────────────
-      PvpLeaderboardEntry.all.each do |entry|
+      PvpLeaderboardEntry.all.find_each do |entry|
         char_name = entry.character.name
         expect(entry.equipment_processed_at).to be_present,
           "entry #{entry.id} (#{char_name}) missing equipment_processed_at"
@@ -349,7 +352,7 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
 
       # ── Sync cycle ───────────────────────────────────────────────────────────
       cycle = PvpSyncCycle.last
-      expect(cycle.status).to                          eq("completed")
+      expect(cycle.status).to eq("completed")
       expect(cycle.completed_character_batches).to eq(1)
       expect(cycle.expected_character_batches).to  eq(1)
     end

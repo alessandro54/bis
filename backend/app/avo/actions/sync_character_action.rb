@@ -4,7 +4,9 @@ class Avo::Actions::SyncCharacterAction < Avo::BaseAction
 
   def handle(records:, **)
     records.each do |character|
+      # rubocop:disable Rails/SkipsModelValidations
       character.update_columns(unavailable_until: nil)
+      # rubocop:enable Rails/SkipsModelValidations
 
       Pvp::SyncCharacterBatchJob
         .set(queue: "character_sync_#{character.region}")

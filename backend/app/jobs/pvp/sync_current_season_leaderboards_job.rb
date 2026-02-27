@@ -138,6 +138,7 @@ module Pvp
       # Sync every bracket across every region concurrently.
       # Returns Hash[region => [character_id, ...]] (not yet deduped).
       # Uses threads for the same reason as discover_all_brackets_concurrently.
+      # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at)
         tasks = REGIONS.flat_map do |region|
           info          = brackets_by_region.fetch(region, { brackets: [], locale: REGION_LOCALES[region] })
@@ -174,6 +175,7 @@ module Pvp
 
         character_ids_by_region
       end
+      # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
       def discover_brackets(season, region, locale)
         response = Blizzard::Api::GameData::PvpSeason::LeaderboardsIndex.fetch(

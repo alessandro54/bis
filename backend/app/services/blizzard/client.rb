@@ -86,6 +86,7 @@ module Blizzard
       # Shared rate-limit + retry wrapper used by both #get and #get_with_etag.
       # Yields the raw HTTPX response to the caller's block, which is responsible
       # for parsing and raising RateLimitedError on 429.
+      # rubocop:disable Metrics/AbcSize
       def perform_request(path, namespace:, params: {}, extra_headers: {})
         attempts = 0
 
@@ -115,9 +116,11 @@ module Blizzard
           retry
         end
       end
+      # rubocop:enable Metrics/AbcSize
 
       # Parses a response for Last-Modified-aware requests.
       # Returns [body_or_nil, last_modified, changed].
+      # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def parse_last_modified_response(response, original_last_modified)
         if response.is_a?(HTTPX::ErrorResponse)
           raise Error, "Network/Transport error: #{response.error}"
@@ -144,6 +147,7 @@ module Blizzard
         raise Error,
               "Blizzard API error: invalid JSON: #{e.message}\n#{response.body}"
       end
+      # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
       def rate_limiter
         RateLimiter.for_credential(auth.client_id)
@@ -157,6 +161,7 @@ module Blizzard
         { Authorization: "Bearer #{auth.access_token}" }
       end
 
+      # rubocop:disable Metrics/AbcSize
       def parse_response(response)
         if response.is_a?(HTTPX::ErrorResponse)
           raise Error, "Network/Transport error: #{response.error}"
@@ -183,5 +188,6 @@ module Blizzard
         raise Error,
               "Blizzard API error: invalid JSON: #{e.message}\n#{response.body}"
       end
+    # rubocop:enable Metrics/AbcSize
   end
 end

@@ -1,6 +1,7 @@
 module Blizzard
   module Data
     module Items
+      # rubocop:disable Metrics/ClassLength
       class UpsertFromRawEquipmentService
         EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
         CACHE_TTL = 1.hour
@@ -147,7 +148,7 @@ module Blizzard
           end
 
           # Cache blizzard_id → DB item id to avoid repeated DB hits across calls.
-          # rubocop:disable Metrics/AbcSize
+          # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
           def fetch_item_ids_with_cache(blizzard_ids)
             return {} if blizzard_ids.empty?
 
@@ -207,7 +208,7 @@ module Blizzard
 
             result
           end
-          # rubocop:enable Metrics/AbcSize
+          # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
           def extract_blizzard_id(raw_item)
             raw_item.dig("item", "id")
@@ -323,6 +324,7 @@ module Blizzard
           end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
       end
+      # rubocop:enable Metrics/ClassLength
     end
   end
 end

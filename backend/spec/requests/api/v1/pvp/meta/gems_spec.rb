@@ -7,10 +7,10 @@ RSpec.describe "Api::V1::Pvp::Meta::Gems", type: :request do
   before do
     create(:translation,
       translatable: gem_item,
-      key: "name",
-      locale: "en_US",
-      value: "Deadly Sapphire",
-      meta: { "source" => "test" }
+      key:          "name",
+      locale:       "en_US",
+      value:        "Deadly Sapphire",
+      meta:         { "source" => "test" }
     )
   end
 
@@ -18,14 +18,14 @@ RSpec.describe "Api::V1::Pvp::Meta::Gems", type: :request do
     context "with valid params" do
       let!(:gem_popularity) do
         create(:pvp_meta_gem_popularity,
-          pvp_season: current_season,
-          item: gem_item,
-          bracket: "3v3",
-          spec_id: 62,
-          slot: "head",
+          pvp_season:  current_season,
+          item:        gem_item,
+          bracket:     "3v3",
+          spec_id:     62,
+          slot:        "head",
           socket_type: "primordial",
           usage_count: 45,
-          usage_pct: 65.0
+          usage_pct:   65.0
         )
       end
 
@@ -44,10 +44,10 @@ RSpec.describe "Api::V1::Pvp::Meta::Gems", type: :request do
 
       it "filters by slot when provided" do
         create(:pvp_meta_gem_popularity,
-          pvp_season: current_season,
-          bracket: "3v3",
-          spec_id: 62,
-          slot: "chest",
+          pvp_season:  current_season,
+          bracket:     "3v3",
+          spec_id:     62,
+          slot:        "chest",
           socket_type: "primordial"
         )
 
@@ -60,10 +60,10 @@ RSpec.describe "Api::V1::Pvp::Meta::Gems", type: :request do
 
       it "filters by socket_type when provided" do
         create(:pvp_meta_gem_popularity,
-          pvp_season: current_season,
-          bracket: "3v3",
-          spec_id: 62,
-          slot: "head",
+          pvp_season:  current_season,
+          bracket:     "3v3",
+          spec_id:     62,
+          slot:        "head",
           socket_type: "regular"
         )
 
@@ -90,4 +90,3 @@ RSpec.describe "Api::V1::Pvp::Meta::Gems", type: :request do
     end
   end
 end
-

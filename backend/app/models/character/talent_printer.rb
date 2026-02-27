@@ -12,6 +12,7 @@ class Character::TalentPrinter
     @character = character
   end
 
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
   def call
     all = @character.character_talents
       .includes(talent: :translations)
@@ -19,7 +20,8 @@ class Character::TalentPrinter
 
     by_type = all.group_by(&:talent_type)
 
-    puts "#{dim}┌─#{reset} #{bold}#{@character.display_name}#{reset} #{dim}(#{@character.region.upcase}) ─ Talents#{reset}"
+    puts "#{dim}┌─#{reset} #{bold}#{@character.display_name}#{reset} " \
+         "#{dim}(#{@character.region.upcase}) ─ Talents#{reset}"
 
     %w[class spec hero pvp].each do |type|
       entries = by_type[type]
@@ -40,6 +42,7 @@ class Character::TalentPrinter
     puts dim("└" + "─" * 64)
     nil
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
   private
 

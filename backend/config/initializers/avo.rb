@@ -2,7 +2,7 @@
 # The values disaplayed here are the default ones. Uncomment and change them to fit your needs.
 Avo.configure do |config|
   ## == Routing ==
-  config.root_path = '/avo'
+  config.root_path = "/avo"
   # used only when you have custom `map` configuration in your config.ru
   # config.prefix_path = "/internal"
 
@@ -102,12 +102,12 @@ Avo.configure do |config|
 
   ## == Customization ==
   config.click_row_to_view_record = true
-  config.app_name = 'Wow Meta Analyzer'
+  config.app_name = "Wow Meta Analyzer"
   config.branding = {
-    logo: nil,
-    logomark: nil,
+    logo:        nil,
+    logomark:    nil,
     placeholder: nil,
-    favicon: nil,
+    favicon:     nil
   }
   # config.timezone = 'UTC'
   # config.currency = 'USD'

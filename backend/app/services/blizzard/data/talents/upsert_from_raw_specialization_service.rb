@@ -116,7 +116,7 @@ module Blizzard
             { "class" => [], "spec" => [], "hero" => [], "pvp" => [] }
           end
 
-          # rubocop:disable Metrics/AbcSize
+          # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
           def fetch_talent_ids_with_cache(blizzard_ids)
             return {} if blizzard_ids.empty?
 
@@ -146,7 +146,7 @@ module Blizzard
 
             result
           end
-          # rubocop:enable Metrics/AbcSize
+          # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
           # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           def upsert_translations(unique_records, talents_by_blizzard_id)

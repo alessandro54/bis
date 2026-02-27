@@ -7,10 +7,10 @@ RSpec.describe "Api::V1::Pvp::Meta::Enchants", type: :request do
   before do
     create(:translation,
       translatable: enchantment,
-      key: "name",
-      locale: "en_US",
-      value: "Enchant Weapon - Dreaming Devotion",
-      meta: { "source" => "test" }
+      key:          "name",
+      locale:       "en_US",
+      value:        "Enchant Weapon - Dreaming Devotion",
+      meta:         { "source" => "test" }
     )
   end
 
@@ -18,13 +18,13 @@ RSpec.describe "Api::V1::Pvp::Meta::Enchants", type: :request do
     context "with valid params" do
       let!(:enchant_popularity) do
         create(:pvp_meta_enchant_popularity,
-          pvp_season: current_season,
+          pvp_season:  current_season,
           enchantment: enchantment,
-          bracket: "3v3",
-          spec_id: 62,
-          slot: "main_hand",
+          bracket:     "3v3",
+          spec_id:     62,
+          slot:        "main_hand",
           usage_count: 80,
-          usage_pct: 90.0
+          usage_pct:   90.0
         )
       end
 
@@ -43,9 +43,9 @@ RSpec.describe "Api::V1::Pvp::Meta::Enchants", type: :request do
       it "filters by slot when provided" do
         create(:pvp_meta_enchant_popularity,
           pvp_season: current_season,
-          bracket: "3v3",
-          spec_id: 62,
-          slot: "legs"
+          bracket:    "3v3",
+          spec_id:    62,
+          slot:       "legs"
         )
 
         get "/api/v1/pvp/meta/enchants", params: { bracket: "3v3", spec_id: 62, slot: "main_hand" }
@@ -71,4 +71,3 @@ RSpec.describe "Api::V1::Pvp::Meta::Enchants", type: :request do
     end
   end
 end
-

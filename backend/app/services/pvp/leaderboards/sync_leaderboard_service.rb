@@ -64,6 +64,7 @@ module Pvp
 
         char_id_map = upsert_result.rows.to_h { |row| [ row[0].to_s, row[1] ] }
 
+        # rubocop:disable Metrics/BlockLength
         with_deadlock_retry do
           leaderboard = PvpLeaderboard.find_or_create_by!(
             pvp_season_id: season.id,
@@ -109,6 +110,7 @@ module Pvp
             end
           end
         end
+        # rubocop:enable Metrics/BlockLength
 
         Rails.logger.info(
           "[SyncLeaderboardService] #{region}/#{bracket}: " \

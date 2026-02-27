@@ -99,31 +99,31 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
 
         # Old processed entry with equipment/spec data
         create(:pvp_leaderboard_entry,
-          character:                  character1,
-          pvp_leaderboard:            leaderboard,
-          item_level:                 620,
-          spec_id:                    265,
-          hero_talent_tree_id:        3,
-          hero_talent_tree_name:      "voidweaver",
-          tier_set_id:                10,
-          tier_set_name:              "Nerub'ar",
-          tier_set_pieces:            4,
-          tier_4p_active:             true,
-          equipment_processed_at:     2.days.ago,
+          character:                   character1,
+          pvp_leaderboard:             leaderboard,
+          item_level:                  620,
+          spec_id:                     265,
+          hero_talent_tree_id:         3,
+          hero_talent_tree_name:       "voidweaver",
+          tier_set_id:                 10,
+          tier_set_name:               "Nerub'ar",
+          tier_set_pieces:             4,
+          tier_4p_active:              true,
+          equipment_processed_at:      2.days.ago,
           specialization_processed_at: 2.days.ago,
-          snapshot_at:                2.days.ago)
+          snapshot_at:                 2.days.ago)
 
         # New unprocessed entry (from current leaderboard sync)
         new_entry = create(:pvp_leaderboard_entry,
-          character:              character1,
-          pvp_leaderboard:        leaderboard,
-          equipment_processed_at: nil,
+          character:                   character1,
+          pvp_leaderboard:             leaderboard,
+          equipment_processed_at:      nil,
           specialization_processed_at: nil,
-          item_level:             nil,
-          spec_id:                nil,
-          hero_talent_tree_id:    nil,
-          hero_talent_tree_name:  nil,
-          snapshot_at:            Time.current)
+          item_level:                  nil,
+          spec_id:                     nil,
+          hero_talent_tree_id:         nil,
+          hero_talent_tree_name:       nil,
+          snapshot_at:                 Time.current)
 
         perform_job
 

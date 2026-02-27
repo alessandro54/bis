@@ -5,6 +5,7 @@ class Character::SyncStatusPrinter
     @character = character
   end
 
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
   def call
     c = @character
 
@@ -48,7 +49,8 @@ c.equipment_fingerprint.present? ? dim(c.equipment_fingerprint[0, 40] + "…") :
         snap    = e.snapshot_at ? e.snapshot_at.strftime("%m/%d %H:%M") : "?"
         bracket = e.respond_to?(:bracket) ? e.bracket.ljust(20) : "?".ljust(20)
 
-        puts "#{dim}│#{reset}    #{dim}#{bracket}#{reset}  snap #{snap}  #{eq_ok}  #{spec_ok}  rating #{bold}#{e.rating}#{reset}"
+        puts "#{dim}│#{reset}    #{dim}#{bracket}#{reset}  snap #{snap}" \
+             "  #{eq_ok}  #{spec_ok}  rating #{bold}#{e.rating}#{reset}"
       end
 
       puts "#{dim}│#{reset}"
@@ -58,8 +60,10 @@ c.equipment_fingerprint.present? ? dim(c.equipment_fingerprint[0, 40] + "…") :
       if latest.equipment_processed_at.nil?
         puts "#{dim}│#{reset}    #{red}✗ equipment never processed#{reset}"
         puts "#{dim}│#{reset}      #{dim}→ API unavailable, spec unavailable, or service error#{reset}"
-        puts "#{dim}│#{reset}      #{dim}→ retry: result = Pvp::Characters::SyncCharacterService.call(character: Character.find(#{c.id}))#{reset}"
-        puts "#{dim}│#{reset}      #{dim}         result.context[:status]  # :synced / :equipment_unavailable / etc.#{reset}"
+        puts "#{dim}│#{reset}      #{dim}→ retry: result = " \
+             "Pvp::Characters::SyncCharacterService.call(character: Character.find(#{c.id}))#{reset}"
+        puts "#{dim}│#{reset}      #{dim}         result.context[:status]  " \
+             "# :synced / :equipment_unavailable / etc.#{reset}"
         puts "#{dim}│#{reset}      #{dim}         result.error             # exception if failed#{reset}"
       else
         puts "#{dim}│#{reset}    #{green}✓ last entry processed successfully#{reset}"
@@ -70,6 +74,7 @@ c.equipment_fingerprint.present? ? dim(c.equipment_fingerprint[0, 40] + "…") :
     puts dim("└" + "─" * 64)
     nil
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
   private
 

@@ -13,6 +13,7 @@ module Pvp
       Rails.logger.warn("[SyncLeaderboardJob] API error, will retry: #{error.message}")
     end
 
+    # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def perform(region: "us", season:, bracket:, locale: "en_US")
       snapshot_at = Time.current
 
@@ -55,5 +56,6 @@ module Pvp
           )
       end
     end
+    # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
   end
 end

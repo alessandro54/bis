@@ -17,6 +17,7 @@ module ServiceSpecHelpers
     )
   end
 
+  # rubocop:disable Metrics/MethodLength
   def raw_equipment
     {
       "equipped_items" => [
@@ -37,8 +38,11 @@ module ServiceSpecHelpers
             }
           ],
           "sockets" => [
-            { "socket_type" => { "type" => "PRISMATIC" },
-"item" => { "id" => socket_gem_blizzard_id, "name" => "Versatile Onyx" }, "display_string" => "+10 Mastery and +3 Versatility" }
+            {
+              "socket_type" => { "type" => "PRISMATIC" },
+              "item" => { "id" => socket_gem_blizzard_id, "name" => "Versatile Onyx" },
+              "display_string" => "+10 Mastery and +3 Versatility"
+            }
           ],
           "modified_crafting_stat" => [
             { "id" => 36, "type" => "HASTE_RATING",   "name" => "Haste" },
@@ -48,6 +52,7 @@ module ServiceSpecHelpers
       ]
     }
   end
+  # rubocop:enable Metrics/MethodLength
 
   def processed_equipment
     {

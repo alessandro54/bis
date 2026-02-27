@@ -1,5 +1,6 @@
 module Pvp
   module Characters
+    # rubocop:disable Metrics/ClassLength
     class SyncCharacterService < BaseService
       # Carries the result of a single ETag-aware Blizzard API fetch.
       #   json    — parsed response body (nil on 304)
@@ -19,6 +20,7 @@ module Pvp
         @spec_fallback_source = spec_fallback_source
       end
 
+      # rubocop:disable Metrics/AbcSize
       def call
         return success(nil, context: { status: :not_found }) unless character
         return success(nil, context: { status: :skipped_private }) if character.is_private
@@ -54,6 +56,7 @@ module Pvp
       rescue => e
         failure(e)
       end
+      # rubocop:enable Metrics/AbcSize
 
       private
 
@@ -250,6 +253,7 @@ module Pvp
         # or after manual data deletion), clear Last-Modified timestamps so
         # Blizzard returns 200 instead of 304.  Without this, a 304 fallback
         # would find no source entry and leave new entries unprocessed.
+        # rubocop:disable Metrics/AbcSize
         def clear_stale_last_modified!
           needs_eq_clear   = character.equipment_last_modified.present? &&
                              !@eq_fallback_source &&
@@ -265,16 +269,17 @@ module Pvp
           attrs[:equipment_last_modified] = nil if needs_eq_clear
           attrs[:talents_last_modified]   = nil if needs_spec_clear
 
-          if attrs.any?
-            # rubocop:disable Rails/SkipsModelValidations
-            character.update_columns(attrs)
-            # rubocop:enable Rails/SkipsModelValidations
-            logger.info(
-              "[SyncCharacterService] Cleared stale Last-Modified for character #{character.id} " \
-              "(#{attrs.keys.join(', ')}) — no processed entries to fall back on"
-            )
-          end
+          return unless attrs.any?
+
+          # rubocop:disable Rails/SkipsModelValidations
+          character.update_columns(attrs)
+          # rubocop:enable Rails/SkipsModelValidations
+          logger.info(
+            "[SyncCharacterService] Cleared stale Last-Modified for character #{character.id} " \
+            "(#{attrs.keys.join(', ')}) — no processed entries to fall back on"
+          )
         end
+        # rubocop:enable Metrics/AbcSize
 
         def latest_entries_per_bracket
           return preloaded_entries unless preloaded_entries.nil?
@@ -305,5 +310,6 @@ module Pvp
           Rails.logger
         end
     end
+    # rubocop:enable Metrics/ClassLength
   end
 end

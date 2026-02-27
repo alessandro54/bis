@@ -105,11 +105,14 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
       context "when equipment fingerprint is already current" do
         before do
           # Fingerprint: slot:blizzard_id:ilvl:enchantment_id:crafting_stats(sorted)
-          character.update_columns(equipment_fingerprint: "head:#{blizzard_item_id}:540:#{enchantment_blizzard_id}:HASTE_RATING+MASTERY_RATING")
+          character.update_columns(
+            equipment_fingerprint: "head:#{blizzard_item_id}:540:#{enchantment_blizzard_id}:HASTE_RATING+MASTERY_RATING"
+          )
         end
 
         it "does not invoke UpsertFromRawEquipmentService#call" do
-          instance = instance_double(Blizzard::Data::Items::UpsertFromRawEquipmentService, item_level: nil, tier_set: nil)
+          instance = instance_double(Blizzard::Data::Items::UpsertFromRawEquipmentService, item_level: nil,
+                                                                                           tier_set:   nil)
           allow(Blizzard::Data::Items::UpsertFromRawEquipmentService).to receive(:new).and_return(instance)
           expect(instance).not_to receive(:call)
           result

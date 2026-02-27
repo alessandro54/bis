@@ -88,6 +88,8 @@ Layout/EmptyLineAfterGuardClause:
 Layout/LineLength:
   Enabled: true
   Max: 120
+  AllowedPatterns:
+    - '\A\s*#\s+index_'  # annotate gem index comment lines
 
 # ----------------------------------------------------------------------
 # Style – Ruby moderno, limpio
@@ -148,6 +150,7 @@ Metrics/BlockLength:
     - "spec/**/*"
     - "config/routes.rb"
     - "db/migrate/**/*"
+    - "lib/tasks/**/*"
 
 Metrics/ClassLength:
   Enabled: true
@@ -168,6 +171,8 @@ Metrics/AbcSize:
 # ----------------------------------------------------------------------
 Rails/SkipsModelValidations:
   Enabled: true
+  Exclude:
+    - "spec/**/*"
 
 Rails/SaveBang:
   Enabled: true

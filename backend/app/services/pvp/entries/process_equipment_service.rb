@@ -60,6 +60,7 @@ module Pvp
         # Fingerprint built entirely from raw API data — slot, Blizzard item ID,
         # item level, and permanent enchantment ID. No DB lookups needed, so the
         # check happens before any writes.
+        # rubocop:disable Metrics/AbcSize
         def raw_fingerprint
           Array(raw_equipment["equipped_items"])
             .reject { |item|
@@ -80,8 +81,9 @@ module Pvp
             .sort
             .join(",")
         end
+        # rubocop:enable Metrics/AbcSize
 
-        # rubocop:disable Metrics/MethodLength
+        # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def rebuild_character_items(character, processed, new_fingerprint)
           equipped_items = processed.is_a?(Hash) ? processed["equipped_items"] : {}
 
@@ -114,7 +116,7 @@ module Pvp
           end
           # rubocop:enable Rails/SkipsModelValidations
         end
-      # rubocop:enable Metrics/MethodLength
+      # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
     end
   end
 end

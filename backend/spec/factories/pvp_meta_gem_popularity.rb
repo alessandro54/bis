@@ -41,4 +41,3 @@ FactoryBot.define do
     snapshot_at { Time.current }
   end
 end
-

@@ -9,7 +9,7 @@ class Avo::Filters::PvpLeaderboardFilter < Avo::Filters::SelectFilter
     PvpLeaderboard.joins(:pvp_season)
       .order("pvp_seasons.blizzard_id DESC", :region, :bracket)
       .pluck(:id, :bracket, :region)
-      .map { |id, bracket, region| [id, "#{region.upcase} – #{bracket}"] }
+      .map { |id, bracket, region| [ id, "#{region.upcase} – #{bracket}" ] }
       .to_h
   end
 end

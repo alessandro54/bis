@@ -43,6 +43,7 @@ module Blizzard
     end
     private_class_method :instance
 
+    # rubocop:disable Metrics/AbcSize
     def self.build_pool
       pairs = [
         {
@@ -57,6 +58,7 @@ module Blizzard
 
       pairs.map { |p| Auth.new(client_id: p[:id], client_secret: p[:secret]) }
     end
+    # rubocop:enable Metrics/AbcSize
     private_class_method :build_pool
   end
 end

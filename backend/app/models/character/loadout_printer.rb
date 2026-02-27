@@ -5,6 +5,7 @@ class Character::LoadoutPrinter
     @character = character
   end
 
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
   def call
     slots = @character.character_items
       .includes(item: :translations, enchantment: :translations, enchantment_source_item: :translations)
@@ -18,7 +19,8 @@ class Character::LoadoutPrinter
 
     slot_w = [ slots.map { |ci| ci.slot.upcase.length }.max || 4, 4 ].max
 
-    puts "#{dim}┌─#{reset} #{bold}#{@character.display_name}#{reset} #{dim}(#{@character.region.upcase}) ─ Loadout#{reset}"
+    puts "#{dim}┌─#{reset} #{bold}#{@character.display_name}#{reset} " \
+         "#{dim}(#{@character.region.upcase}) ─ Loadout#{reset}"
     puts "#{dim}│#{reset} #{@character.class_slug.upcase}: #{bold}#{@character.class_slug.upcase}#{reset}"
     puts "#{dim}│#{reset} #{slots.size} slots  ·  avg ilvl #{bold}#{avg_ilvl}#{reset}"
     puts dim("├" + "─" * 64)
@@ -38,9 +40,11 @@ class Character::LoadoutPrinter
     puts dim("└" + "─" * 64)
     nil
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
   private
 
+    # rubocop:disable Metrics/AbcSize
     def build_children(ci, gems_by_id)
       children = []
 
@@ -58,6 +62,7 @@ locale: 'en_US')})#{reset}" : ""
 
       children
     end
+    # rubocop:enable Metrics/AbcSize
 
     def reset  = "\e[0m"
     def bold   = "\e[1m"

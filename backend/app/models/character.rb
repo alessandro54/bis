@@ -56,7 +56,7 @@ class Character < ApplicationRecord
     horde:    1
   }
 
-  self.filter_attributes += [:equipment_fingerprint]
+  self.filter_attributes += [ :equipment_fingerprint ]
 
   def print_loadout     = Character::LoadoutPrinter.call(self)
   def print_talents     = Character::TalentPrinter.call(self)

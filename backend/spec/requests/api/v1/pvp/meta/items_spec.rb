@@ -7,10 +7,10 @@ RSpec.describe "Api::V1::Pvp::Meta::Items", type: :request do
   before do
     create(:translation,
       translatable: item,
-      key: "name",
-      locale: "en_US",
-      value: "Helm of Testing",
-      meta: { "source" => "test" }
+      key:          "name",
+      locale:       "en_US",
+      value:        "Helm of Testing",
+      meta:         { "source" => "test" }
     )
   end
 
@@ -18,13 +18,13 @@ RSpec.describe "Api::V1::Pvp::Meta::Items", type: :request do
     context "with valid params" do
       let!(:item_popularity) do
         create(:pvp_meta_item_popularity,
-          pvp_season: current_season,
-          item: item,
-          bracket: "3v3",
-          spec_id: 62,
-          slot: "head",
+          pvp_season:  current_season,
+          item:        item,
+          bracket:     "3v3",
+          spec_id:     62,
+          slot:        "head",
           usage_count: 50,
-          usage_pct: 75.5
+          usage_pct:   75.5
         )
       end
 
@@ -43,9 +43,9 @@ RSpec.describe "Api::V1::Pvp::Meta::Items", type: :request do
       it "filters by slot when provided" do
         create(:pvp_meta_item_popularity,
           pvp_season: current_season,
-          bracket: "3v3",
-          spec_id: 62,
-          slot: "chest"
+          bracket:    "3v3",
+          spec_id:    62,
+          slot:       "chest"
         )
 
         get "/api/v1/pvp/meta/items", params: { bracket: "3v3", spec_id: 62, slot: "head" }
@@ -71,4 +71,3 @@ RSpec.describe "Api::V1::Pvp::Meta::Items", type: :request do
     end
   end
 end
-

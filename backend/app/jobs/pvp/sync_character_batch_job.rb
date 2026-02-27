@@ -14,6 +14,7 @@ module Pvp
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
     end
 
+    # rubocop:disable Metrics/AbcSize
     def perform(character_ids:, locale: "en_US", sync_cycle_id: nil)
       @sync_cycle_id = sync_cycle_id
 
@@ -51,6 +52,7 @@ module Pvp
     ensure
       track_sync_cycle_completion
     end
+    # rubocop:enable Metrics/AbcSize
 
     private
 
@@ -118,6 +120,7 @@ module Pvp
           .group_by(&:character_id)
       end
 
+      # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def sync_one(character:, locale:, outcome:, entries: nil, eq_fallback_source: nil, spec_fallback_source: nil)
         return unless character
 
@@ -150,10 +153,12 @@ module Pvp
         )
         outcome.record_failure(id: character&.id, status: :unexpected_error, error: "#{e.class}: #{e.message}")
       end
+      # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
       # Bulk-copy equipment & spec attrs from the latest processed entry to
       # any unprocessed entries for characters that were skipped (cooldown or
       # TTL). A single UPDATE … FROM keeps this to one round-trip.
+      # rubocop:disable Metrics/MethodLength
       def propagate_cached_entry_data(skipped_ids)
         return if skipped_ids.empty?
 
@@ -185,16 +190,17 @@ module Pvp
             AND target.equipment_processed_at IS NULL
         SQL
 
-        sanitized = ApplicationRecord.sanitize_sql_array([sql, skipped_ids])
+        sanitized = ApplicationRecord.sanitize_sql_array([ sql, skipped_ids ])
         count = ApplicationRecord.connection.exec_update(sanitized, "PropagateCache")
 
-        if count > 0
-          Rails.logger.info(
-            "[SyncCharacterBatchJob] Propagated cached data to #{count} entries " \
-            "for skipped characters (cooldown/TTL)"
-          )
-        end
+        return unless count > 0
+
+        Rails.logger.info(
+          "[SyncCharacterBatchJob] Propagated cached data to #{count} entries " \
+          "for skipped characters (cooldown/TTL)"
+        )
       end
+      # rubocop:enable Metrics/MethodLength
 
       def enqueue_meta_sync_for_stale(character_ids)
         stale_ids = Character

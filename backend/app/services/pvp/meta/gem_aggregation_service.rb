@@ -16,7 +16,9 @@ module Pvp
 
         ApplicationRecord.transaction do
           PvpMetaGemPopularity.where(pvp_season_id: season.id).delete_all
+          # rubocop:disable Rails/SkipsModelValidations
           PvpMetaGemPopularity.insert_all!(records) if records.any?
+          # rubocop:enable Rails/SkipsModelValidations
         end
 
         success(records.size, context: { count: records.size })
@@ -28,6 +30,7 @@ module Pvp
 
         attr_reader :season, :top_n
 
+        # rubocop:disable Metrics/MethodLength
         def execute_query
           # jsonb_array_elements unnests each socket into a row.
           # slot_totals counts chars with at least one socket per slot
@@ -68,6 +71,7 @@ module Pvp
             ApplicationRecord.sanitize_sql_array([ sql, { season_id: season.id, top_n: top_n } ])
           )
         end
+        # rubocop:enable Metrics/MethodLength
 
         def build_records(rows)
           now = Time.current

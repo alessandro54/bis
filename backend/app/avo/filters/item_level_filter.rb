@@ -7,7 +7,7 @@ class Avo::Filters::ItemLevelFilter < Avo::Filters::SelectFilter
 
   def options
     {
-      "150+" => "150",
+      "150+" => "150"
     }
   end
 end

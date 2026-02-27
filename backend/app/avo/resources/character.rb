@@ -18,7 +18,7 @@ class Avo::Resources::Character < Avo::BaseResource
   }
 
   self.cover_photo = {
-    size: :lg,
+    size:   :lg,
     source: -> {
       if view.index?
         nil
@@ -32,6 +32,7 @@ class Avo::Resources::Character < Avo::BaseResource
     action Avo::Actions::SyncCharacterAction
   end
 
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
   def fields
     field :id, as: :id
     field :blizzard_id, as: :number
@@ -64,4 +65,5 @@ class Avo::Resources::Character < Avo::BaseResource
     field :character_talents, as: :has_many
     field :character_items, as: :has_many
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 end

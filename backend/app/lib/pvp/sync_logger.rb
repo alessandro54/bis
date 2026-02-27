@@ -47,6 +47,7 @@ module Pvp
 
     # ── Phase 2 — Character batch sync ───────────────────────────────────────
 
+    # rubocop:disable Metrics/AbcSize
     def self.batch_complete(outcome:)
       succeeded = outcome.successes.size
       failed    = outcome.failures.size
@@ -68,6 +69,7 @@ module Pvp
 
       logger.info(line)
     end
+    # rubocop:enable Metrics/AbcSize
 
     # ── Phase 3 — Aggregations ───────────────────────────────────────────────
 

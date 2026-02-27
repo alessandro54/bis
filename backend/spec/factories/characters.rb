@@ -64,6 +64,7 @@ module FixtureParser
   # Creates CharacterItem records for every non-excluded slot in equipment/<char_name>.json.
   # Items, enchantments, and gem items are found-or-created by blizzard_id so the
   # method is safe to invoke in parallel test runs without unique-constraint errors.
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
   def self.build_equipment(character, char_name)
     raw_items = load("equipment/#{char_name}.json")["equipped_items"].reject { |i|
       EXCLUDED_SLOTS.include?(i.dig("slot", "type")) || i.dig("level", "value").to_i <= 0
@@ -75,7 +76,8 @@ module FixtureParser
     raw_items.each do |raw|
       permanent = Array(raw["enchantments"]).find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
       sockets   = Array(raw["sockets"]).map { |s|
-        { "type" => s.dig("socket_type", "type"), "item_id" => item_map[s.dig("item", "id")]&.id, "display_string" => s["display_string"] }
+        { "type" => s.dig("socket_type", "type"), "item_id" => item_map[s.dig("item", "id")]&.id,
+"display_string" => s["display_string"] }
       }
 
       CharacterItem.create!(
@@ -92,9 +94,11 @@ module FixtureParser
       )
     end
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
   # Creates Talent and CharacterTalent records from the active loadout in
   # specialization/<char_name>.json. Also writes talent_loadout_code to the character.
+  # rubocop:disable Metrics/AbcSize
   def self.build_talents(character, char_name)
     raw     = load("specialization/#{char_name}.json")
     spec_id = raw.dig("active_specialization", "id")
@@ -106,13 +110,15 @@ module FixtureParser
 
     character.update_columns(talent_loadout_code: loadout["talent_loadout_code"]) # rubocop:disable Rails/SkipsModelValidations
 
-    { "selected_class_talents" => "class", "selected_spec_talents" => "spec", "selected_hero_talents" => "hero" }.each do |key, type|
+    { "selected_class_talents" => "class", "selected_spec_talents" => "spec",
+"selected_hero_talents" => "hero" }.each do |key, type|
       Array(loadout[key]).each do |t|
         talent = Talent.find_or_create_by!(blizzard_id: t["id"]) { |rec| rec.talent_type = type }
         CharacterTalent.create!(character: character, talent: talent, talent_type: type, rank: t["rank"])
       end
     end
   end
+  # rubocop:enable Metrics/AbcSize
 
   class << self
     private
@@ -124,13 +130,15 @@ module FixtureParser
       # Builds a blizzard_id → Item map covering equipped items, gem items, and
       # enchant source items. Equipped items get full attributes from the JSON;
       # supporting items (gems, enchant sources) are created with nil attrs.
+      # rubocop:disable Metrics/AbcSize
       def build_item_map(raw_items)
         equipped_by_id = raw_items.index_by { |i| i.dig("item", "id") }
 
         all_ids = (
           raw_items.map { |i| i.dig("item", "id") } +
           raw_items.flat_map { |i| Array(i["sockets"]).filter_map { |s| s.dig("item", "id") } } +
-          raw_items.filter_map { |i| Array(i["enchantments"]).find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }&.dig("source_item", "id") }
+          raw_items.filter_map { |i| Array(i["enchantments"]).find { |e|
+ e.dig("enchantment_slot", "type") == "PERMANENT" }&.dig("source_item", "id") }
         ).compact.uniq
 
         all_ids.index_with do |bid|
@@ -145,6 +153,7 @@ module FixtureParser
           end
         end
       end
+      # rubocop:enable Metrics/AbcSize
 
       def build_enchant_map(raw_items)
         ids = raw_items.filter_map { |i|

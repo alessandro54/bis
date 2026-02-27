@@ -61,11 +61,11 @@ module Characters
           updated_at:        Time.current
         )
 
-        if was_unavailable
-          Pvp::SyncCharacterBatchJob
-            .set(queue: "character_sync_#{character.region}")
-            .perform_later(character_ids: [ character.id ])
-        end
+        return unless was_unavailable
+
+        Pvp::SyncCharacterBatchJob
+          .set(queue: "character_sync_#{character.region}")
+          .perform_later(character_ids: [ character.id ])
       end
 
       def fetch_profile(region:, realm:, name:)

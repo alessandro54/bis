@@ -13,6 +13,7 @@ class Avo::Resources::PvpLeaderboardEntry < Avo::BaseResource
     filter Avo::Filters::ItemLevelFilter
   end
 
+  # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
   def fields
     field :rank, as: :number
     field :rating, as: :number
@@ -41,7 +42,7 @@ class Avo::Resources::PvpLeaderboardEntry < Avo::BaseResource
     field :character, as: :belongs_to
 
     field "equipment_last_modified", as: :text do
-      record.character.equipment_last_modified&.in_time_zone('America/Lima')&.strftime('%B %d, %Y %I:%M %p')
+      record.character.equipment_last_modified&.in_time_zone("America/Lima")&.strftime("%B %d, %Y %I:%M %p")
     end
 
     field :equipment_processed_at, as: :date_time
@@ -60,4 +61,5 @@ class Avo::Resources::PvpLeaderboardEntry < Avo::BaseResource
     field :tier_set_pieces, as: :number
     field :pvp_leaderboard, as: :belongs_to
   end
+  # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 end
