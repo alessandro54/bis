@@ -1,4 +1,3 @@
-# app/services/pvp/meta/class_distribution.rb
 module Api
   module V1
     module Pvp

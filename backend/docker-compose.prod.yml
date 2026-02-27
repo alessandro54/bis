@@ -1,0 +1,28 @@
+name: wow-bis
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: wow-bis-backend:latest
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:3000:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    image: wow-bis-backend:latest
+    command: bundle exec rails solid_queue:start
+    env_file: .env.prod
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

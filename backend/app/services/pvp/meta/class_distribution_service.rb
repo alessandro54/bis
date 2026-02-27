@@ -50,8 +50,6 @@ module Pvp
 
         Stat = Struct.new(
           :spec_id,
-          :class_id,
-          :class_slug,
           :entry_count,
           :avg_rating,
           :p90_rating,
@@ -64,25 +62,17 @@ module Pvp
         def aggregated_stats
           base_scope
             .reorder(nil)
-            .group(
-              "pvp_leaderboard_entries.spec_id",
-              "characters.class_id",
-              "characters.class_slug"
-            )
+            .group("pvp_leaderboard_entries.spec_id")
             .pluck(
               "pvp_leaderboard_entries.spec_id",
-              "characters.class_id",
-              "characters.class_slug",
               Arel.sql("COUNT(*) AS entry_count"),
               Arel.sql("AVG(pvp_leaderboard_entries.rating) AS avg_rating"),
               Arel.sql("PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY pvp_leaderboard_entries.rating) AS p90_rating"),
               Arel.sql("SUM(pvp_leaderboard_entries.wins) AS total_wins"),
               Arel.sql("SUM(pvp_leaderboard_entries.losses) AS total_losses")
-            ).map do |spec_id, class_id, class_slug, entry_count, avg_rating, p90_rating, total_wins, total_losses|
+            ).map do |spec_id, entry_count, avg_rating, p90_rating, total_wins, total_losses|
               Stat.new(
                 spec_id:      spec_id,
-                class_id:     class_id,
-                class_slug:   class_slug,
                 entry_count:  entry_count.to_i,
                 avg_rating:   avg_rating.to_f,
                 p90_rating:   p90_rating.to_f,
@@ -95,12 +85,14 @@ module Pvp
 
         # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def build_row(stat, global_avg_rating)
-          spec_id = ::Wow::Catalog.normalize_spec_id(stat.spec_id)
-          row_role = ::Wow::Roles.role_for(class_id: stat.class_id.to_i, spec_id: spec_id)
-          spec_slug = ::Wow::Specs.slug_for(spec_id)
+          spec_id   = ::Wow::Catalog.normalize_spec_id(stat.spec_id)
+          spec_data = ::Wow::Catalog::SPECS[spec_id]
+          return nil unless spec_data
 
-          return nil unless row_role
-          return nil unless spec_slug
+          row_role   = spec_data[:role]
+          spec_slug  = spec_data[:spec_slug]
+          class_slug = spec_data[:class_slug]
+
           return nil if role && row_role != role
 
           total_games = stat.total_wins + stat.total_losses
@@ -110,7 +102,7 @@ module Pvp
           volume_raw     = Math.log10([ total_games, 1 ].max)
 
           {
-            class:          stat.class_slug,
+            class:          class_slug,
             spec:           spec_slug,
             spec_id:        spec_id,
             role:           row_role,
@@ -228,11 +220,10 @@ module Pvp
         def base_scope
           PvpLeaderboardEntry
             .latest_snapshot_for_bracket(bracket, season_id: season.id)
-            .joins(:character, :pvp_leaderboard)
+            .joins(:pvp_leaderboard)
             .where(pvp_leaderboards: { region: region })
             .where.not(
               "pvp_leaderboard_entries.spec_id": nil,
-              "characters.class_id":             nil,
               "pvp_leaderboard_entries.rating":  nil
             )
         end

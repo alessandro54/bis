@@ -10,8 +10,6 @@
 #  losses                      :integer          default(0)
 #  rank                        :integer
 #  rating                      :integer
-#  raw_equipment               :binary
-#  raw_specialization          :binary
 #  snapshot_at                 :datetime
 #  specialization_processed_at :datetime
 #  tier_4p_active              :boolean          default(FALSE)
@@ -32,8 +30,7 @@
 #  index_entries_for_spec_meta                             (pvp_leaderboard_id,spec_id,rating)
 #  index_entries_on_leaderboard_and_rating                 (pvp_leaderboard_id,rating)
 #  index_entries_on_leaderboard_and_snapshot               (pvp_leaderboard_id,snapshot_at)
-#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) \
-#  WHERE (equipment_processed_at IS NOT NULL)
+#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
 #  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
 #  index_pvp_entries_on_snapshot_at                        (snapshot_at)
 #  index_pvp_leaderboard_entries_on_character_id           (character_id)
@@ -53,20 +50,6 @@ RSpec.describe PvpLeaderboardEntry, type: :model do
   describe 'associations' do
     it { should belong_to(:pvp_leaderboard) }
     it { should belong_to(:character) }
-    it { should have_many(:pvp_leaderboard_entry_items).dependent(:destroy) }
-    it { should have_many(:items).through(:pvp_leaderboard_entry_items) }
-  end
-
-  describe 'included modules' do
-    it 'includes Translatable module' do
-      expect(described_class.included_modules).to include(Translatable)
-    end
-  end
-
-  describe 'filter_attributes' do
-    it 'filters sensitive attributes' do
-      expect(described_class.filter_attributes).to include(:raw_equipment, :raw_specialization)
-    end
   end
 
   describe '#winrate' do
@@ -156,37 +139,40 @@ RSpec.describe PvpLeaderboardEntry, type: :model do
         expect(results).not_to include(entry_current_snapshot)
         expect(results).not_to include(entry_non_snapshot)
       end
-    end
-  end
 
-  describe 'JSONB handling' do
-    let(:entry) { create(:pvp_leaderboard_entry) }
+      context 'when latest snapshot has unprocessed entries' do
+        let!(:new_snapshot_time) { 1.hour.from_now }
 
-    it 'stores and retrieves raw_equipment correctly' do
-      equipment_data = {
-        'head' => { 'item_id' => 12_345, 'name' => 'Helm of Valor' },
-        'chest' => { 'item_id' => 67_890, 'name' => 'Breastplate of Might' }
-      }
+        before do
+          leaderboard_current.update!(last_synced_at: new_snapshot_time)
+        end
 
-      entry.update!(raw_equipment: equipment_data)
-      entry.reload
+        let!(:unprocessed_entry) do
+          create(:pvp_leaderboard_entry,
+            character:       character,
+            pvp_leaderboard: leaderboard_current,
+            snapshot_at:     new_snapshot_time,
+            spec_id:         nil
+          )
+        end
 
-      expect(entry.raw_equipment).to eq(equipment_data)
-      expect(entry.raw_equipment['head']['item_id']).to eq(12_345)
-    end
+        it 'falls back to the previous processed snapshot' do
+          results = described_class.latest_snapshot_for_bracket('2v2')
+          expect(results).to include(entry_current_snapshot)
+          expect(results).not_to include(unprocessed_entry)
+        end
+      end
 
-    it 'stores and retrieves raw_specialization correctly' do
-      spec_data = {
-        'talents' => [ 'fireball', 'frostbolt' ],
-        'specialization_name' => 'Frost',
-        'class' => 'Mage'
-      }
+      context 'when no entries have been processed' do
+        before do
+          PvpLeaderboardEntry.update_all(spec_id: nil) # rubocop:disable Rails/SkipsModelValidations
+        end
 
-      entry.update!(raw_specialization: spec_data)
-      entry.reload
-
-      expect(entry.raw_specialization).to eq(spec_data)
-      expect(entry.raw_specialization['specialization_name']).to eq('Frost')
+        it 'returns no results' do
+          results = described_class.latest_snapshot_for_bracket('2v2')
+          expect(results).to be_empty
+        end
+      end
     end
   end
 

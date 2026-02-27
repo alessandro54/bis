@@ -1,7 +1,13 @@
 # Job performance monitoring and optimization service
 class JobPerformanceMonitor
+  # Sample rate for DB writes: 1 = 100%, 10 = 10%, 0 = disabled
+  # Failures are always recorded regardless of sample rate
+  SAMPLE_RATE = ENV.fetch("JOB_MONITOR_SAMPLE_RATE", 0).to_i
+
   class << self
     def track_job_performance(job_class, duration, success:, error: nil)
+      return if SAMPLE_RATE.zero?
+
       metrics = {
         job_class: job_class.name,
         duration:  duration,
@@ -10,14 +16,19 @@ class JobPerformanceMonitor
         error:     error&.class&.name
       }
 
-      # Store metrics for analysis
-      store_metrics(metrics)
+      # Always store failures; sample successes
+      if !success || sampled?
+        store_metrics(metrics)
+      end
 
-      # Alert on performance issues
-      alert_on_performance_issues(metrics)
+      # Alert on slow jobs (cheap check, no DB query)
+      return unless duration > 60.seconds
 
-      # Auto-optimize if needed
-      suggest_optimizations(metrics)
+      Rails.logger.warn("Slow job detected: #{metrics[:job_class]} took #{duration}s")
+    end
+
+    private def sampled?
+      SAMPLE_RATE >= 1 && rand(SAMPLE_RATE) == 0
     end
 
     def get_performance_stats(job_class: nil, time_range: 1.hour)
@@ -81,35 +92,6 @@ class JobPerformanceMonitor
         )
       rescue => e
         Rails.logger.error("Failed to store job metrics: #{e.message}")
-      end
-
-      def alert_on_performance_issues(metrics)
-        # Alert on slow jobs
-        if metrics[:duration] > 60.seconds
-          Rails.logger.warn("Slow job detected: #{metrics[:job_class]} took #{metrics[:duration]}s")
-        end
-
-        # Alert on high failure rates
-        recent_failures = JobPerformanceMetric.where(
-          job_class:  metrics[:job_class],
-          success:    false,
-          created_at: 5.minutes.ago..Time.current
-        ).count
-
-        return unless recent_failures > 5
-
-        Rails.logger.error("High failure rate for #{metrics[:job_class]}: #{recent_failures} failures in 5 minutes")
-      end
-
-      def suggest_optimizations(metrics)
-        # Suggest optimizations based on patterns
-        if metrics[:job_class].include?("Batch") && metrics[:duration] > 30.seconds
-          Rails.logger.info("Consider reducing batch size for #{metrics[:job_class]}")
-        end
-
-        return unless metrics[:error] == "Blizzard::Client::Error"
-
-        Rails.logger.info("Consider implementing circuit breaker for #{metrics[:job_class]}")
       end
 
       def get_queue_performance

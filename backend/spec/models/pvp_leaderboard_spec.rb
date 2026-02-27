@@ -13,8 +13,8 @@
 #
 # Indexes
 #
-#  index_pvp_leaderboards_on_pvp_season_id              (pvp_season_id)
-#  index_pvp_leaderboards_on_pvp_season_id_and_bracket  (pvp_season_id,bracket) UNIQUE
+#  idx_leaderboards_season_bracket_region   (pvp_season_id,bracket,region) UNIQUE
+#  index_pvp_leaderboards_on_pvp_season_id  (pvp_season_id)
 #
 # Foreign Keys
 #
@@ -30,13 +30,22 @@ RSpec.describe PvpLeaderboard, type: :model do
   end
 
   describe 'database constraints' do
-    it 'enforces unique pvp_season_id and bracket combination' do
+    it 'enforces unique pvp_season_id, bracket, and region combination' do
       season = create_test_season
-      create_test_leaderboard(pvp_season: season, bracket: '2v2')
+      create_test_leaderboard(pvp_season: season, bracket: '2v2', region: 'us')
 
       expect {
-        create_test_leaderboard(pvp_season: season, bracket: '2v2')
+        create_test_leaderboard(pvp_season: season, bracket: '2v2', region: 'us')
       }.to raise_error(ActiveRecord::RecordNotUnique)
+    end
+
+    it 'allows the same bracket in different regions' do
+      season = create_test_season
+      create_test_leaderboard(pvp_season: season, bracket: '2v2', region: 'us')
+
+      expect {
+        create_test_leaderboard(pvp_season: season, bracket: '2v2', region: 'eu')
+      }.not_to raise_error
     end
 
     it 'allows the same bracket for different seasons' do

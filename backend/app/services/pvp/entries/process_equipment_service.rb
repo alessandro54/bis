@@ -1,55 +1,53 @@
 module Pvp
   module Entries
     class ProcessEquipmentService < BaseService
-      def initialize(entry:, locale: "en_US")
-        @entry  = entry
-        @locale = locale
+      EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
+
+      def initialize(character:, raw_equipment:, locale: "en_US")
+        @character     = character
+        @raw_equipment = raw_equipment
+        @locale        = locale
       end
 
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def call
-        # Skip if equipment was recently processed (within configurable TTL)
-        # This prevents redundant processing when same entry is queued multiple times
-        ttl_hours = ENV.fetch("EQUIPMENT_PROCESS_TTL_HOURS", 1).to_i
-        if entry.equipment_processed_at.present? && entry.equipment_processed_at > ttl_hours.hours.ago
-          return success(entry)
-        end
-
-        raw_equipment = entry.raw_equipment
         unless raw_equipment.is_a?(Hash) && raw_equipment["equipped_items"].present?
           return failure("Missing equipped_items in raw_equipment")
         end
 
+        # Instantiated before the fingerprint check so item_level is available
+        # even on the early-return path (fingerprint match = gear unchanged).
         equipment_service = Blizzard::Data::Items::UpsertFromRawEquipmentService.new(
           raw_equipment: raw_equipment,
           locale:        locale
         )
-        processed_equipment = equipment_service.call
 
-        # Build equipment attributes
-        # Compress raw_equipment for storage efficiency
-        equipment_attrs = {
-          equipment_processed_at: Time.zone.now,
-          raw_equipment:          PvpLeaderboardEntry.compress_json_value(processed_equipment)
-        }
+        # Compute fingerprint from raw Blizzard IDs + item level + enchantment —
+        # no DB round-trip required. Skip all DB writes when gear is unchanged.
+        new_fingerprint = raw_fingerprint
 
-        # Add optional fields if they exist
-        equipment_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
-        equipment_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
-
-        # Wrap update and item rebuild in a single transaction for atomicity
-        # This ensures if item rebuild fails, the entry update is rolled back
-        ActiveRecord::Base.transaction do
-          # Use update_columns for faster update (skips callbacks/validations)
-          # rubocop:disable Rails/SkipsModelValidations
-          entry.update_columns(equipment_attrs)
-          # rubocop:enable Rails/SkipsModelValidations
-
-          # Rebuild entry items
-          rebuild_entry_items(processed_equipment)
+        if character.equipment_fingerprint == new_fingerprint
+          entry_attrs = { equipment_processed_at: Time.zone.now }
+          entry_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
+          entry_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
+          return success(nil, context: { entry_attrs: entry_attrs })
         end
 
-        success(entry)
+        processed = equipment_service.call
+
+        equipped_items = processed.dig("equipped_items")
+        if equipped_items.blank?
+          return failure("UpsertFromRawEquipmentService returned no equipped items for character #{character.id} " \
+                         "(raw had #{Array(raw_equipment['equipped_items']).size} slots)")
+        end
+
+        rebuild_character_items(character, processed, new_fingerprint)
+
+        entry_attrs = { equipment_processed_at: Time.zone.now }
+        entry_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
+        entry_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
+
+        success(nil, context: { entry_attrs: entry_attrs })
       rescue => e
         failure(e)
       end
@@ -57,42 +55,65 @@ module Pvp
 
       private
 
-        attr_reader :entry, :locale
+        attr_reader :character, :raw_equipment, :locale
+
+        # Fingerprint built entirely from raw API data — slot, Blizzard item ID,
+        # item level, and permanent enchantment ID. No DB lookups needed, so the
+        # check happens before any writes.
+        # rubocop:disable Metrics/AbcSize
+        def raw_fingerprint
+          Array(raw_equipment["equipped_items"])
+            .reject { |item|
+              slot  = item.dig("slot", "type")
+              ilvl  = item.dig("level", "value").to_i
+              EXCLUDED_SLOTS.include?(slot) || ilvl <= 0
+            }
+            .map { |item|
+              slot   = item.dig("slot", "type")&.downcase
+              blz_id = item.dig("item", "id")
+              ilvl   = item.dig("level", "value").to_i
+              enc    = Array(item["enchantments"])
+                         .find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
+                         &.dig("enchantment_id")
+              crafting = Array(item["modified_crafting_stat"]).map { |s| s["type"] }.sort.join("+")
+              "#{slot}:#{blz_id}:#{ilvl}:#{enc}:#{crafting}"
+            }
+            .sort
+            .join(",")
+        end
+        # rubocop:enable Metrics/AbcSize
 
         # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
-        def rebuild_entry_items(processed_equipment)
-          equipped_items = processed_equipment.is_a?(Hash) ? processed_equipment["equipped_items"] : {}
+        def rebuild_character_items(character, processed, new_fingerprint)
+          equipped_items = processed.is_a?(Hash) ? processed["equipped_items"] : {}
 
-          # Use delete_all instead of destroy_all to skip callbacks (faster)
-          entry.pvp_leaderboard_entry_items.delete_all
-
-          return if equipped_items.empty?
-
-          # Build item records from the slot -> item hash
-          item_records = []
           now = Time.current
+          records = equipped_items.filter_map do |slot, item_data|
+            next unless item_data.is_a?(Hash) && item_data["item_id"]
 
-          equipped_items.each do |slot, item_data|
-            next unless item_data.is_a?(Hash)
-
-            item_id = item_data["item_id"]
-            next unless item_id
-
-            item_records << {
-              pvp_leaderboard_entry_id: entry.id,
-              item_id:                  item_id,
-              slot:                     slot.upcase,
-              item_level:               item_data["item_level"],
-              context:                  item_data["context"],
-              raw:                      item_data,
-              created_at:               now,
-              updated_at:               now
+            {
+              character_id:               character.id,
+              item_id:                    item_data["item_id"],
+              slot:                       slot.upcase,
+              item_level:                 item_data["item_level"],
+              context:                    item_data["context"],
+              enchantment_id:             item_data["enchantment_id"],
+              enchantment_source_item_id: item_data["enchantment_source_item_id"],
+              embellishment_spell_id:     item_data["embellishment_spell_id"],
+              bonus_list:                 item_data["bonus_list"] || [],
+              sockets:                    item_data["sockets"] || [],
+              crafting_stats:             item_data["crafting_stats"] || [],
+              created_at:                 now,
+              updated_at:                 now
             }
           end
 
-          # Bulk insert all entry items
           # rubocop:disable Rails/SkipsModelValidations
-          PvpLeaderboardEntryItem.insert_all!(item_records) if item_records.any?
+          ApplicationRecord.transaction do
+            character.character_items.delete_all
+            CharacterItem.insert_all!(records) if records.any?
+            character.update_columns(equipment_fingerprint: new_fingerprint)
+          end
           # rubocop:enable Rails/SkipsModelValidations
         end
       # rubocop:enable Metrics/MethodLength, Metrics/AbcSize

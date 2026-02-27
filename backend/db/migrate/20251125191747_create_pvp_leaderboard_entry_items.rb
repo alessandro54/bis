@@ -12,8 +12,8 @@ class CreatePvpLeaderboardEntryItems < ActiveRecord::Migration[8.1]
     end
 
     add_index :pvp_leaderboard_entry_items,
-              [:pvp_leaderboard_entry_id, :slot],
+              %i[pvp_leaderboard_entry_id slot],
               unique: true,
-              name: "index_entry_items_on_entry_and_slot"
+              name:   "index_entry_items_on_entry_and_slot"
   end
 end

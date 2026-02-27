@@ -119,12 +119,12 @@ RSpec.describe Pvp::SyncLeaderboardJob, type: :job do
         expect(character_ids).not_to include(existing_character.id)
       end
 
-      it "logs the number of skipped characters" do
+      it "logs the sync via the service" do
         allow(Rails.logger).to receive(:info).and_call_original
 
         perform_job
 
-        expect(Rails.logger).to have_received(:info).with(/skipped \(recently synced\)/)
+        expect(Rails.logger).to have_received(:info).with(/SyncLeaderboardService/)
       end
     end
 
@@ -158,7 +158,7 @@ RSpec.describe Pvp::SyncLeaderboardJob, type: :job do
       let(:bracket) { "3v3" }
 
       before do
-        # 3v3 has a rating_min of 2200
+        # 3v3 has a rating_min of 2000
         api_response["entries"] << {
           "character" => {
             "id" => 11_111,
@@ -167,7 +167,7 @@ RSpec.describe Pvp::SyncLeaderboardJob, type: :job do
           },
           "faction" => { "type" => "HORDE" },
           "rank" => 100,
-          "rating" => 2000, # Below 2200 threshold
+          "rating" => 1500, # Below 2000 threshold
           "season_match_statistics" => { "won" => 50, "lost" => 50 }
         }
       end

@@ -3,36 +3,62 @@ default: &base
     - polling_interval: 0.5
       batch_size: 100
 
+  # Single worker for development — both region queues + everything else.
+  # Set SOLID_QUEUE_THREADS >= PVP_SYNC_THREADS so safe_concurrency math is correct.
   workers:
-    # Character sync queues - handles API calls to Blizzard
-    - queues: [character_sync_a, character_sync_b, character_sync_c, character_sync_d]
-      threads: <%= ENV.fetch("CHARACTER_SYNC_THREADS", 2) %>
+    - queues:
+        - character_sync_us
+        - character_sync_eu
+        - pvp_sync_2v2
+        - pvp_sync_3v3
+        - pvp_sync_rbg
+        - pvp_sync_shuffle
+        - pvp_processing
+        - "*"
+      threads: <%= ENV.fetch("SOLID_QUEUE_THREADS", 10) %>
       processes: 1
       polling_interval: 0.25
-
-    # PVP sync queues - fetches leaderboard data
-    - queues: [pvp_sync_2v2, pvp_sync_3v3, pvp_sync_rbg, pvp_sync_shuffle]
-      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 2) %>
-      processes: 1
-      polling_interval: 0.5
-
-    # Processing queue - CPU-intensive data processing
-    - queues: [pvp_processing]
-      threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 2) %>
-      processes: 1
-      polling_interval: 0.25
-
-    # Default queue - misc jobs
-    - queues: "*"
-      threads: <%= ENV.fetch("DEFAULT_THREADS", 2) %>
-      processes: 1
-      polling_interval: 0.5
 
 development:
   <<: *base
 
-production:
-  <<: *base
+production: &production
+  dispatchers:
+    - polling_interval: 0.5
+      batch_size: 100
+
+  workers:
+    # US characters — dedicated worker so a Blizzard US rate-limit never stalls EU.
+    # PVP_SYNC_THREADS controls both SolidQueue parallelism AND safe_concurrency math
+    # inside SyncCharacterBatchJob. Must stay in sync. With DB_POOL=130:
+    #   per_thread = floor(130 / PVP_SYNC_THREADS) - 1
+    #   8 threads → 15 chars/batch → 120 peak connections (safe under pool of 130)
+    - queues: [character_sync_us]
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 8) %>
+      processes: 1
+      polling_interval: 0.25
+
+    # EU characters — independent from US, separate Blizzard rate-limit bucket.
+    - queues: [character_sync_eu]
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 8) %>
+      processes: 1
+      polling_interval: 0.25
+
+    # Leaderboard sync + bracket-specific queues
+    - queues:
+        - pvp_sync_2v2
+        - pvp_sync_3v3
+        - pvp_sync_rbg
+        - pvp_sync_shuffle
+      threads: <%= ENV.fetch("PVP_SYNC_THREADS", 3) %>
+      processes: 1
+      polling_interval: 0.25
+
+    # CPU-bound: aggregations + default catch-all
+    - queues: [pvp_processing, "*"]
+      threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 3) %>
+      processes: 1
+      polling_interval: 0.25
 
 # Low-resource profile for cheap cloud instances (2 vCPU, 2GB RAM)
 # Use with: QUEUE_PROFILE=low_resource
@@ -42,23 +68,7 @@ low_resource:
       batch_size: 50
 
   workers:
-    - queues: [character_sync_a, character_sync_b, character_sync_c, character_sync_d]
-      threads: 1
-      processes: 1
-      polling_interval: 0.5
-
-    - queues: [pvp_sync_2v2, pvp_sync_3v3, pvp_sync_rbg, pvp_sync_shuffle]
-      threads: 1
-      processes: 1
-      polling_interval: 1.0
-
-    - queues: [pvp_processing]
-      threads: 1
-      processes: 1
-      polling_interval: 0.5
-
     - queues: "*"
-      threads: 1
+      threads: 2
       processes: 1
       polling_interval: 1.0
-

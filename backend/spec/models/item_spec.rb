@@ -9,7 +9,7 @@
 #  item_class        :string
 #  item_subclass     :string
 #  meta_synced_at    :datetime
-#  quality           :integer
+#  quality           :string
 #  created_at        :datetime         not null
 #  updated_at        :datetime         not null
 #  blizzard_id       :bigint           not null
@@ -23,8 +23,8 @@ require 'rails_helper'
 
 RSpec.describe Item, type: :model do
   describe 'associations' do
-    it { should have_many(:pvp_leaderboard_entry_items).dependent(:destroy) }
-    it { should have_many(:pvp_leaderboard_entries).through(:pvp_leaderboard_entry_items) }
+    it { should have_many(:character_items).dependent(:destroy) }
+    it { should have_many(:characters).through(:character_items) }
   end
 
   describe 'validations' do
@@ -63,9 +63,5 @@ RSpec.describe Item, type: :model do
         expect(item.meta_synced?).to be false
       end
     end
-  end
-
-  describe 'accepts_nested_attributes_for' do
-    it { should accept_nested_attributes_for(:translations) }
   end
 end

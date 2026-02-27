@@ -4,6 +4,10 @@ require "rails_helper"
 RSpec.describe Blizzard::Auth do
   include ActiveSupport::Testing::TimeHelpers
 
+  # Reset the in-process token cache between examples so one test's cached
+  # token doesn't bleed into the next (the cache is a class-level variable).
+  before { described_class.reset_in_process_cache! }
+
   let(:client_id) { "test_client_id" }
   let(:client_secret) { "test_client_secret" }
 
@@ -48,7 +52,7 @@ RSpec.describe Blizzard::Auth do
   end
 
   describe "#access_token" do
-    let(:cache_key) { Blizzard::Auth::CACHE_KEY }
+    let(:cache_key) { Blizzard::Auth.cache_key_for(client_id) }
 
     context "when there is a valid cached token" do
       let(:cached_token) { "cached-token" }

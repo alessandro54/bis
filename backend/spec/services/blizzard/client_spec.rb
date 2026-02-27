@@ -2,7 +2,7 @@
 require "rails_helper"
 
 RSpec.describe Blizzard::Client do
-  let(:auth_double) { instance_double("Blizzard::Auth", access_token: "fake-token") }
+  let(:auth_double) { instance_double("Blizzard::Auth", access_token: "fake-token", client_id: "test_client_id") }
 
   describe "#initialize" do
     it "sets region, locale and auth for valid values" do

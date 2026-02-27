@@ -13,9 +13,9 @@ class CreateTranslations < ActiveRecord::Migration[8.1]
     end
 
     add_index :translations,
-              [:translatable_type, :translatable_id, :locale, :key],
+              %i[translatable_type translatable_id locale key],
               unique: true,
-              name: :index_translations_on_translatable_and_locale_and_key
+              name:   :index_translations_on_translatable_and_locale_and_key
 
     add_index :translations, :key
     add_index :translations, :locale

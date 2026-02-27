@@ -10,8 +10,6 @@
 #  losses                      :integer          default(0)
 #  rank                        :integer
 #  rating                      :integer
-#  raw_equipment               :jsonb
-#  raw_specialization          :jsonb
 #  snapshot_at                 :datetime
 #  specialization_processed_at :datetime
 #  tier_4p_active              :boolean          default(FALSE)
@@ -28,8 +26,11 @@
 #
 # Indexes
 #
-#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) \
-#    WHERE (equipment_processed_at IS NOT NULL)
+#  index_entries_for_batch_processing                      (id,equipment_processed_at)
+#  index_entries_for_spec_meta                             (pvp_leaderboard_id,spec_id,rating)
+#  index_entries_on_leaderboard_and_rating                 (pvp_leaderboard_id,rating)
+#  index_entries_on_leaderboard_and_snapshot               (pvp_leaderboard_id,snapshot_at)
+#  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
 #  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
 #  index_pvp_entries_on_snapshot_at                        (snapshot_at)
 #  index_pvp_leaderboard_entries_on_character_id           (character_id)
@@ -44,8 +45,6 @@
 #  fk_rails_...  (pvp_leaderboard_id => pvp_leaderboards.id)
 #
 class PvpLeaderboardEntry < ApplicationRecord
-  include Translatable
-
   belongs_to :pvp_leaderboard
   belongs_to :character
 
@@ -57,18 +56,23 @@ class PvpLeaderboardEntry < ApplicationRecord
         PvpSeason.where(is_current: true).select(:id).limit(1)
       end
 
+    leaderboard_ids = PvpLeaderboard
+      .where(bracket: bracket)
+      .where(pvp_season_id: season_filter)
+      .select(:id)
+
+    # Use the latest snapshot that has at least one processed entry (spec_id set).
+    # Falls back to previous snapshot when the current sync is still in progress or failed.
+    latest_processed = PvpLeaderboardEntry
+      .where(pvp_leaderboard_id: leaderboard_ids)
+      .where.not(spec_id: nil)
+      .select("MAX(pvp_leaderboard_entries.snapshot_at)")
+
     joins(pvp_leaderboard: :pvp_season)
       .where(pvp_leaderboards: { bracket: bracket })
       .where(pvp_seasons: { id: season_filter })
-      .where("pvp_leaderboard_entries.snapshot_at = pvp_leaderboards.last_synced_at")
+      .where("pvp_leaderboard_entries.snapshot_at = (#{latest_processed.to_sql})")
   }
-
-  has_many :pvp_leaderboard_entry_items, dependent: :destroy
-  has_many :items, through: :pvp_leaderboard_entry_items
-
-  self.filter_attributes += %i[
-    raw_equipment raw_specialization
-  ]
 
   def winrate
     total_games = wins.to_i + losses.to_i

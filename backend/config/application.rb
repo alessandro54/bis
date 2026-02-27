@@ -21,12 +21,23 @@ module WowBis
     # These settings can be overridden in specific environments using the files
     # in config/environments, which are processed later.
     #
-    # config.time_zone = "Central Time (US & Canada)"
+    config.time_zone = "UTC"
+    config.active_record.default_timezone = :utc
     # config.eager_load_paths << Rails.root.join("extras")
 
     # Only loads a smaller set of middleware suitable for API only apps.
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # Each fiber gets its own ActiveRecord connection checkout,
+    # preventing fibers from sharing/corrupting each other's queries.
+    config.active_support.isolation_level = :fiber
+
+
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use ActionDispatch::Session::CookieStore, key: "_your_app_session"
+    config.middleware.use ActionDispatch::Flash
+    config.middleware.use Rack::MethodOverride
   end
 end

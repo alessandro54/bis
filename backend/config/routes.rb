@@ -14,6 +14,10 @@ Rails.application.routes.draw do
 
       namespace :pvp do
         namespace :meta do
+          resources :items, only: [ :index ]
+          resources :enchants, only: [ :index ]
+          resources :gems, only: [ :index ]
+          resources :specs, only: %i[index show]
           get :class_distribution, to: "class_distributions#show"
         end
       end
@@ -21,4 +25,5 @@ Rails.application.routes.draw do
   end
 
   mount MissionControl::Jobs::Engine, at: "/jobs"
+  mount_avo
 end

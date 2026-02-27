@@ -6,9 +6,47 @@ module Blizzard
   class Auth
     class Error < StandardError; end
 
-    OAUTH_URL = "https://oauth.battle.net/oauth/token".freeze
-    CACHE_KEY = "blizzard_access_token".freeze
+    OAUTH_URL           = "https://oauth.battle.net/oauth/token".freeze
+    CACHE_KEY_PREFIX    = "blizzard_access_token".freeze
     EXPIRY_SKEW_SECONDS = 60
+
+    # In-process token cache — avoids a Rails.cache (SolidCache/DB) round-trip on
+    # every API request. Keyed by client_id so multiple credentials don't share
+    # the same slot and overwrite each other's tokens.
+    PROCESS_TOKEN_MUTEX = Mutex.new
+    @process_tokens     = {}
+    @process_expires_at = {}
+
+    def self.cache_key_for(client_id)
+      "#{CACHE_KEY_PREFIX}:#{client_id}"
+    end
+
+    def self.in_process_token(client_id)
+      PROCESS_TOKEN_MUTEX.synchronize do
+        t   = @process_tokens[client_id]
+        exp = @process_expires_at[client_id]
+        return t if t.present? && exp && exp > Time.current
+
+        nil
+      end
+    end
+
+    def self.store_in_process(client_id, token, expires_at)
+      PROCESS_TOKEN_MUTEX.synchronize do
+        @process_tokens[client_id]     = token
+        @process_expires_at[client_id] = expires_at
+      end
+    end
+
+    # Used in tests to prevent token leaking across examples.
+    def self.reset_in_process_cache!
+      PROCESS_TOKEN_MUTEX.synchronize do
+        @process_tokens     = {}
+        @process_expires_at = {}
+      end
+    end
+
+    attr_reader :client_id
 
     def initialize(
       client_id: Rails.application.credentials.dig(:blizzard, :client_id) || ENV["BLIZZARD_CLIENT_ID"],
@@ -27,15 +65,19 @@ module Blizzard
     end
 
     def access_token
-      cached = read_cache
+      # 1. In-process memory — no DB query at all (fastest path)
+      in_process = self.class.in_process_token(@client_id)
+      return in_process if in_process
 
-      if cached.present? &&
-        cached[:token].present? &&
-        cached[:expires_at].present? &&
-        cached[:expires_at] > Time.current
+      # 2. Shared Rails.cache — another worker process may have refreshed the token
+      cached = read_cache
+      if cached.present? && cached[:token].present? &&
+         cached[:expires_at].present? && cached[:expires_at] > Time.current
+        self.class.store_in_process(@client_id, cached[:token], cached[:expires_at])
         return cached[:token]
       end
 
+      # 3. Fetch fresh token from Blizzard OAuth
       fetch_and_cache_access_token!
     end
 
@@ -49,6 +91,7 @@ module Blizzard
         expires_at = compute_expires_at(expires_in)
 
         write_cache(token, expires_at, expires_in)
+        self.class.store_in_process(@client_id, token, expires_at)
         token
       end
 
@@ -89,7 +132,7 @@ module Blizzard
       end
 
       def read_cache
-        Rails.cache&.read(CACHE_KEY)
+        Rails.cache&.read(self.class.cache_key_for(@client_id))
       end
 
       def write_cache(token, expires_at, expires_in)
@@ -101,7 +144,7 @@ module Blizzard
         end
 
         cache.write(
-          CACHE_KEY,
+          self.class.cache_key_for(@client_id),
           { token: token, expires_at: expires_at },
           expires_in: expires_in
         )

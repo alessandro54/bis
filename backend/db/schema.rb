@@ -10,9 +10,41 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
+
+  create_table "character_items", force: :cascade do |t|
+    t.integer "bonus_list", default: [], array: true
+    t.bigint "character_id", null: false
+    t.integer "context"
+    t.string "crafting_stats", default: [], array: true
+    t.datetime "created_at", null: false
+    t.integer "embellishment_spell_id"
+    t.bigint "enchantment_id"
+    t.bigint "enchantment_source_item_id"
+    t.bigint "item_id", null: false
+    t.integer "item_level"
+    t.string "slot", null: false
+    t.jsonb "sockets", default: []
+    t.datetime "updated_at", null: false
+    t.index ["character_id", "slot"], name: "idx_character_items_on_char_and_slot", unique: true
+    t.index ["enchantment_id"], name: "index_character_items_on_enchantment_id", where: "(enchantment_id IS NOT NULL)"
+    t.index ["item_id"], name: "index_character_items_on_item_id"
+  end
+
+  create_table "character_talents", force: :cascade do |t|
+    t.bigint "character_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "rank", default: 1
+    t.integer "slot_number"
+    t.bigint "talent_id", null: false
+    t.string "talent_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["character_id", "talent_id"], name: "idx_character_talents_on_char_and_talent", unique: true
+    t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
+    t.index ["talent_id"], name: "index_character_talents_on_talent_id"
+  end
 
   create_table "characters", force: :cascade do |t|
     t.string "avatar_url"
@@ -20,6 +52,8 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.bigint "class_id"
     t.string "class_slug"
     t.datetime "created_at", null: false
+    t.string "equipment_fingerprint"
+    t.datetime "equipment_last_modified", precision: nil
     t.integer "faction"
     t.string "inset_url"
     t.boolean "is_private", default: false
@@ -31,10 +65,23 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.integer "race_id"
     t.string "realm"
     t.string "region"
+    t.string "talent_loadout_code"
+    t.datetime "talents_last_modified", precision: nil
+    t.datetime "unavailable_until"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
+    t.index ["equipment_fingerprint"], name: "index_characters_on_equipment_fingerprint"
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
+    t.index ["talent_loadout_code"], name: "index_characters_on_talent_loadout_code"
+    t.index ["unavailable_until"], name: "index_characters_on_unavailable_until_active", where: "(unavailable_until IS NOT NULL)"
+  end
+
+  create_table "enchantments", force: :cascade do |t|
+    t.bigint "blizzard_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["blizzard_id"], name: "index_enchantments_on_blizzard_id", unique: true
   end
 
   create_table "items", force: :cascade do |t|
@@ -46,7 +93,7 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.string "item_class"
     t.string "item_subclass"
     t.datetime "meta_synced_at"
-    t.integer "quality"
+    t.string "quality"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id"], name: "index_items_on_blizzard_id", unique: true
   end
@@ -75,8 +122,6 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.bigint "pvp_leaderboard_id", null: false
     t.integer "rank"
     t.integer "rating"
-    t.binary "raw_equipment"
-    t.binary "raw_specialization"
     t.datetime "snapshot_at"
     t.integer "spec_id"
     t.datetime "specialization_processed_at"
@@ -100,20 +145,6 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.index ["tier_set_id"], name: "index_pvp_leaderboard_entries_on_tier_set_id"
   end
 
-  create_table "pvp_leaderboard_entry_items", force: :cascade do |t|
-    t.string "context"
-    t.datetime "created_at", null: false
-    t.bigint "item_id", null: false
-    t.integer "item_level"
-    t.bigint "pvp_leaderboard_entry_id", null: false
-    t.jsonb "raw"
-    t.string "slot"
-    t.datetime "updated_at", null: false
-    t.index ["item_id"], name: "index_pvp_leaderboard_entry_items_on_item_id"
-    t.index ["pvp_leaderboard_entry_id", "slot"], name: "index_entry_items_on_entry_and_slot", unique: true
-    t.index ["pvp_leaderboard_entry_id"], name: "index_pvp_leaderboard_entry_items_on_pvp_leaderboard_entry_id"
-  end
-
   create_table "pvp_leaderboards", force: :cascade do |t|
     t.string "bracket"
     t.datetime "created_at", null: false
@@ -121,8 +152,60 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.bigint "pvp_season_id", null: false
     t.string "region"
     t.datetime "updated_at", null: false
-    t.index ["pvp_season_id", "bracket"], name: "index_pvp_leaderboards_on_pvp_season_id_and_bracket", unique: true
+    t.index ["pvp_season_id", "bracket", "region"], name: "idx_leaderboards_season_bracket_region", unique: true
     t.index ["pvp_season_id"], name: "index_pvp_leaderboards_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_enchant_popularity", force: :cascade do |t|
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "enchantment_id", null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "slot", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["enchantment_id"], name: "index_pvp_meta_enchant_popularity_on_enchantment_id"
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "enchantment_id"], name: "idx_meta_enchant_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_enchant_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_enchant_popularity_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_gem_popularity", force: :cascade do |t|
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "item_id", null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "slot", null: false
+    t.datetime "snapshot_at", null: false
+    t.string "socket_type", null: false
+    t.integer "spec_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["item_id"], name: "index_pvp_meta_gem_popularity_on_item_id"
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "socket_type", "item_id"], name: "idx_meta_gem_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_gem_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_gem_popularity_on_pvp_season_id"
+  end
+
+  create_table "pvp_meta_item_popularity", force: :cascade do |t|
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "item_id", null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "slot", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["item_id"], name: "index_pvp_meta_item_popularity_on_item_id"
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "item_id"], name: "idx_meta_item_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_item_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_item_popularity_on_pvp_season_id"
   end
 
   create_table "pvp_seasons", force: :cascade do |t|
@@ -136,6 +219,30 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.index ["blizzard_id"], name: "index_pvp_seasons_on_blizzard_id", unique: true
     t.index ["is_current"], name: "index_pvp_seasons_on_is_current"
     t.index ["updated_at"], name: "index_pvp_seasons_on_updated_at"
+  end
+
+  create_table "pvp_sync_cycles", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.integer "completed_character_batches", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.integer "expected_character_batches", default: 0, null: false
+    t.bigint "pvp_season_id", null: false
+    t.string "regions", default: [], null: false, array: true
+    t.datetime "snapshot_at", null: false
+    t.string "status", default: "syncing_leaderboards", null: false
+    t.datetime "updated_at", null: false
+    t.index ["pvp_season_id", "status"], name: "index_pvp_sync_cycles_on_pvp_season_id_and_status"
+    t.index ["pvp_season_id"], name: "index_pvp_sync_cycles_on_pvp_season_id"
+  end
+
+  create_table "talents", force: :cascade do |t|
+    t.bigint "blizzard_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "spell_id"
+    t.string "talent_type", null: false
+    t.datetime "updated_at", null: false
+    t.index ["blizzard_id"], name: "index_talents_on_blizzard_id", unique: true
+    t.index ["talent_type", "blizzard_id"], name: "index_talents_on_talent_type_and_blizzard_id"
   end
 
   create_table "translations", force: :cascade do |t|
@@ -153,9 +260,20 @@ ActiveRecord::Schema[8.1].define(version: 2025_12_26_194802) do
     t.index ["translatable_type", "translatable_id"], name: "index_translations_on_translatable"
   end
 
+  add_foreign_key "character_items", "characters"
+  add_foreign_key "character_items", "enchantments"
+  add_foreign_key "character_items", "items"
+  add_foreign_key "character_items", "items", column: "enchantment_source_item_id"
+  add_foreign_key "character_talents", "characters"
+  add_foreign_key "character_talents", "talents"
   add_foreign_key "pvp_leaderboard_entries", "characters"
   add_foreign_key "pvp_leaderboard_entries", "pvp_leaderboards"
-  add_foreign_key "pvp_leaderboard_entry_items", "items"
-  add_foreign_key "pvp_leaderboard_entry_items", "pvp_leaderboard_entries"
   add_foreign_key "pvp_leaderboards", "pvp_seasons"
+  add_foreign_key "pvp_meta_enchant_popularity", "enchantments"
+  add_foreign_key "pvp_meta_enchant_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_gem_popularity", "items"
+  add_foreign_key "pvp_meta_gem_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_item_popularity", "items"
+  add_foreign_key "pvp_meta_item_popularity", "pvp_seasons"
+  add_foreign_key "pvp_sync_cycles", "pvp_seasons"
 end

@@ -17,6 +17,7 @@ module ServiceSpecHelpers
     )
   end
 
+  # rubocop:disable Metrics/MethodLength
   def raw_equipment
     {
       "equipped_items" => [
@@ -24,13 +25,34 @@ module ServiceSpecHelpers
           "item" => { "id" => blizzard_item_id },
           "slot" => { "type" => "HEAD" },
           "level" => { "value" => 540 },
-          "context" => "some_context",
+          "context" => 26,
           "name" => "Test Helm",
-          "quality" => { "type" => "EPIC" }
+          "quality" => { "type" => "EPIC" },
+          "bonus_list" => [ 10_397, 9438 ],
+          "enchantments" => [
+            {
+              "display_string" => "Enchanted: Chant of Leeching Fangs |A:Professions-ChatIcon-Quality-Tier3:20:20|a",
+              "enchantment_id" => enchantment_blizzard_id,
+              "enchantment_slot" => { "type" => "PERMANENT" },
+              "source_item" => { "id" => enchantment_source_blizzard_id }
+            }
+          ],
+          "sockets" => [
+            {
+              "socket_type" => { "type" => "PRISMATIC" },
+              "item" => { "id" => socket_gem_blizzard_id, "name" => "Versatile Onyx" },
+              "display_string" => "+10 Mastery and +3 Versatility"
+            }
+          ],
+          "modified_crafting_stat" => [
+            { "id" => 36, "type" => "HASTE_RATING",   "name" => "Haste" },
+            { "id" => 49, "type" => "MASTERY_RATING", "name" => "Mastery" }
+          ]
         }
       ]
     }
   end
+  # rubocop:enable Metrics/MethodLength
 
   def processed_equipment
     {
@@ -41,7 +63,14 @@ module ServiceSpecHelpers
           "item_level" => 540,
           "name" => "Test Helm",
           "quality" => "epic",
-          "context" => "some_context"
+          "context" => 26,
+          "bonus_list" => [ 10_397, 9438 ],
+          "enchantment_id" => enchantment.id,
+          "enchantment_source_item_id" => enchantment_source_item.id,
+          "embellishment_spell_id" => nil,
+          "sockets" => [ { "type" => "PRISMATIC", "item_id" => socket_gem_item.id,
+"display_string" => "+10 Mastery and +3 Versatility" } ],
+          "crafting_stats" => [ "HASTE_RATING", "MASTERY_RATING" ]
         }
       }
     }
@@ -56,8 +85,32 @@ module ServiceSpecHelpers
     }
   end
 
+  def enchantment
+    @enchantment ||= create(:enchantment, blizzard_id: enchantment_blizzard_id)
+  end
+
+  def enchantment_source_item
+    @enchantment_source_item ||= create(:item, blizzard_id: enchantment_source_blizzard_id)
+  end
+
+  def socket_gem_item
+    @socket_gem_item ||= create(:item, blizzard_id: socket_gem_blizzard_id)
+  end
+
   def blizzard_item_id
     123
+  end
+
+  def enchantment_blizzard_id
+    7534
+  end
+
+  def enchantment_source_blizzard_id
+    226_977
+  end
+
+  def socket_gem_blizzard_id
+    213_746
   end
 
   def locale

@@ -6,6 +6,8 @@
 #  id                         :bigint           not null, primary key
 #  avatar_url                 :string
 #  class_slug                 :string
+#  equipment_fingerprint      :string
+#  equipment_last_modified    :datetime
 #  faction                    :integer
 #  inset_url                  :string
 #  is_private                 :boolean          default(FALSE)
@@ -16,6 +18,9 @@
 #  race                       :string
 #  realm                      :string
 #  region                     :string
+#  talent_loadout_code        :string
+#  talents_last_modified      :datetime
+#  unavailable_until          :datetime
 #  created_at                 :datetime         not null
 #  updated_at                 :datetime         not null
 #  blizzard_id                :bigint
@@ -25,8 +30,11 @@
 # Indexes
 #
 #  index_characters_on_blizzard_id_and_region     (blizzard_id,region) UNIQUE
+#  index_characters_on_equipment_fingerprint      (equipment_fingerprint)
 #  index_characters_on_is_private                 (is_private) WHERE (is_private = true)
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
+#  index_characters_on_talent_loadout_code        (talent_loadout_code)
+#  index_characters_on_unavailable_until_active   (unavailable_until) WHERE (unavailable_until IS NOT NULL)
 #
 require 'rails_helper'
 
