@@ -1,0 +1,9 @@
+class ApplicationJob < ActiveJob::Base
+  private
+
+  def safe_concurrency: (Integer, Integer, ?threads: Integer) -> Integer
+  def run_concurrently: (Array[untyped], concurrency: Integer) { (untyped) -> untyped } -> Array[untyped]
+  def run_with_threads: (Array[untyped], concurrency: Integer) { (untyped) -> untyped } -> Array[untyped]
+  def with_query_cache: () { () -> untyped } -> untyped
+  def monitor_performance: () { () -> untyped } -> untyped
+end

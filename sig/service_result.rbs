@@ -1,0 +1,15 @@
+class ServiceResult
+  attr_reader error: untyped
+  attr_reader message: String?
+  attr_reader payload: untyped
+  attr_reader context: Hash[Symbol, untyped]
+
+  def initialize: (?error: untyped, ?message: String?, ?payload: untyped, ?context: Hash[Symbol, untyped]) -> void
+
+  def self.success: (?untyped payload, ?message: String?, ?context: Hash[Symbol, untyped]) -> ServiceResult
+  def self.failure: (untyped error, ?message: String?, ?payload: untyped, ?context: Hash[Symbol, untyped]) -> ServiceResult
+
+  def ok?: () -> bool
+  def success?: () -> bool
+  def failure?: () -> bool
+end
