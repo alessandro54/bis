@@ -154,6 +154,77 @@ RSpec.describe Pvp::SyncLeaderboardJob, type: :job do
       end
     end
 
+    context "when the leaderboard is synced a second time (upsert behaviour)" do
+      let!(:existing_character) do
+        create(:character, blizzard_id: 12_345, region: region, name: "TestPlayer", realm: "illidan")
+      end
+
+      let!(:existing_leaderboard) do
+        create(:pvp_leaderboard, pvp_season: season, bracket: bracket, region: region)
+      end
+
+      let!(:existing_entry) do
+        create(:pvp_leaderboard_entry,
+          character:              existing_character,
+          pvp_leaderboard:        existing_leaderboard,
+          rank:                   5,
+          rating:                 2100,
+          spec_id:                65,
+          item_level:             620,
+          equipment_processed_at: 1.hour.ago)
+      end
+
+      it "does not create a duplicate entry for the existing character" do
+        perform_job
+        count = PvpLeaderboardEntry.where(
+          character:       existing_character,
+          pvp_leaderboard: existing_leaderboard
+        ).count
+        expect(count).to eq(1)
+      end
+
+      it "updates rank and rating on the existing entry" do
+        perform_job
+        existing_entry.reload
+        expect(existing_entry.rank).to   eq(1)
+        expect(existing_entry.rating).to eq(2400)
+      end
+
+      it "preserves equipment and spec data on the existing entry" do
+        perform_job
+        existing_entry.reload
+        expect(existing_entry.spec_id).to                eq(65)
+        expect(existing_entry.item_level).to             eq(620)
+        expect(existing_entry.equipment_processed_at).to be_present
+      end
+    end
+
+    context "when a character falls off the leaderboard" do
+      let!(:dropped_character) do
+        create(:character, blizzard_id: 99_999, region: region, name: "DroppedPlayer", realm: "illidan")
+      end
+
+      let!(:existing_leaderboard) do
+        create(:pvp_leaderboard, pvp_season: season, bracket: bracket, region: region)
+      end
+
+      let!(:dropped_entry) do
+        create(:pvp_leaderboard_entry,
+          character:       dropped_character,
+          pvp_leaderboard: existing_leaderboard)
+      end
+
+      it "removes the entry for the dropped character" do
+        perform_job
+        expect(PvpLeaderboardEntry.exists?(dropped_entry.id)).to be false
+      end
+
+      it "keeps entries for characters still on the leaderboard" do
+        perform_job
+        expect(PvpLeaderboardEntry.count).to eq(2) # only the 2 from api_response
+      end
+    end
+
     context "with rating filter" do
       let(:bracket) { "3v3" }
 

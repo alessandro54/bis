@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_27_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -132,16 +132,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
     t.datetime "updated_at", null: false
     t.integer "wins", default: 0
     t.index ["character_id", "equipment_processed_at"], name: "index_pvp_entries_on_character_and_equipment_processed", where: "(equipment_processed_at IS NOT NULL)"
-    t.index ["character_id", "snapshot_at"], name: "index_pvp_entries_on_character_and_snapshot"
+    t.index ["character_id", "pvp_leaderboard_id"], name: "idx_entries_unique_char_leaderboard", unique: true
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["id", "equipment_processed_at"], name: "index_entries_for_batch_processing"
     t.index ["pvp_leaderboard_id", "rating"], name: "index_entries_on_leaderboard_and_rating"
-    t.index ["pvp_leaderboard_id", "snapshot_at"], name: "index_entries_on_leaderboard_and_snapshot"
     t.index ["pvp_leaderboard_id", "spec_id", "rating"], name: "index_entries_for_spec_meta"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
-    t.index ["snapshot_at"], name: "index_pvp_entries_on_snapshot_at"
     t.index ["tier_set_id"], name: "index_pvp_leaderboard_entries_on_tier_set_id"
   end
 

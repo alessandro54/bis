@@ -284,14 +284,7 @@ module Pvp
         def latest_entries_per_bracket
           return preloaded_entries unless preloaded_entries.nil?
 
-          PvpLeaderboardEntry
-            .joins(:pvp_leaderboard)
-            .where(character_id: character.id)
-            .select("DISTINCT ON (pvp_leaderboards.bracket) pvp_leaderboard_entries.*")
-            .order(
-              "pvp_leaderboards.bracket, pvp_leaderboard_entries.snapshot_at DESC, " \
-              "pvp_leaderboard_entries.id DESC"
-            )
+          PvpLeaderboardEntry.where(character_id: character.id)
         end
 
         def log_service_failure(stage, character, error)

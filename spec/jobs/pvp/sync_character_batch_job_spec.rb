@@ -94,47 +94,27 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
           .with(hash_including(character: character2, locale: locale))
       end
 
-      it "propagates cached data to unprocessed entries for the cooldown character" do
+      it "retains existing equipment and spec data on the entry for the cooldown character" do
         leaderboard = create(:pvp_leaderboard)
 
-        # Old processed entry with equipment/spec data
-        create(:pvp_leaderboard_entry,
+        entry = create(:pvp_leaderboard_entry,
           character:                   character1,
           pvp_leaderboard:             leaderboard,
           item_level:                  620,
           spec_id:                     265,
           hero_talent_tree_id:         3,
           hero_talent_tree_name:       "voidweaver",
-          tier_set_id:                 10,
-          tier_set_name:               "Nerub'ar",
-          tier_set_pieces:             4,
-          tier_4p_active:              true,
           equipment_processed_at:      2.days.ago,
-          specialization_processed_at: 2.days.ago,
-          snapshot_at:                 2.days.ago)
-
-        # New unprocessed entry (from current leaderboard sync)
-        new_entry = create(:pvp_leaderboard_entry,
-          character:                   character1,
-          pvp_leaderboard:             leaderboard,
-          equipment_processed_at:      nil,
-          specialization_processed_at: nil,
-          item_level:                  nil,
-          spec_id:                     nil,
-          hero_talent_tree_id:         nil,
-          hero_talent_tree_name:       nil,
-          snapshot_at:                 Time.current)
+          specialization_processed_at: 2.days.ago)
 
         perform_job
 
-        new_entry.reload
-        expect(new_entry.item_level).to eq(620)
-        expect(new_entry.spec_id).to eq(265)
-        expect(new_entry.hero_talent_tree_name).to eq("voidweaver")
-        expect(new_entry.tier_set_id).to eq(10)
-        expect(new_entry.tier_4p_active).to be(true)
-        expect(new_entry.equipment_processed_at).to be_present
-        expect(new_entry.specialization_processed_at).to be_present
+        # With upsert model, the single entry retains its processed data
+        # unchanged for skipped (cooldown) characters.
+        entry.reload
+        expect(entry.item_level).to eq(620)
+        expect(entry.spec_id).to eq(265)
+        expect(entry.hero_talent_tree_name).to eq("voidweaver")
       end
     end
 

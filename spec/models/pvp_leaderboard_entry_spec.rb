@@ -26,13 +26,11 @@
 #
 # Indexes
 #
+#  idx_entries_unique_char_leaderboard                     (character_id,pvp_leaderboard_id) UNIQUE
 #  index_entries_for_batch_processing                      (id,equipment_processed_at)
 #  index_entries_for_spec_meta                             (pvp_leaderboard_id,spec_id,rating)
 #  index_entries_on_leaderboard_and_rating                 (pvp_leaderboard_id,rating)
-#  index_entries_on_leaderboard_and_snapshot               (pvp_leaderboard_id,snapshot_at)
 #  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
-#  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
-#  index_pvp_entries_on_snapshot_at                        (snapshot_at)
 #  index_pvp_leaderboard_entries_on_character_id           (character_id)
 #  index_pvp_leaderboard_entries_on_hero_talent_tree_id    (hero_talent_tree_id)
 #  index_pvp_leaderboard_entries_on_pvp_leaderboard_id     (pvp_leaderboard_id)
@@ -97,80 +95,65 @@ RSpec.describe PvpLeaderboardEntry, type: :model do
   describe 'scopes' do
     describe '.latest_snapshot_for_bracket' do
       let!(:current_season) { create(:pvp_season, is_current: true) }
-      let!(:old_season) { create(:pvp_season, is_current: false) }
+      let!(:old_season)     { create(:pvp_season, is_current: false) }
       let!(:leaderboard_current) { create(:pvp_leaderboard, pvp_season: current_season, bracket: '2v2') }
-      let!(:leaderboard_old) { create(:pvp_leaderboard, pvp_season: old_season, bracket: '2v2') }
-      let!(:character) { create(:character) }
+      let!(:leaderboard_old)     { create(:pvp_leaderboard, pvp_season: old_season, bracket: '2v2') }
+      let!(:leaderboard_3v3)     { create(:pvp_leaderboard, pvp_season: current_season, bracket: '3v3') }
+      let!(:char_a) { create(:character) }
+      let!(:char_b) { create(:character) }
 
-      let!(:entry_current_snapshot) do
+      let!(:entry_current_processed) do
         create(:pvp_leaderboard_entry,
-          character:       character,
+          character:       char_a,
           pvp_leaderboard: leaderboard_current,
-          snapshot_at:     leaderboard_current.last_synced_at
-        )
+          spec_id:         65)
       end
 
-      let!(:entry_old_snapshot) do
+      let!(:entry_current_unprocessed) do
         create(:pvp_leaderboard_entry,
-          character:       character,
+          character:       char_b,
+          pvp_leaderboard: leaderboard_current,
+          spec_id:         nil)
+      end
+
+      let!(:entry_old_season) do
+        create(:pvp_leaderboard_entry,
+          character:       char_a,
           pvp_leaderboard: leaderboard_old,
-          snapshot_at:     leaderboard_old.last_synced_at
-        )
+          spec_id:         65)
       end
 
-      let!(:entry_non_snapshot) do
+      let!(:entry_other_bracket) do
         create(:pvp_leaderboard_entry,
-          character:       character,
-          pvp_leaderboard: leaderboard_current,
-          snapshot_at:     1.day.ago
-        )
+          character:       char_a,
+          pvp_leaderboard: leaderboard_3v3,
+          spec_id:         65)
       end
 
-      it 'returns entries for current season by default' do
+      it 'returns processed entries for current season by default' do
         results = described_class.latest_snapshot_for_bracket('2v2')
-        expect(results).to include(entry_current_snapshot)
-        expect(results).not_to include(entry_old_snapshot)
-        expect(results).not_to include(entry_non_snapshot)
+        expect(results).to include(entry_current_processed)
+        expect(results).not_to include(entry_current_unprocessed)
+        expect(results).not_to include(entry_old_season)
+        expect(results).not_to include(entry_other_bracket)
       end
 
       it 'returns entries for specified season' do
         results = described_class.latest_snapshot_for_bracket('2v2', season_id: old_season.id)
-        expect(results).to include(entry_old_snapshot)
-        expect(results).not_to include(entry_current_snapshot)
-        expect(results).not_to include(entry_non_snapshot)
+        expect(results).to include(entry_old_season)
+        expect(results).not_to include(entry_current_processed)
       end
 
-      context 'when latest snapshot has unprocessed entries' do
-        let!(:new_snapshot_time) { 1.hour.from_now }
-
-        before do
-          leaderboard_current.update!(last_synced_at: new_snapshot_time)
-        end
-
-        let!(:unprocessed_entry) do
-          create(:pvp_leaderboard_entry,
-            character:       character,
-            pvp_leaderboard: leaderboard_current,
-            snapshot_at:     new_snapshot_time,
-            spec_id:         nil
-          )
-        end
-
-        it 'falls back to the previous processed snapshot' do
-          results = described_class.latest_snapshot_for_bracket('2v2')
-          expect(results).to include(entry_current_snapshot)
-          expect(results).not_to include(unprocessed_entry)
-        end
+      it 'excludes unprocessed entries (spec_id nil)' do
+        results = described_class.latest_snapshot_for_bracket('2v2')
+        expect(results).not_to include(entry_current_unprocessed)
       end
 
       context 'when no entries have been processed' do
-        before do
-          PvpLeaderboardEntry.update_all(spec_id: nil) # rubocop:disable Rails/SkipsModelValidations
-        end
+        before { PvpLeaderboardEntry.update_all(spec_id: nil) } # rubocop:disable Rails/SkipsModelValidations
 
         it 'returns no results' do
-          results = described_class.latest_snapshot_for_bracket('2v2')
-          expect(results).to be_empty
+          expect(described_class.latest_snapshot_for_bracket('2v2')).to be_empty
         end
       end
     end
