@@ -53,9 +53,10 @@ group :development do
   # Auto-add schema annotations to models
   gem "annotaterb", "~> 4.20"
 
+  gem "rbs", require: false
+
   # Static type checking
   gem "steep", require: false
-  gem "rbs", require: false
 end
 
 group :development, :test do
