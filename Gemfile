@@ -26,9 +26,6 @@ gem "mission_control-jobs", "~> 1.1"
 # Fast, optimized JSON parser/serializer
 gem "oj", "~> 3.16"
 
-# Fast compression for JSON data (60% smaller, faster I/O)
-gem "zstd-ruby", "~> 1.5"
-
 # Explicit OpenSSL dependency (fix macOS SSL issues)
 gem "openssl"
 
