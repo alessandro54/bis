@@ -28,10 +28,11 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     create(
       :pvp_leaderboard_entry,
       character:          character,
-      pvp_leaderboard:    create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "2v2",
-region: character.region),
-      raw_equipment:      nil,
-      raw_specialization: nil
+      pvp_leaderboard:    create(
+                                  :pvp_leaderboard,
+                                  pvp_season: create(:pvp_season),
+                                  bracket: "2v2",
+                                  region: character.region),
     )
   end
 
@@ -41,10 +42,11 @@ region: character.region),
     create(
       :pvp_leaderboard_entry,
       character:          character,
-      pvp_leaderboard:    create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "3v3",
-region: character.region),
-      raw_equipment:      nil,
-      raw_specialization: nil
+      pvp_leaderboard:    create(
+                                  :pvp_leaderboard,
+                                  pvp_season: create(:pvp_season),
+                                  bracket: "3v3",
+                                  region: character.region),
     )
   end
 
@@ -55,8 +57,11 @@ region: character.region),
     create(
       :pvp_leaderboard_entry,
       character:                   character,
-      pvp_leaderboard:             create(:pvp_leaderboard, pvp_season: create(:pvp_season), bracket: "shuffle",
-region: character.region),
+      pvp_leaderboard:    create(
+                                  :pvp_leaderboard,
+                                  pvp_season: create(:pvp_season),
+                                  bracket: "shuffle",
+                                  region: character.region),
       snapshot_at:                 2.hours.ago,
       item_level:                  540,
       tier_set_id:                 999,

@@ -11,8 +11,6 @@
 #  losses                      :integer          default(0)
 #  rank                        :integer
 #  rating                      :integer
-#  raw_equipment               :binary
-#  raw_specialization          :binary
 #  snapshot_at                 :datetime
 #  specialization_processed_at :datetime
 #  tier_4p_active              :boolean          default(FALSE)

@@ -90,6 +90,13 @@ module Pvp
               }
             end
 
+            # Deduplicate by character_id — shuffle-overall leaderboards return the
+            # same character once per spec ranking.  Keep the best placement (lowest rank).
+            entry_records = entry_records
+              .group_by { |r| r[:character_id] }
+              .transform_values { |dupes| dupes.min_by { |r| r[:rank] } }
+              .values
+
             ActiveRecord::Base.transaction do
               # rubocop:disable Rails/SkipsModelValidations
               PvpLeaderboardEntry.insert_all!(entry_records)
@@ -136,7 +143,7 @@ module Pvp
           return if character_ids.empty?
 
           ranked = PvpLeaderboardEntry
-            .select("id, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY snapshot_at DESC) AS rn")
+            .select("id, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY snapshot_at DESC, id DESC) AS rn")
             .where(pvp_leaderboard_id: leaderboard_id, character_id: character_ids)
 
           keep_ids = PvpLeaderboardEntry

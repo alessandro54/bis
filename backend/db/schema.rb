@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_25_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -122,8 +122,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_25_000002) do
     t.bigint "pvp_leaderboard_id", null: false
     t.integer "rank"
     t.integer "rating"
-    t.binary "raw_equipment"
-    t.binary "raw_specialization"
     t.datetime "snapshot_at"
     t.integer "spec_id"
     t.datetime "specialization_processed_at"

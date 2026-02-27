@@ -10,8 +10,6 @@
 #  losses                      :integer          default(0)
 #  rank                        :integer
 #  rating                      :integer
-#  raw_equipment               :binary
-#  raw_specialization          :binary
 #  snapshot_at                 :datetime
 #  specialization_processed_at :datetime
 #  tier_4p_active              :boolean          default(FALSE)
@@ -47,10 +45,6 @@
 #  fk_rails_...  (pvp_leaderboard_id => pvp_leaderboards.id)
 #
 class PvpLeaderboardEntry < ApplicationRecord
-  include CompressedJson
-
-  compressed_json :raw_equipment, :raw_specialization
-
   belongs_to :pvp_leaderboard
   belongs_to :character
 
@@ -79,10 +73,6 @@ class PvpLeaderboardEntry < ApplicationRecord
       .where(pvp_seasons: { id: season_filter })
       .where("pvp_leaderboard_entries.snapshot_at = (#{latest_processed.to_sql})")
   }
-
-  self.filter_attributes += %i[
-    raw_equipment raw_specialization
-  ]
 
   def winrate
     total_games = wins.to_i + losses.to_i

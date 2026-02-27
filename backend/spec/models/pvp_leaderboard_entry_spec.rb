@@ -10,8 +10,6 @@
 #  losses                      :integer          default(0)
 #  rank                        :integer
 #  rating                      :integer
-#  raw_equipment               :binary
-#  raw_specialization          :binary
 #  snapshot_at                 :datetime
 #  specialization_processed_at :datetime
 #  tier_4p_active              :boolean          default(FALSE)
@@ -52,18 +50,6 @@ RSpec.describe PvpLeaderboardEntry, type: :model do
   describe 'associations' do
     it { should belong_to(:pvp_leaderboard) }
     it { should belong_to(:character) }
-  end
-
-  describe 'included modules' do
-    it 'includes CompressedJson module' do
-      expect(described_class.included_modules).to include(CompressedJson)
-    end
-  end
-
-  describe 'filter_attributes' do
-    it 'filters sensitive attributes' do
-      expect(described_class.filter_attributes).to include(:raw_equipment, :raw_specialization)
-    end
   end
 
   describe '#winrate' do
@@ -187,37 +173,6 @@ RSpec.describe PvpLeaderboardEntry, type: :model do
           expect(results).to be_empty
         end
       end
-    end
-  end
-
-  describe 'JSONB handling' do
-    let(:entry) { create(:pvp_leaderboard_entry) }
-
-    it 'stores and retrieves raw_equipment correctly' do
-      equipment_data = {
-        'head' => { 'item_id' => 12_345, 'name' => 'Helm of Valor' },
-        'chest' => { 'item_id' => 67_890, 'name' => 'Breastplate of Might' }
-      }
-
-      entry.update!(raw_equipment: equipment_data)
-      entry.reload
-
-      expect(entry.raw_equipment).to eq(equipment_data)
-      expect(entry.raw_equipment['head']['item_id']).to eq(12_345)
-    end
-
-    it 'stores and retrieves raw_specialization correctly' do
-      spec_data = {
-        'talents' => [ 'fireball', 'frostbolt' ],
-        'specialization_name' => 'Frost',
-        'class' => 'Mage'
-      }
-
-      entry.update!(raw_specialization: spec_data)
-      entry.reload
-
-      expect(entry.raw_specialization).to eq(spec_data)
-      expect(entry.raw_specialization['specialization_name']).to eq('Frost')
     end
   end
 

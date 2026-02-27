@@ -41,7 +41,7 @@
 # character attributes and associated records. Keeps factories data-driven and
 # avoids duplicating fixture data in both JSON files and hardcoded Ruby hashes.
 module FixtureParser
-  EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
+  EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze unless defined?(EXCLUDED_SLOTS)
 
   # Sets character attributes from profile/<char_name>.json onto an unsaved record.
   def self.apply_profile(character, char_name)

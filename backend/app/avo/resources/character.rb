@@ -12,7 +12,7 @@ class Avo::Resources::Character < Avo::BaseResource
       if view.index?
         nil
       else
-        record.avatar_url || DEFAULT_IMAGE
+        record.avatar_url || nil
       end
     }
   }
@@ -23,7 +23,7 @@ class Avo::Resources::Character < Avo::BaseResource
       if view.index?
         nil
       else
-        record.inset_url || DEFAULT_IMAGE
+        record.inset_url || nil
       end
     }
   }

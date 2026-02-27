@@ -108,8 +108,10 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
           character.update_columns(equipment_fingerprint: "head:#{blizzard_item_id}:540:#{enchantment_blizzard_id}:HASTE_RATING+MASTERY_RATING")
         end
 
-        it "does not call UpsertFromRawEquipmentService" do
-          expect(Blizzard::Data::Items::UpsertFromRawEquipmentService).not_to receive(:new)
+        it "does not invoke UpsertFromRawEquipmentService#call" do
+          instance = instance_double(Blizzard::Data::Items::UpsertFromRawEquipmentService, item_level: nil, tier_set: nil)
+          allow(Blizzard::Data::Items::UpsertFromRawEquipmentService).to receive(:new).and_return(instance)
+          expect(instance).not_to receive(:call)
           result
         end
 

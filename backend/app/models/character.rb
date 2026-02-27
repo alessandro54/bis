@@ -77,17 +77,14 @@ class Character < ApplicationRecord
   end
 
   def spec
-    entry = pvp_leaderboard_entries
+    spec_id = pvp_leaderboard_entries
       .where.not(spec_id: nil)
       .order(snapshot_at: :desc)
       .pick(:spec_id)
 
-    return nil unless entry
+    return nil unless spec_id
 
-    data = Wow::Catalog::SPECS[entry]
-    return nil unless data
-
-    "#{data[:spec_slug]} #{data[:class_slug].tr('_', ' ')}"
+    "#{Wow::Specs.slug_for(spec_id)} #{class_slug}".titleize
   end
 
   def meta_synced?

@@ -15,18 +15,24 @@ module Pvp
           return failure("Missing equipped_items in raw_equipment")
         end
 
+        # Instantiated before the fingerprint check so item_level is available
+        # even on the early-return path (fingerprint match = gear unchanged).
+        equipment_service = Blizzard::Data::Items::UpsertFromRawEquipmentService.new(
+          raw_equipment: raw_equipment,
+          locale:        locale
+        )
+
         # Compute fingerprint from raw Blizzard IDs + item level + enchantment —
         # no DB round-trip required. Skip all DB writes when gear is unchanged.
         new_fingerprint = raw_fingerprint
 
         if character.equipment_fingerprint == new_fingerprint
-          return success(nil, context: { entry_attrs: { equipment_processed_at: Time.zone.now } })
+          entry_attrs = { equipment_processed_at: Time.zone.now }
+          entry_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
+          entry_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
+          return success(nil, context: { entry_attrs: entry_attrs })
         end
 
-        equipment_service = Blizzard::Data::Items::UpsertFromRawEquipmentService.new(
-          raw_equipment: raw_equipment,
-          locale:        locale
-        )
         processed = equipment_service.call
 
         equipped_items = processed.dig("equipped_items")
