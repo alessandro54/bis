@@ -23,10 +23,8 @@ jobs:
         with:
           ruby-version: '3.2'
           bundler-cache: true
-          working-directory: backend
 
       - name: Run RuboCop
-        working-directory: backend
         run: |
           bundle exec rubocop --format progress --color
 
@@ -57,7 +55,6 @@ jobs:
         with:
           ruby-version: '3.2'
           bundler-cache: true
-          working-directory: backend
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -91,7 +88,6 @@ jobs:
         run: pnpm build
 
       - name: Setup database
-        working-directory: backend
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/wow_bis_test
         run: |
@@ -100,7 +96,6 @@ jobs:
           bundle exec rails db:test:prepare
 
       - name: Run RSpec tests
-        working-directory: backend
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/wow_bis_test
         run: |
@@ -109,7 +104,7 @@ jobs:
       - name: Upload coverage reports
         uses: codecov/codecov-action@v3
         with:
-          directory: backend/coverage
+          directory: ./coverage
           flags: backend
           name: backend-coverage
         if: always()
