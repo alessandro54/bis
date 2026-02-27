@@ -1,0 +1,20 @@
+class BatchOutcome
+  class TotalBatchFailureError < StandardError
+  end
+
+  FAILURE_STATUSES: Array[Symbol]
+
+  attr_reader successes: Array[Hash[Symbol, untyped]]
+  attr_reader failures: Array[Hash[Symbol, untyped]]
+
+  def initialize: () -> void
+
+  def record_success: (id: untyped, status: Symbol) -> void
+  def record_failure: (id: untyped, status: Symbol, error: untyped) -> void
+
+  def total: () -> Integer
+  def total_failure?: () -> bool
+  def counts_by_status: () -> Hash[Symbol, Integer]
+  def summary_message: (job_label: String) -> String
+  def raise_if_total_failure!: (job_label: String) -> void
+end

@@ -1,0 +1,10 @@
+class BaseService
+  def self.call: (*untyped, **untyped) -> untyped
+  def initialize: (*untyped, **untyped) -> void
+  def call: (*untyped, **untyped) -> untyped
+
+  private
+
+  def success: (?untyped, ?message: String?, ?context: Hash[Symbol, untyped]) -> ServiceResult
+  def failure: (untyped, ?message: String?, ?payload: untyped, ?context: Hash[Symbol, untyped]) -> ServiceResult
+end

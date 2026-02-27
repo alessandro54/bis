@@ -1,0 +1,82 @@
+# Minimal stubs for Rails, async gem, and third-party types
+# that Steep cannot resolve without full gem RBS definitions.
+
+# ActiveRecord
+module ActiveRecord
+  class Base
+    def self.cache: () { () -> untyped } -> untyped
+    def self.connection_pool: () -> ConnectionPool
+  end
+
+  class ConnectionPool
+    def size: () -> Integer
+  end
+
+  class Deadlocked < StandardError
+  end
+
+  class RecordNotFound < StandardError
+  end
+end
+
+# ActiveJob
+module ActiveJob
+  class Base
+    def self.retry_on: (untyped, *untyped, **untyped) -> void
+    def self.discard_on: (untyped, *untyped) -> void
+    def self.around_perform: (Symbol) -> void
+  end
+
+  class DeserializationError < StandardError
+  end
+end
+
+# ActiveSupport
+module ActiveSupport
+  class TimeWithZone
+    def -: (::Time | TimeWithZone) -> Float
+  end
+end
+
+# Time.current (ActiveSupport extension) — returns untyped to avoid
+# overload-resolution issues with Time#- across rescue branches.
+class Time
+  def self.current: () -> untyped
+end
+
+# Async gem
+module Async
+  class Semaphore
+    def initialize: (Integer) -> void
+  end
+
+  class Barrier
+    def initialize: (?parent: Semaphore) -> void
+    def async: () { () -> untyped } -> untyped
+    def wait: () -> void
+    def stop: () -> void
+  end
+end
+
+module Kernel
+  private
+
+  def Async: () { () -> untyped } -> untyped
+end
+
+# HTTPX (used in Blizzard::Client sig)
+module HTTPX
+  class Session
+  end
+end
+
+# Net::HTTP (used in Blizzard::Auth sig)
+module Net
+  class HTTPResponse
+  end
+end
+
+# App-internal class used in ApplicationJob
+class JobPerformanceMonitor
+  def self.track_job_performance: (untyped, Float, ?success: bool, ?error: untyped) -> void
+end
