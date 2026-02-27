@@ -50,8 +50,10 @@ class Character::LoadoutPrinter
 
       if ci.enchantment
         enc_name = ci.enchantment.t("name", locale: "en_US") || "?"
-        source   = ci.enchantment_source_item ? " #{dim}(#{ci.enchantment_source_item.t('name',
-locale: 'en_US')})#{reset}" : ""
+        source = ""
+        if ci.enchantment_source_item
+          source = " #{dim}(#{ci.enchantment_source_item.t('name', locale: 'en_US')})#{reset}"
+        end
         children << "#{teal}✦ #{enc_name}#{reset}#{source}"
       end
 

@@ -4,15 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Structure
 
-This is a monorepo with two independent apps:
-- `backend/` — Rails 8.1 API (Ruby 3.2)
-- `frontend/` — Next.js 16 app (TypeScript, pnpm)
+This is a standalone Rails API. The frontend lives in a separate repository.
+
+All commands are run from the repo root.
 
 ## Commands
 
-All backend commands must be run from the `backend/` directory; frontend from `frontend/`.
-
-### Backend (Rails)
+### Rails
 
 ```bash
 # Development
@@ -32,20 +30,11 @@ bundle exec rails db:create db:migrate
 bundle exec rails db:schema:load  # faster for fresh setup
 ```
 
-### Frontend (Next.js / pnpm)
-
-```bash
-pnpm install
-pnpm dev       # runs on port 5123
-pnpm build
-pnpm lint
-```
-
 ## Architecture
 
 ### What it does
 
-WoW BIS tracks World of Warcraft PvP leaderboard data (US/EU, multi-region). It ingests character equipment and talent data from the Blizzard API, runs aggregations to compute PvP meta statistics (item popularity, talent builds, hero talents), and exposes the results through a Rails JSON API consumed by the Next.js frontend.
+WoW BIS tracks World of Warcraft PvP leaderboard data (US/EU, multi-region). It ingests character equipment and talent data from the Blizzard API, runs aggregations to compute PvP meta statistics (item popularity, talent builds, hero talents), and exposes the results through a Rails JSON API.
 
 ### Backend
 
@@ -73,15 +62,6 @@ WoW BIS tracks World of Warcraft PvP leaderboard data (US/EU, multi-region). It 
 **Job monitoring**: `JobPerformanceMonitor` records duration and success/failure for every job. Mission Control UI is mounted at `/jobs`.
 
 **Domain data** (`app/lib/`): WoW game constants (classes, specs, roles, bracket configs) live under `app/lib/wow/` and `app/lib/pvp/`.
-
-### Frontend
-
-Next.js App Router with routes:
-- `/dashboard` — main dashboard
-- `/[classSlug]/[specSlug]/pvp/[bracket]/` — per-spec PvP stats
-- `/meta/pvp/[bracket]/[role]/` — meta breakdown by bracket and role
-
-UI uses Radix UI primitives, Tailwind CSS v4, and `next-themes` for dark mode. WoW class/spec configuration lives in `src/config/wow/`.
 
 ### API
 

@@ -1,5 +1,14 @@
 module Blizzard
   class Client
+    class Error < StandardError
+    end
+
+    class NotFoundError < Error
+    end
+
+    class RateLimitedError < Error
+    end
+
 
     VALID_LOCALES: Hash[String, Array[String]]
     VALID_REGIONS: Array[String]

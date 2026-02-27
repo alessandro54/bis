@@ -3,9 +3,13 @@ module Blizzard
     class BaseRequest
       @client: Client
 
-      attr_reader client: Client
-
       def initialize: (?region: String, ?locale: String) -> void
+
+      def self.client: (region: String, ?locale: String) -> Client
+
+      def self.to_slug: (String str) -> string
+
+      attr_reader client: Client
     end
   end
 end
