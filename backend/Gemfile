@@ -54,7 +54,7 @@ gem "tzinfo-data", platforms: %i[windows jruby]
 
 group :development do
   # Auto-add schema annotations to models
-  gem "annotaterb", "~> 4.20"
+  gem "annotaterb", "~> 4.22"
 end
 
 group :development, :test do
