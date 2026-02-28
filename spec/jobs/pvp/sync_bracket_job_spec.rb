@@ -1,6 +1,6 @@
 require "rails_helper"
 
-RSpec.describe Pvp::SyncLeaderboardJob, type: :job do
+RSpec.describe Pvp::SyncBracketJob, type: :job do
   include ActiveJob::TestHelper
 
   subject(:perform_job) do

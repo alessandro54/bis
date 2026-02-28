@@ -2,21 +2,6 @@ module Pvp
   class SyncCurrentSeasonLeaderboardsJob < ApplicationJob
     queue_as :default
 
-    REGIONS = %w[us eu].freeze
-
-    REGION_LOCALES = {
-      "us" => "en_US",
-      "eu" => "en_GB"
-    }.freeze
-
-    # Each region gets its own SolidQueue worker so US and EU API calls never
-    # compete for the same worker — and a rate-limit hit on one region doesn't
-    # stall the other.
-    REGION_QUEUES = {
-      "us" => :character_sync_us,
-      "eu" => :character_sync_eu
-    }.freeze
-
     # Max simultaneous Blizzard HTTP calls during leaderboard discovery + sync.
     # Raise via PVP_LEADERBOARD_CONCURRENCY env var if rate limits allow.
     MAX_LEADERBOARD_CONCURRENCY = ENV.fetch("PVP_LEADERBOARD_CONCURRENCY", 10).to_i
@@ -27,9 +12,10 @@ module Pvp
       return unless season
 
       snapshot_at = Time.current
-      sync_cycle = PvpSyncCycle.create!(
+      sync_cycle  = nil
+      sync_cycle  = PvpSyncCycle.create!(
         pvp_season:  season,
-        regions:     REGIONS,
+        regions:     Pvp::RegionConfig::REGIONS,
         snapshot_at: snapshot_at,
         status:      :syncing_leaderboards
       )
@@ -37,7 +23,7 @@ module Pvp
       Pvp::SyncLogger.start_cycle(
         cycle_id:    sync_cycle.id,
         season_name: season.display_name,
-        regions:     REGIONS
+        regions:     Pvp::RegionConfig::REGIONS
       )
 
       # Phase 1: Discover brackets for all regions concurrently (parallel HTTP).
@@ -46,52 +32,13 @@ module Pvp
       # Phase 2: Sync all brackets across all regions concurrently (parallel HTTP).
       # A character that appears in 2v2 AND shuffle is the same record —
       # dedup within the region so it is only fetched from Blizzard once.
-      character_ids_by_region = sync_all_leaderboards_concurrently(
-        season, brackets_by_region, snapshot_at
-      )
+      character_ids_by_region = sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at)
+      Pvp::RegionConfig::REGIONS.each { |r| character_ids_by_region[r]&.uniq! }
 
-      REGIONS.each { |r| character_ids_by_region[r]&.uniq! }
+      # Phase 3: Filter recently synced, build batches, enqueue per-region.
+      region_batch_map, total_batches = build_region_batch_map(character_ids_by_region)
 
-      # Phase 3: Filter recently synced per region, then enqueue each region's
-      # batches to its dedicated queue so US and EU process in parallel.
-      batch_size       = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
-      total_batches    = 0
-      region_batch_map = {}
-
-      character_ids_by_region.each do |region, char_ids|
-        next if char_ids.empty?
-
-        recently_synced = PvpLeaderboardEntry
-          .where(character_id: char_ids)
-          .where("equipment_processed_at > ?", 1.hour.ago)
-          .distinct.pluck(:character_id).to_set
-
-        to_sync = char_ids.reject { |id| recently_synced.include?(id) }
-
-        Rails.logger.info(
-          "[SyncCurrentSeasonLeaderboardsJob] #{region}: " \
-          "#{char_ids.size} total, #{to_sync.size} need API fetch " \
-          "(#{char_ids.size - to_sync.size} recently synced — entries will reuse cache)"
-        )
-        Pvp::SyncLogger.leaderboards_synced(
-          region:  region,
-          total:   char_ids.size,
-          to_sync: to_sync.size,
-          skipped: char_ids.size - to_sync.size
-        )
-
-        # Pass ALL character IDs to the batch job — not just `to_sync`.
-        # Characters filtered out here still have new entries (created by
-        # SyncLeaderboardService) that need equipment/spec data. The batch
-        # job handles TTL/cooldown filtering + cached-data propagation.
-        region_batch_map[region] = char_ids.each_slice(batch_size).to_a
-        total_batches += region_batch_map[region].size
-      end
-
-      sync_cycle.update!(
-        status:                     :syncing_characters,
-        expected_character_batches: total_batches
-      )
+      sync_cycle.update!(status: :syncing_characters, expected_character_batches: total_batches)
 
       if total_batches.zero?
         sync_cycle.update!(status: :completed)
@@ -99,22 +46,9 @@ module Pvp
         return
       end
 
-      region_batch_map.each do |region, batches|
-        queue         = REGION_QUEUES.fetch(region, :character_sync_us)
-        region_locale = REGION_LOCALES.fetch(region, locale)
-
-        batches.each do |batch|
-          Pvp::SyncCharacterBatchJob
-            .set(queue: queue)
-            .perform_later(
-              character_ids: batch,
-              locale:        region_locale,
-              sync_cycle_id: sync_cycle.id
-            )
-        end
-      end
-    rescue => e
-      sync_cycle&.update!(status: :failed) if sync_cycle&.persisted?
+      enqueue_character_batches(region_batch_map, sync_cycle, locale)
+    rescue StandardError
+      sync_cycle&.update!(status: :failed)
       raise
     end
     # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
@@ -126,8 +60,8 @@ module Pvp
       # loop and does not yield to the Async scheduler — threads release the GIL
       # during network I/O so both region requests truly run in parallel.
       def discover_all_brackets_concurrently(season, locale)
-        results = run_with_threads(REGIONS, concurrency: REGIONS.size) do |region|
-          region_locale = REGION_LOCALES.fetch(region, locale)
+        results = run_with_threads(Pvp::RegionConfig::REGIONS, concurrency: Pvp::RegionConfig::REGIONS.size) do |region|
+          region_locale = Pvp::RegionConfig::REGION_LOCALES.fetch(region, locale)
           brackets      = discover_brackets(season, region, region_locale)
           { region: region, brackets: brackets, locale: region_locale }
         end
@@ -140,18 +74,17 @@ module Pvp
       # Uses threads for the same reason as discover_all_brackets_concurrently.
       # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
       def sync_all_leaderboards_concurrently(season, brackets_by_region, snapshot_at)
-        tasks = REGIONS.flat_map do |region|
-          info          = brackets_by_region.fetch(region, { brackets: [], locale: REGION_LOCALES[region] })
-          region_locale = info[:locale] || REGION_LOCALES[region]
+        tasks = Pvp::RegionConfig::REGIONS.flat_map do |region|
+          default       = { brackets: [], locale: Pvp::RegionConfig::REGION_LOCALES[region] }
+          info          = brackets_by_region.fetch(region, default)
+          region_locale = info[:locale] || Pvp::RegionConfig::REGION_LOCALES[region]
           Array(info[:brackets]).map { |b| { region: region, bracket: b, locale: region_locale } }
         end
 
         character_ids_by_region = Hash.new { |h, k| h[k] = [] }
         return character_ids_by_region if tasks.empty?
 
-        concurrency = [ tasks.size, MAX_LEADERBOARD_CONCURRENCY ].min
-
-        results = run_with_threads(tasks, concurrency: concurrency) do |task|
+        results = run_with_threads(tasks, concurrency: [ tasks.size, MAX_LEADERBOARD_CONCURRENCY ].min) do |task|
           result = Pvp::Leaderboards::SyncLeaderboardService.call(
             season:      season,
             bracket:     task[:bracket],
@@ -160,18 +93,14 @@ module Pvp
             snapshot_at: snapshot_at
           )
           { region: task[:region], ids: result.context[:character_ids] } if result.success?
-        rescue => e
+        rescue StandardError => e
           Rails.logger.error(
             "[SyncCurrentSeasonLeaderboardsJob] #{task[:region]}/#{task[:bracket]} failed: #{e.message}"
           )
           nil
         end
 
-        results.each do |r|
-          next unless r
-
-          character_ids_by_region[r[:region]].concat(r[:ids] || [])
-        end
+        results.each { |r| character_ids_by_region[r[:region]].concat(r[:ids] || []) if r }
 
         character_ids_by_region
       end
@@ -183,7 +112,6 @@ module Pvp
           region:        region,
           locale:        locale
         )
-
         leaderboards  = response.fetch("leaderboards", [])
         bracket_names = leaderboards.map { |lb| lb.dig("name") }.compact
 
@@ -197,6 +125,65 @@ module Pvp
           "[SyncCurrentSeasonLeaderboardsJob] Failed to discover brackets for #{region}: #{e.message}"
         )
         []
+      end
+
+      # Filters out recently synced characters, logs per-region stats, and
+      # returns [region_batch_map, total_batches].
+      # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
+      def build_region_batch_map(character_ids_by_region)
+        batch_size       = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+        region_batch_map = {}
+        total_batches    = 0
+
+        character_ids_by_region.each do |region, char_ids|
+          next if char_ids.empty?
+
+          recently_synced = PvpLeaderboardEntry
+            .where(character_id: char_ids)
+            .where("equipment_processed_at > ?", Pvp::SyncConfig::EQUIPMENT_TTL.ago)
+            .distinct.pluck(:character_id).to_set
+
+          to_sync = char_ids.reject { |id| recently_synced.include?(id) }
+
+          Rails.logger.info(
+            "[SyncCurrentSeasonLeaderboardsJob] #{region}: " \
+            "#{char_ids.size} total, #{to_sync.size} need API fetch " \
+            "(#{char_ids.size - to_sync.size} recently synced — entries will reuse cache)"
+          )
+          Pvp::SyncLogger.leaderboards_synced(
+            region:  region,
+            total:   char_ids.size,
+            to_sync: to_sync.size,
+            skipped: char_ids.size - to_sync.size
+          )
+
+          # Pass ALL character IDs to the batch job — not just `to_sync`.
+          # Characters filtered out here still have new entries (created by
+          # SyncLeaderboardService) that need equipment/spec data. The batch
+          # job handles TTL/cooldown filtering + cached-data propagation.
+          region_batch_map[region] = char_ids.each_slice(batch_size).to_a
+          total_batches += region_batch_map[region].size
+        end
+
+        [ region_batch_map, total_batches ]
+      end
+      # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
+
+      def enqueue_character_batches(region_batch_map, sync_cycle, locale)
+        region_batch_map.each do |region, batches|
+          queue         = Pvp::RegionConfig::REGION_QUEUES.fetch(region, :character_sync_us)
+          region_locale = Pvp::RegionConfig::REGION_LOCALES.fetch(region, locale)
+
+          batches.each do |batch|
+            Pvp::SyncCharacterBatchJob
+              .set(queue: queue)
+              .perform_later(
+                character_ids: batch,
+                locale:        region_locale,
+                sync_cycle_id: sync_cycle.id
+              )
+          end
+        end
       end
   end
 end

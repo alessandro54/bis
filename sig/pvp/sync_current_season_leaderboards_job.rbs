@@ -1,0 +1,22 @@
+module Pvp
+  class SyncCurrentSeasonLeaderboardsJob < ApplicationJob
+    MAX_LEADERBOARD_CONCURRENCY: Integer
+
+    def perform: (?locale: String) -> void
+
+    private
+
+      # Returns Hash[region => { region:, brackets:, locale: }]
+      def discover_all_brackets_concurrently: (PvpSeason season, String locale) -> Hash[String, untyped]
+
+      # Returns Hash[region => Array[character_id]]
+      def sync_all_leaderboards_concurrently: (PvpSeason season, Hash[String, untyped] brackets_by_region, untyped snapshot_at) -> Hash[String, Array[Integer]]
+
+      def discover_brackets: (PvpSeason season, String region, String locale) -> Array[String]
+
+      # Returns [region_batch_map, total_batches]
+      def build_region_batch_map: (Hash[String, Array[Integer]] character_ids_by_region) -> [ Hash[String, Array[Array[Integer]]], Integer ]
+
+      def enqueue_character_batches: (Hash[String, Array[Array[Integer]]] region_batch_map, untyped sync_cycle, String locale) -> void
+  end
+end

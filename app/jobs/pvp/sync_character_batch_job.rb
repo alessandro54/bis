@@ -10,7 +10,7 @@ module Pvp
     # safe_concurrency divides the pool correctly.
     THREADS     = ENV.fetch("PVP_SYNC_THREADS", 8).to_i
 
-    retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|
+    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
     end
 
@@ -146,7 +146,7 @@ module Pvp
         stale_ids = Character
           .where(id: character_ids)
           .where(is_private: false)
-          .where("meta_synced_at IS NULL OR meta_synced_at < ?", 1.week.ago)
+          .where("meta_synced_at IS NULL OR meta_synced_at < ?", Pvp::SyncConfig::META_TTL.ago)
           .pluck(:id)
 
         return if stale_ids.empty?

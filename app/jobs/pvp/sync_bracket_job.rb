@@ -1,16 +1,16 @@
 module Pvp
-  class SyncLeaderboardJob < ApplicationJob
+  class SyncBracketJob < ApplicationJob
     queue_as :default
 
-    # RateLimitedError inherits from Error but needs to be listed first
+    # RateLimitedError inherits from Error but needs to be listed first,
     # so ActiveJob matches the more specific class.
     # The client already sleeps for Retry-After before raising, so a short wait suffices.
     retry_on Blizzard::Client::RateLimitedError, wait: 5, attempts: 5 do |_job, error|
-      Rails.logger.warn("[SyncLeaderboardJob] Rate limited, will retry: #{error.message}")
+      Rails.logger.warn("[SyncBracketJob] Rate limited, will retry: #{error.message}")
     end
 
     retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |_job, error|
-      Rails.logger.warn("[SyncLeaderboardJob] API error, will retry: #{error.message}")
+      Rails.logger.warn("[SyncBracketJob] API error, will retry: #{error.message}")
     end
 
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
@@ -26,7 +26,7 @@ module Pvp
       )
 
       unless result.success?
-        Rails.logger.error("[SyncLeaderboardJob] #{region}/#{bracket} failed: #{result.error}")
+        Rails.logger.error("[SyncBracketJob] #{region}/#{bracket} failed: #{result.error}")
         return
       end
 
@@ -36,7 +36,7 @@ module Pvp
       # Filter out recently synced characters
       recently_synced_ids = PvpLeaderboardEntry
         .where(character_id: character_ids)
-        .where("equipment_processed_at > ?", 1.hour.ago)
+        .where("equipment_processed_at > ?", Pvp::SyncConfig::EQUIPMENT_TTL.ago)
         .distinct
         .pluck(:character_id)
         .to_set

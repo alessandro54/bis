@@ -6,7 +6,7 @@ module Characters
       characters = Character
         .where(id: character_ids)
         .where(is_private: false)
-        .where("meta_synced_at IS NULL OR meta_synced_at < ?", 1.week.ago)
+        .where("meta_synced_at IS NULL OR meta_synced_at < ?", Pvp::SyncConfig::META_TTL.ago)
 
       characters.each do |character|
         Characters::SyncCharacterJob.perform_later(

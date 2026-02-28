@@ -1,0 +1,6 @@
+module Pvp
+  module SyncConfig
+    EQUIPMENT_TTL: ActiveSupport::Duration
+    META_TTL: ActiveSupport::Duration
+  end
+end
