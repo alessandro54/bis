@@ -4,65 +4,138 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Structure
 
-This is a standalone Rails API. The frontend lives in a separate repository.
-
-All commands are run from the repo root.
+Standalone Rails API-only app (Rails 8.1, Ruby 4.0.1). Frontend lives in a separate repository. All commands run from the repo root.
 
 ## Commands
-
-### Rails
 
 ```bash
 # Development
 bundle exec rails server
 
 # Tests
-bundle exec rspec                                     # full suite
-bundle exec rspec spec/services/pvp/                  # specific directory
-bundle exec rspec spec/jobs/pvp/sync_character_batch_job_spec.rb  # single file
+bundle exec rspec                                                          # full suite
+bundle exec rspec spec/services/pvp/                                      # directory
+bundle exec rspec spec/jobs/pvp/sync_character_batch_job_spec.rb          # single file
 
-# Linting
+# Linting & type checking
 bundle exec rubocop
 bundle exec rubocop --autocorrect
+bundle exec steep check
 
 # Database
 bundle exec rails db:create db:migrate
-bundle exec rails db:schema:load  # faster for fresh setup
+bundle exec rails db:schema:load   # faster for fresh setup
 ```
 
 ## Architecture
 
 ### What it does
 
-WoW BIS tracks World of Warcraft PvP leaderboard data (US/EU, multi-region). It ingests character equipment and talent data from the Blizzard API, runs aggregations to compute PvP meta statistics (item popularity, talent builds, hero talents), and exposes the results through a Rails JSON API.
+WoW BIS tracks World of Warcraft PvP leaderboard data (US/EU). It ingests character equipment and talent data from the Blizzard API, runs aggregations to compute PvP meta statistics (item/enchant/gem popularity, talent builds, class distribution), and exposes results via a versioned JSON API at `/api/v1/`.
 
-### Backend
+### Sync Pipeline
 
-**Multi-phase sync pipeline** (all jobs under `app/jobs/pvp/`):
+Four-phase pipeline, all jobs under `app/jobs/pvp/`:
 
-1. `SyncCurrentSeasonLeaderboardsJob` — fetches all bracket leaderboards per region, collects character IDs
-2. `SyncCharacterBatchJob` — processes characters concurrently using async fibers, enqueues entry processing
-3. `ProcessLeaderboardEntryBatchJob` — runs `ProcessEquipmentService` and `ProcessSpecializationService` per entry
-4. `BuildAggregationsJob` — triggered atomically when all batches complete; runs `ItemAggregationService` and `TalentAggregationService` per bracket
+1. **`SyncCurrentSeasonLeaderboardsJob`** — orchestrator; creates a `PvpSyncCycle`, discovers brackets for US+EU concurrently, calls `SyncLeaderboardService` per bracket, then enqueues `SyncCharacterBatchJob` batches to region-isolated queues (`character_sync_us`, `character_sync_eu`).
+2. **`SyncCharacterBatchJob`** — processes a batch of characters concurrently via threads; calls `SyncCharacterService` per character; atomically increments `PvpSyncCycle#completed_character_batches` and triggers `BuildAggregationsJob` when all batches finish.
+3. **`BuildAggregationsJob`** — runs `ItemAggregationService`, `EnchantAggregationService`, `GemAggregationService`, and `ClassDistributionService` per bracket.
+4. **`SyncBracketJob`** — standalone single-bracket sync (no sync cycle), for ad-hoc/manual use.
 
-**Concurrency model** (`app/jobs/application_job.rb`): Jobs use `Async` gem (fiber-based, not threads). The `run_concurrently` helper wraps items in `Async::Semaphore`+`Async::Barrier`. `safe_concurrency` caps fiber count to `DB_POOL - 1` to prevent connection exhaustion. Concurrency is tunable via `PVP_SYNC_CONCURRENCY` (default: 5) and batch size via `PVP_SYNC_BATCH_SIZE` (default: 50).
+`Characters::SyncCharacterMetaBatchJob` runs separately to refresh character metadata (class, spec, media).
 
-**Service pattern** (`app/services/base_service.rb`): Services extend `BaseService`, are invoked via `.call(...)`, and return a `ServiceResult` with `#success?`, `#error`, `#payload`, and `#context`. Services live under `app/services/pvp/{characters,entries,leaderboards,meta}/` and `app/services/blizzard/`.
+### Concurrency Model
 
-**Data storage optimizations**:
-- Raw API responses (`raw_equipment`, `raw_specialization`) stored as bytea using `zstd-ruby` compression (~60% smaller)
-- OJ used for fast JSON serialization/deserialization
+Jobs use two concurrency mechanisms:
+- **Threads** (`run_with_threads`): used for Blizzard HTTP calls (leaderboard discovery, character sync batches). `safe_concurrency` caps to `THREADS - 1` to prevent DB pool exhaustion.
+- **Fibers** (`run_concurrently`, Async gem): available via `ApplicationJob` helpers but currently threads are preferred for HTTP work.
+
+Tunable via env vars: `PVP_SYNC_CONCURRENCY` (default 15), `PVP_SYNC_THREADS` (default 8), `PVP_SYNC_BATCH_SIZE` (default 50), `PVP_LEADERBOARD_CONCURRENCY` (default 10).
+
+### Service Pattern
+
+All services extend `BaseService`, are called via `.call(...)`, and return a `ServiceResult` with `#success?`, `#failure?`, `#error`, `#payload`, `#context`. Services live under:
+- `app/services/pvp/characters/` — character sync
+- `app/services/pvp/leaderboards/` — leaderboard sync
+- `app/services/pvp/entries/` — equipment/specialization processing
+- `app/services/pvp/meta/` — aggregation SQL + services
+- `app/services/blizzard/` — API client, auth, rate limiter
+
+### Blizzard API
+
+`Blizzard::Auth` manages OAuth tokens; `Blizzard::AuthPool` supports multiple client credentials for redundancy. `Blizzard::Client` wraps `httpx` for concurrent HTTP. Rate limiter enforces `PVP_BLIZZARD_RPS` (default 95.0 rps) and `PVP_BLIZZARD_HOURLY_QUOTA` (default 36,000).
+
+### Data Storage
+
+- Raw API responses (`raw_equipment`, `raw_specialization`) stored as `bytea` using `zstd-ruby` compression (~60% smaller)
+- `oj` gem used for all JSON (via `Oj.optimize_rails` + `Oj.mimic_JSON` in initializer)
 - Query cache enabled in all jobs via `around_perform :with_query_cache`
-- Atomic increments on `PvpSyncCycle` track batch completion without locking
+- `PvpSyncCycle` uses atomic DB increments to track batch completion without locking
 
-**Blizzard API** (`app/services/blizzard/`): `Blizzard::Auth` manages OAuth tokens; `Blizzard::Client` wraps `httpx` for concurrent HTTP. API request classes live under `app/services/blizzard/api/`.
+### Databases (all PostgreSQL)
 
-**Databases**: Multi-database Rails setup — primary app DB, plus separate SolidQueue, SolidCache, and SolidCable databases (all PostgreSQL).
+Multi-database Rails setup:
+- `primary` — app data
+- `queue` — SolidQueue backend
+- `cache` — SolidCache backend (256MB max)
+- `cable` — SolidCable backend
 
-**Job monitoring**: `JobPerformanceMonitor` records duration and success/failure for every job. Mission Control UI is mounted at `/jobs`.
+### Queue Configuration (`config/queue.yml`)
 
-**Domain data** (`app/lib/`): WoW game constants (classes, specs, roles, bracket configs) live under `app/lib/wow/` and `app/lib/pvp/`.
+Production workers are region-isolated:
+- `character_sync_us` / `character_sync_eu` — one dedicated worker per region (`PVP_SYNC_THREADS` threads each)
+- Bracket queues (`pvp_sync_2v2`, `pvp_sync_3v3`, `pvp_sync_shuffle`, `pvp_sync_rbg`) — shared worker
+- `pvp_processing` + catchall — shared worker
 
-### API
+Set `QUEUE_PROFILE=low_resource` for a single-worker low-thread profile.
 
-Rails API-only app, versioned at `/api/v1/`. Routes are defined in `config/routes.rb`.
+### Domain Constants (`app/lib/`)
+
+- `Pvp::SyncConfig` — `EQUIPMENT_TTL` (1 hour), `META_TTL` (1 week)
+- `Pvp::RegionConfig` — `REGIONS`, `REGION_QUEUES`, `REGION_LOCALES` for US/EU
+- `Pvp::BracketConfig` — per-bracket settings: `top_n`, `rating_min`, `job_queue`
+- `Wow::Catalog` — all 40 specs mapped to class/role; `Wow::Classes`, `Wow::Specs`, `Wow::Roles`
+
+### Key Environment Variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `BLIZZARD_CLIENT_ID` / `_SECRET` | — | Blizzard OAuth credentials (required) |
+| `BLIZZARD_CLIENT_ID_2` / `_SECRET_2` | — | Secondary Blizzard credentials (auth pool) |
+| `DB_POOL` | 130 | PostgreSQL connection pool size |
+| `DB_HOST` / `DB_PORT` | localhost/5432 | PostgreSQL host/port |
+| `WOW_BIS_DATABASE_PASSWORD` | — | Production DB password |
+| `PVP_SYNC_BATCH_SIZE` | 50 | Characters per batch job |
+| `PVP_SYNC_CONCURRENCY` | 15 | Fiber/thread concurrency in batch job |
+| `PVP_SYNC_THREADS` | 8 | SolidQueue threads for character_sync workers |
+| `PVP_LEADERBOARD_CONCURRENCY` | 10 | Concurrent leaderboard HTTP fetches |
+| `PVP_BLIZZARD_RPS` | 95.0 | Blizzard API requests per second |
+
+### Admin & Monitoring
+
+- Mission Control job UI: `/jobs`
+- Avo admin panel: `/avo`
+- `JobPerformanceMonitor` records duration and success/failure for every job
+
+### API Routes
+
+```
+GET /up                                      # health check
+GET /api/v1/characters
+GET /api/v1/pvp/meta/items
+GET /api/v1/pvp/meta/enchants
+GET /api/v1/pvp/meta/gems
+GET /api/v1/pvp/meta/specs
+GET /api/v1/pvp/meta/specs/:id
+GET /api/v1/pvp/meta/class_distribution
+```
+
+### Testing
+
+RSpec + FactoryBot + DatabaseCleaner (truncation between suite runs, transaction per test). Fixtures for Blizzard API responses live in `spec/fixtures/`. SimpleCov tracks coverage.
+
+```bash
+bundle exec rspec spec/jobs/
+bundle exec rspec spec/services/pvp/
+bundle exec rspec spec/requests/
+```
