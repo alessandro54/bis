@@ -19,7 +19,7 @@ module Pvp
           PvpMetaTalentPopularity.upsert_all(
             records,
             unique_by:   %i[pvp_season_id bracket spec_id talent_id],
-            update_only: %i[talent_type usage_count usage_pct snapshot_at]
+            update_only: %i[talent_type usage_count usage_pct in_top_build snapshot_at]
           )
           # rubocop:enable Rails/SkipsModelValidations
         end
@@ -60,6 +60,37 @@ module Pvp
           SQL
         end
 
+        # Builds the top-build CTEs: fingerprint each character's full talent loadout,
+        # find the single most common loadout per bracket/spec, and expose its talent ids.
+        def top_build_cte
+          <<~SQL
+            char_builds AS (
+              SELECT
+                t.bracket,
+                t.spec_id,
+                t.character_id,
+                array_agg(ct.talent_id ORDER BY ct.talent_id) AS build
+              FROM top_chars t
+              JOIN character_talents ct ON ct.character_id = t.character_id AND ct.rank > 0
+              GROUP BY t.bracket, t.spec_id, t.character_id
+            ),
+            build_counts AS (
+              SELECT bracket, spec_id, build, COUNT(*) AS cnt
+              FROM char_builds
+              GROUP BY bracket, spec_id, build
+            ),
+            best_build AS (
+              SELECT DISTINCT ON (bracket, spec_id) bracket, spec_id, build
+              FROM build_counts
+              ORDER BY bracket, spec_id, cnt DESC
+            ),
+            top_build_talents AS (
+              SELECT bracket, spec_id, unnest(build) AS talent_id
+              FROM best_build
+            )
+          SQL
+        end
+
         # rubocop:disable Metrics/MethodLength
         def execute_query
           sql = <<~SQL
@@ -68,22 +99,40 @@ module Pvp
               SELECT bracket, spec_id, COUNT(*) AS total
               FROM top_chars
               GROUP BY bracket, spec_id
-            )
+            ),
+            talent_usage AS (
+              SELECT
+                t.bracket,
+                t.spec_id,
+                ct.talent_id,
+                tal.talent_type,
+                COUNT(*)                                AS usage_count,
+                ROUND(COUNT(*) * 100.0 / st.total, 4)  AS usage_pct,
+                NOW()                                   AS snapshot_at
+              FROM top_chars t
+              JOIN character_talents ct ON ct.character_id = t.character_id
+              JOIN talents tal ON tal.id = ct.talent_id
+              JOIN spec_totals st
+                ON st.bracket = t.bracket AND st.spec_id = t.spec_id
+              GROUP BY t.bracket, t.spec_id, ct.talent_id, tal.talent_type, st.total
+            ),
+            #{top_build_cte}
             SELECT
-              t.bracket,
-              t.spec_id,
-              ct.talent_id,
-              tal.talent_type,
-              COUNT(*)                                AS usage_count,
-              ROUND(COUNT(*) * 100.0 / st.total, 2)  AS usage_pct,
-              NOW()                                   AS snapshot_at
-            FROM top_chars t
-            JOIN character_talents ct ON ct.character_id = t.character_id
-            JOIN talents tal ON tal.id = ct.talent_id
-            JOIN spec_totals st
-              ON st.bracket = t.bracket AND st.spec_id = t.spec_id
-            GROUP BY t.bracket, t.spec_id, ct.talent_id, tal.talent_type, st.total
-            ORDER BY t.bracket, t.spec_id, tal.talent_type, usage_count DESC
+              tu.bracket,
+              tu.spec_id,
+              tu.talent_id,
+              tu.talent_type,
+              tu.usage_count,
+              tu.usage_pct,
+              tu.snapshot_at,
+              EXISTS (
+                SELECT 1 FROM top_build_talents tbt
+                WHERE tbt.bracket = tu.bracket
+                  AND tbt.spec_id = tu.spec_id
+                  AND tbt.talent_id = tu.talent_id
+              ) AS in_top_build
+            FROM talent_usage tu
+            ORDER BY tu.bracket, tu.spec_id, tu.talent_type, tu.usage_count DESC
           SQL
 
           ApplicationRecord.connection.select_all(
@@ -103,6 +152,7 @@ module Pvp
               talent_type:   r["talent_type"],
               usage_count:   r["usage_count"],
               usage_pct:     r["usage_pct"],
+              in_top_build:  r["in_top_build"],
               snapshot_at:   r["snapshot_at"] || now,
               created_at:    now,
               updated_at:    now

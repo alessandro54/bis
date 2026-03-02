@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_02_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_02_200004) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -209,6 +209,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_02_000001) do
   create_table "pvp_meta_talent_popularity", force: :cascade do |t|
     t.string "bracket", null: false
     t.datetime "created_at", null: false
+    t.boolean "in_top_build", default: false, null: false
     t.bigint "pvp_season_id", null: false
     t.datetime "snapshot_at", null: false
     t.integer "spec_id", null: false
@@ -216,7 +217,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_02_000001) do
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
     t.integer "usage_count", default: 0, null: false
-    t.decimal "usage_pct", precision: 5, scale: 2
+    t.decimal "usage_pct", precision: 8, scale: 4
     t.index ["pvp_season_id", "bracket", "spec_id", "talent_id"], name: "idx_meta_talent_unique", unique: true
     t.index ["pvp_season_id", "bracket", "spec_id", "talent_type"], name: "idx_meta_talent_lookup"
     t.index ["pvp_season_id"], name: "index_pvp_meta_talent_popularity_on_pvp_season_id"
@@ -250,13 +251,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_02_000001) do
     t.index ["pvp_season_id"], name: "index_pvp_sync_cycles_on_pvp_season_id"
   end
 
+  create_table "talent_prerequisites", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "node_id", null: false
+    t.bigint "prerequisite_node_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["node_id", "prerequisite_node_id"], name: "idx_talent_prerequisites_unique", unique: true
+    t.index ["node_id"], name: "index_talent_prerequisites_on_node_id"
+  end
+
+  create_table "talent_spec_assignments", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "spec_id", null: false
+    t.bigint "talent_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["spec_id"], name: "index_talent_spec_assignments_on_spec_id"
+    t.index ["talent_id", "spec_id"], name: "index_talent_spec_assignments_on_talent_id_and_spec_id", unique: true
+  end
+
   create_table "talents", force: :cascade do |t|
     t.bigint "blizzard_id", null: false
     t.datetime "created_at", null: false
+    t.integer "display_col"
+    t.integer "display_row"
+    t.string "icon_url"
+    t.integer "max_rank", default: 1, null: false
+    t.bigint "node_id"
     t.integer "spell_id"
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
     t.index ["blizzard_id"], name: "index_talents_on_blizzard_id", unique: true
+    t.index ["node_id"], name: "index_talents_on_node_id"
     t.index ["talent_type", "blizzard_id"], name: "index_talents_on_talent_type_and_blizzard_id"
   end
 
@@ -293,4 +318,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_02_000001) do
   add_foreign_key "pvp_meta_talent_popularity", "pvp_seasons"
   add_foreign_key "pvp_meta_talent_popularity", "talents"
   add_foreign_key "pvp_sync_cycles", "pvp_seasons"
+  add_foreign_key "talent_spec_assignments", "talents"
 end
