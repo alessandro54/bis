@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_27_100000) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_02_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -206,6 +206,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_100000) do
     t.index ["pvp_season_id"], name: "index_pvp_meta_item_popularity_on_pvp_season_id"
   end
 
+  create_table "pvp_meta_talent_popularity", force: :cascade do |t|
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.bigint "pvp_season_id", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.bigint "talent_id", null: false
+    t.string "talent_type", null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 5, scale: 2
+    t.index ["pvp_season_id", "bracket", "spec_id", "talent_id"], name: "idx_meta_talent_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "talent_type"], name: "idx_meta_talent_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_talent_popularity_on_pvp_season_id"
+    t.index ["talent_id"], name: "index_pvp_meta_talent_popularity_on_talent_id"
+  end
+
   create_table "pvp_seasons", force: :cascade do |t|
     t.integer "blizzard_id"
     t.datetime "created_at", null: false
@@ -273,5 +290,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_100000) do
   add_foreign_key "pvp_meta_gem_popularity", "pvp_seasons"
   add_foreign_key "pvp_meta_item_popularity", "items"
   add_foreign_key "pvp_meta_item_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_talent_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_talent_popularity", "talents"
   add_foreign_key "pvp_sync_cycles", "pvp_seasons"
 end

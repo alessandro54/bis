@@ -39,5 +39,7 @@ module WowBis
     config.middleware.use ActionDispatch::Session::CookieStore, key: "_your_app_session"
     config.middleware.use ActionDispatch::Flash
     config.middleware.use Rack::MethodOverride
+
+    config.hosts << "intervals-gently-underground-amber.trycloudflare.com"
   end
 end

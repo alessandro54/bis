@@ -2,6 +2,15 @@ module Pvp
   class BuildAggregationsJob < ApplicationJob
     queue_as :default
 
+    # Each entry: [key, service_class, model_class, min_interval]
+    # min_interval — skip if the latest snapshot_at for the season is more recent than this.
+    AGGREGATIONS = [
+      [ :items,    Pvp::Meta::ItemAggregationService,    PvpMetaItemPopularity,    1.hour    ],
+      [ :enchants, Pvp::Meta::EnchantAggregationService, PvpMetaEnchantPopularity, 1.hour    ],
+      [ :gems,     Pvp::Meta::GemAggregationService,     PvpMetaGemPopularity,     1.hour    ],
+      [ :talents,  Pvp::Meta::TalentAggregationService,  PvpMetaTalentPopularity,  12.hours  ]
+    ].freeze
+
     def perform(pvp_season_id:, sync_cycle_id: nil, cycle_started_at: nil)
       season = find_season!(pvp_season_id)
       return unless season
@@ -24,20 +33,22 @@ module Pvp
         nil
       end
 
-      def aggregations
-        [
-          [ :items,    Pvp::Meta::ItemAggregationService ],
-          [ :enchants, Pvp::Meta::EnchantAggregationService ],
-          [ :gems,     Pvp::Meta::GemAggregationService ]
-        ]
-      end
-
       def run_aggregations(season, pvp_season_id)
-        results = run_with_threads(aggregations, concurrency: aggregations.size) do |(key, service_class)|
-          run_single_aggregation(key, service_class, season, pvp_season_id)
+        results = run_with_threads(AGGREGATIONS, concurrency: AGGREGATIONS.size) do |tuple|
+          key, service_class, model_class, min_interval = tuple
+          if stale?(model_class, season, min_interval)
+            run_single_aggregation(key, service_class, season, pvp_season_id)
+          else
+            [ key, :skipped ]
+          end
         end
 
         results.to_h
+      end
+
+      def stale?(model_class, season, min_interval)
+        last = model_class.where(pvp_season_id: season.id).maximum(:snapshot_at)
+        last.nil? || last < min_interval.ago
       end
 
       def run_single_aggregation(key, service_class, season, pvp_season_id)
@@ -61,7 +72,8 @@ module Pvp
       def log_completion(pvp_season_id, results)
         Rails.logger.info(
           "[BuildAggregationsJob] Season #{pvp_season_id} done — " \
-            "items: #{results[:items]}, enchants: #{results[:enchants]}, gems: #{results[:gems]}"
+            "items: #{results[:items]}, enchants: #{results[:enchants]}, " \
+            "gems: #{results[:gems]}, talents: #{results[:talents]}"
         )
       end
 
@@ -69,7 +81,8 @@ module Pvp
         Pvp::SyncLogger.aggregations_complete(
           items:    results[:items],
           enchants: results[:enchants],
-          gems:     results[:gems]
+          gems:     results[:gems],
+          talents:  results[:talents]
         )
       end
 

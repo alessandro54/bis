@@ -73,9 +73,9 @@ module Pvp
 
     # ── Phase 3 — Aggregations ───────────────────────────────────────────────
 
-    def self.aggregations_complete(items:, enchants:, gems:)
+    def self.aggregations_complete(items:, enchants:, gems:, talents: nil)
       logger.info(
-        "  [aggregations]  items=#{items}  enchants=#{enchants}  gems=#{gems}"
+        "  [aggregations]  items=#{items}  enchants=#{enchants}  gems=#{gems}  talents=#{talents}"
       )
     end
 
