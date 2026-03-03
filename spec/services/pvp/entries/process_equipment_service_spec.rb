@@ -10,7 +10,7 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
   let(:service_instance) { default_service_instance }
 
   subject(:result) do
-    described_class.call(character: character, raw_equipment: raw_equipment, locale: locale)
+    described_class.call(character: character, raw_equipment: raw_equipment, spec_id: 262, locale: locale)
   end
 
   before { mock_equipment_service(service_instance) }
@@ -75,11 +75,11 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
       end
 
       context "when equipment fingerprint has changed" do
-        before { character.update_columns(equipment_fingerprint: "old:fingerprint") }
+        before { character.update_columns(spec_equipment_fingerprints: { "262" => "old:fingerprint" }) }
 
         it "replaces character_items with the new equipment" do
           old_item = create(:item)
-          character.character_items.create!(item: old_item, slot: "CHEST", item_level: 500)
+          character.character_items.create!(item: old_item, slot: "CHEST", item_level: 500, spec_id: 262)
 
           result
           character.reload
@@ -98,7 +98,7 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
         end
 
         it "updates the character's equipment_fingerprint" do
-          expect { result }.to change { character.reload.equipment_fingerprint }
+          expect { result }.to change { character.reload.spec_equipment_fingerprints["262"] }
         end
       end
 
@@ -106,7 +106,7 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
         before do
           # Fingerprint: slot:blizzard_id:ilvl:enchantment_id:crafting_stats(sorted)
           character.update_columns(
-            equipment_fingerprint: "head:#{blizzard_item_id}:540:#{enchantment_blizzard_id}:HASTE_RATING+MASTERY_RATING"
+            spec_equipment_fingerprints: { "262" => "head:#{blizzard_item_id}:540:#{enchantment_blizzard_id}:HASTE_RATING+MASTERY_RATING" }
           )
         end
 
@@ -123,7 +123,7 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
         end
 
         it "does not update the fingerprint" do
-          expect { result }.not_to change { character.reload.equipment_fingerprint }
+          expect { result }.not_to change { character.reload.spec_equipment_fingerprints["262"] }
         end
 
         it "still returns entry_attrs with equipment_processed_at" do

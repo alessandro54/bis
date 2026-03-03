@@ -3,9 +3,10 @@ module Pvp
     class ProcessEquipmentService < BaseService
       EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
 
-      def initialize(character:, raw_equipment:, locale: "en_US")
+      def initialize(character:, raw_equipment:, spec_id:, locale: "en_US")
         @character     = character
         @raw_equipment = raw_equipment
+        @spec_id       = spec_id
         @locale        = locale
       end
 
@@ -26,7 +27,8 @@ module Pvp
         # no DB round-trip required. Skip all DB writes when gear is unchanged.
         new_fingerprint = raw_fingerprint
 
-        if character.equipment_fingerprint == new_fingerprint
+        current_fp = character.spec_equipment_fingerprints&.dig(spec_id.to_s)
+        if current_fp == new_fingerprint
           entry_attrs = { equipment_processed_at: Time.zone.now }
           entry_attrs[:item_level] = equipment_service.item_level if equipment_service.item_level.present?
           entry_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
@@ -55,7 +57,7 @@ module Pvp
 
       private
 
-        attr_reader :character, :raw_equipment, :locale
+        attr_reader :character, :raw_equipment, :spec_id, :locale
 
         # Fingerprint built entirely from raw API data — slot, Blizzard item ID,
         # item level, and permanent enchantment ID. No DB lookups needed, so the
@@ -95,6 +97,7 @@ module Pvp
               character_id:               character.id,
               item_id:                    item_data["item_id"],
               slot:                       slot.upcase,
+              spec_id:                    spec_id,
               item_level:                 item_data["item_level"],
               context:                    item_data["context"],
               enchantment_id:             item_data["enchantment_id"],
@@ -110,9 +113,11 @@ module Pvp
 
           # rubocop:disable Rails/SkipsModelValidations
           ApplicationRecord.transaction do
-            character.character_items.delete_all
+            character.character_items.where(spec_id: spec_id).delete_all
             CharacterItem.insert_all!(records) if records.any?
-            character.update_columns(equipment_fingerprint: new_fingerprint)
+
+            new_fingerprints = (character.spec_equipment_fingerprints || {}).merge(spec_id.to_s => new_fingerprint)
+            character.update_columns(spec_equipment_fingerprints: new_fingerprints)
           end
           # rubocop:enable Rails/SkipsModelValidations
         end

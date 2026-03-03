@@ -108,6 +108,21 @@ module Wow
       SPECS.map { |id, data| data.merge(id: id) }
     end
 
+    # Extracts spec_id from spec-specific bracket names like
+    # "shuffle-rogue-assassination" or "blitz-warrior-arms".
+    # Returns nil for non-spec brackets (2v2, 3v3, shuffle-overall, etc.).
+    def self.spec_id_from_bracket(bracket)
+      match = bracket&.match(/\A(?:shuffle|blitz)-(.+)-(.+)\z/)
+      return nil unless match
+
+      class_slug = match[1].tr("-", "_")
+      spec_slug  = match[2]
+
+      SPECS.find { |_id, data|
+        data[:class_slug] == class_slug && data[:spec_slug] == spec_slug
+      }&.first
+    end
+
     private_class_method :normalize_integer_id
   end
 end

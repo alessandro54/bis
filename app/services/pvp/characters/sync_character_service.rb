@@ -66,32 +66,19 @@ module Pvp
         # Inline processing (fresh fetch or 304)
         # ------------------------------------------------------------------
 
+        EQUIPMENT_ENTRY_ATTRS = %i[
+          equipment_processed_at item_level tier_set_id tier_set_name
+          tier_set_pieces tier_4p_active
+        ].freeze
+
         # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
         def process_inline(entries, eq_fetch, spec_fetch)
-          entry_attrs = {}
-          char_attrs  = {}
+          entry_attrs          = {}
+          char_attrs           = {}
+          active_spec_id       = nil
+          per_spec_hero_trees  = {}
 
-          # --- Equipment ---
-          if eq_fetch.changed?
-            eq_result = Pvp::Entries::ProcessEquipmentService.call(
-              character:     character,
-              raw_equipment: eq_fetch.json,
-              locale:        locale
-            )
-
-            unless eq_result.success?
-              log_service_failure("Equipment", character, eq_result.error)
-              return
-            end
-
-            entry_attrs.merge!(eq_result.context[:entry_attrs]) if eq_result.context[:entry_attrs]
-            char_attrs[:equipment_last_modified] = eq_fetch.last_modified if eq_fetch.last_modified.present?
-          else
-            # 304: equipment unchanged — propagate attrs from latest processed entry
-            entry_attrs.merge!(equipment_entry_attrs_from_latest)
-          end
-
-          # --- Specialization ---
+          # --- Specialization FIRST (to get active spec_id) ---
           if spec_fetch.changed?
             spec_result = Pvp::Entries::ProcessSpecializationService.call(
               character:          character,
@@ -107,18 +94,39 @@ module Pvp
             entry_attrs.merge!(spec_result.context[:entry_attrs]) if spec_result.context[:entry_attrs]
             char_attrs.merge!(spec_result.context[:char_attrs])   if spec_result.context[:char_attrs]
             char_attrs[:talents_last_modified] = spec_fetch.last_modified if spec_fetch.last_modified.present?
+            active_spec_id      = spec_result.context[:entry_attrs]&.dig(:spec_id)
+            per_spec_hero_trees = spec_result.context[:per_spec_hero_trees] || {}
           else
             # 304: talents unchanged — propagate attrs from latest processed entry
             entry_attrs.merge!(spec_entry_attrs_from_latest)
+            active_spec_id = entry_attrs[:spec_id]
           end
 
-          if entry_attrs.any?
-            # rubocop:disable Rails/SkipsModelValidations
-            PvpLeaderboardEntry.where(id: entries.map(&:id)).update_all(
-              entry_attrs.merge(updated_at: Time.current)
-            )
-            # rubocop:enable Rails/SkipsModelValidations
+          # --- Equipment (with active_spec_id) ---
+          if eq_fetch.changed?
+            if active_spec_id
+              eq_result = Pvp::Entries::ProcessEquipmentService.call(
+                character:     character,
+                raw_equipment: eq_fetch.json,
+                spec_id:       active_spec_id,
+                locale:        locale
+              )
+
+              unless eq_result.success?
+                log_service_failure("Equipment", character, eq_result.error)
+                return
+              end
+
+              entry_attrs.merge!(eq_result.context[:entry_attrs]) if eq_result.context[:entry_attrs]
+            end
+            char_attrs[:equipment_last_modified] = eq_fetch.last_modified if eq_fetch.last_modified.present?
+          else
+            # 304: equipment unchanged — propagate attrs from latest processed entry
+            entry_attrs.merge!(equipment_entry_attrs_from_latest)
           end
+
+          # --- Spec-aware entry updates ---
+          update_entries_with_spec_awareness(entries, entry_attrs, active_spec_id, per_spec_hero_trees)
 
           char_attrs[:last_equipment_snapshot_at] = Time.current
           char_attrs[:unavailable_until]          = nil
@@ -135,6 +143,48 @@ module Pvp
           )
         end
         # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
+
+        # Entries whose spec matches the active spec get full attrs (equipment + talents).
+        # Entries with a different spec (e.g., shuffle bracket) get talent attrs only —
+        # equipment_processed_at is NOT set because the gear doesn't match.
+        def update_entries_with_spec_awareness(entries, entry_attrs, active_spec_id, per_spec_hero_trees)
+          return if entry_attrs.empty?
+
+          matching_ids     = []
+          non_matching_ids = []
+
+          entries.each do |e|
+            if e.spec_id.nil? || e.spec_id == active_spec_id
+              matching_ids << e.id
+            else
+              non_matching_ids << e.id
+            end
+          end
+
+          now = Time.current
+
+          # rubocop:disable Rails/SkipsModelValidations
+          if matching_ids.any?
+            PvpLeaderboardEntry.where(id: matching_ids).update_all(
+              entry_attrs.merge(updated_at: now)
+            )
+          end
+
+          if non_matching_ids.any?
+            talent_only_attrs = entry_attrs.except(*EQUIPMENT_ENTRY_ATTRS)
+            if talent_only_attrs.any?
+              # Apply per-spec hero tree info if available
+              entries.select { |e| non_matching_ids.include?(e.id) }.group_by(&:spec_id).each do |sid, group|
+                hero_info = per_spec_hero_trees[sid] || {}
+                attrs = talent_only_attrs.merge(hero_info).merge(updated_at: now)
+                # Don't overwrite the bracket-derived spec_id
+                attrs.delete(:spec_id)
+                PvpLeaderboardEntry.where(id: group.map(&:id)).update_all(attrs)
+              end
+            end
+          end
+          # rubocop:enable Rails/SkipsModelValidations
+        end
 
         # ------------------------------------------------------------------
         # 304 fallback: copy entry-level attrs from latest processed entry

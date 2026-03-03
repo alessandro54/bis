@@ -72,13 +72,16 @@ module Pvp
             region:        region
           )
 
+          bracket_spec_id  = Wow::Catalog.spec_id_from_bracket(bracket)
+          bracket_class_id = Wow::Catalog.class_id_for_spec(bracket_spec_id) if bracket_spec_id
+
           leaderboard.with_lock do
             now = Time.current
             entry_records = entries.map do |entry_json|
               character_data = entry_json.fetch("character")
               stats          = entry_json.fetch("season_match_statistics")
 
-              {
+              record = {
                 pvp_leaderboard_id: leaderboard.id,
                 character_id:       char_id_map[character_data["id"].to_s],
                 rank:               entry_json["rank"],
@@ -89,6 +92,10 @@ module Pvp
                 created_at:         now,
                 updated_at:         now
               }
+
+              record[:spec_id]  = bracket_spec_id  if bracket_spec_id
+              record[:class_id] = bracket_class_id if bracket_class_id
+              record
             end
 
             # Deduplicate by character_id — shuffle-overall leaderboards return the
@@ -99,11 +106,14 @@ module Pvp
               .values
 
             ActiveRecord::Base.transaction do
+              update_cols = %i[rank rating wins losses snapshot_at]
+              update_cols.push(:spec_id, :class_id) if bracket_spec_id
+
               # rubocop:disable Rails/SkipsModelValidations
               PvpLeaderboardEntry.upsert_all(
                 entry_records,
                 unique_by:   %i[character_id pvp_leaderboard_id],
-                update_only: %i[rank rating wins losses snapshot_at]
+                update_only: update_cols
               )
               # rubocop:enable Rails/SkipsModelValidations
 

@@ -35,17 +35,21 @@ module Pvp
           end
         end
 
-        talent_upsert = Blizzard::Data::Talents::UpsertFromRawSpecializationService.call(
-          raw_specialization: spec_service.talents,
-          locale:             locale
-        )
-        new_loadout_code = spec_service.talents["talent_loadout_code"]
-
-        if character.talent_loadout_code != new_loadout_code
-          char_attrs[:talent_loadout_code] = new_loadout_code
-          rebuild_character_talents(talent_upsert)
-        end
+        process_all_specs_talents(spec_service, char_attrs)
         # rubocop:enable Rails/SkipsModelValidations
+
+        # Build per-spec hero tree info for SyncCharacterService
+        # to apply to entries that don't match the active spec
+        per_spec_hero_trees = spec_service.all_specializations.each_with_object({}) do |s, h|
+          sid = Wow::Catalog.normalize_spec_id(s[:spec_id])
+          next unless sid
+
+          ht = s[:hero_tree]
+          h[sid] = {
+            hero_talent_tree_name: ht&.fetch("name", nil).to_s.downcase,
+            hero_talent_tree_id:   ht&.fetch("id", nil)
+          }
+        end
 
         entry_attrs = {
           specialization_processed_at: Time.zone.now,
@@ -54,7 +58,11 @@ module Pvp
           hero_talent_tree_id:         hero_tree&.fetch("id", nil)
         }
 
-        success(nil, context: { entry_attrs: entry_attrs, char_attrs: char_attrs })
+        success(nil, context: {
+          entry_attrs:          entry_attrs,
+          char_attrs:           char_attrs,
+          per_spec_hero_trees:  per_spec_hero_trees
+        })
       rescue => e
         failure(e)
       end
@@ -64,8 +72,40 @@ module Pvp
 
         attr_reader :character, :raw_specialization, :locale
 
-        def rebuild_character_talents(talent_upsert)
-          character.character_talents.delete_all
+        # Process talents for ALL specs returned by the API, not just the active one.
+        # Each spec's talents are stored independently, keyed by spec_id.
+        def process_all_specs_talents(spec_service, char_attrs)
+          current_codes = character.spec_talent_loadout_codes || {}
+          new_codes = current_codes.dup
+
+          spec_service.all_specializations.each do |spec_data|
+            sid = Wow::Catalog.normalize_spec_id(spec_data[:spec_id])
+            next unless sid
+
+            new_code     = spec_data[:talent_loadout_code]
+            current_code = current_codes[sid.to_s]
+
+            next if current_code == new_code
+
+            talent_hash = spec_data[:talents].merge(
+              "pvp_talents"         => spec_data[:pvp_talents],
+              "talent_loadout_code" => new_code
+            ).stringify_keys!
+
+            talent_upsert = Blizzard::Data::Talents::UpsertFromRawSpecializationService.call(
+              raw_specialization: talent_hash,
+              locale:             locale
+            )
+
+            rebuild_character_talents(talent_upsert, sid)
+            new_codes[sid.to_s] = new_code
+          end
+
+          char_attrs[:spec_talent_loadout_codes] = new_codes if new_codes != current_codes
+        end
+
+        def rebuild_character_talents(talent_upsert, spec_id)
+          character.character_talents.where(spec_id: spec_id).delete_all
 
           now     = Time.current
           records = []
@@ -80,6 +120,7 @@ module Pvp
                 talent_type:  talent_data[:talent_type],
                 rank:         talent_data[:rank] || 1,
                 slot_number:  talent_data[:slot_number],
+                spec_id:      spec_id,
                 created_at:   now,
                 updated_at:   now
               }

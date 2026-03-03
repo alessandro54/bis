@@ -23,7 +23,7 @@ class Character::SyncStatusPrinter
     row "ID",          c.id
     row "Private",     c.is_private ? "#{red}yes#{reset}" : "no"
     row "Fingerprint",
-c.equipment_fingerprint.present? ? dim(c.equipment_fingerprint[0, 40] + "…") : "#{red}none#{reset}"
+c.spec_equipment_fingerprints.present? ? dim(c.spec_equipment_fingerprints.to_s[0, 40] + "…") : "#{red}none#{reset}"
 
     # Snapshot timestamps
     puts "#{dim}│#{reset}"

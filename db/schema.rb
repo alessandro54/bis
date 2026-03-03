@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_02_200005) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_03_174500) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -27,8 +27,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_02_200005) do
     t.integer "item_level"
     t.string "slot", null: false
     t.jsonb "sockets", default: []
+    t.integer "spec_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["character_id", "slot"], name: "idx_character_items_on_char_and_slot", unique: true
+    t.index ["character_id", "slot", "spec_id"], name: "idx_character_items_on_char_slot_spec", unique: true
     t.index ["enchantment_id"], name: "index_character_items_on_enchantment_id", where: "(enchantment_id IS NOT NULL)"
     t.index ["item_id"], name: "index_character_items_on_item_id"
   end
@@ -38,10 +39,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_02_200005) do
     t.datetime "created_at", null: false
     t.integer "rank", default: 1
     t.integer "slot_number"
+    t.integer "spec_id", null: false
     t.bigint "talent_id", null: false
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
-    t.index ["character_id", "talent_id"], name: "idx_character_talents_on_char_and_talent", unique: true
+    t.index ["character_id", "talent_id", "spec_id"], name: "idx_character_talents_on_char_talent_spec", unique: true
     t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
     t.index ["talent_id"], name: "index_character_talents_on_talent_id"
   end
@@ -52,7 +54,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_02_200005) do
     t.bigint "class_id"
     t.string "class_slug"
     t.datetime "created_at", null: false
-    t.string "equipment_fingerprint"
     t.datetime "equipment_last_modified", precision: nil
     t.integer "faction"
     t.string "inset_url"
@@ -65,15 +66,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_02_200005) do
     t.integer "race_id"
     t.string "realm"
     t.string "region"
-    t.string "talent_loadout_code"
+    t.jsonb "spec_equipment_fingerprints", default: {}
+    t.jsonb "spec_talent_loadout_codes", default: {}
     t.datetime "talents_last_modified", precision: nil
     t.datetime "unavailable_until"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
-    t.index ["equipment_fingerprint"], name: "index_characters_on_equipment_fingerprint"
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
-    t.index ["talent_loadout_code"], name: "index_characters_on_talent_loadout_code"
     t.index ["unavailable_until"], name: "index_characters_on_unavailable_until_active", where: "(unavailable_until IS NOT NULL)"
   end
 

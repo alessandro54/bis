@@ -37,7 +37,7 @@ module Pvp
             slot_totals AS (
               SELECT t.bracket, t.spec_id, ci.slot, COUNT(*) AS total
               FROM top_chars t
-              JOIN character_items ci ON ci.character_id = t.character_id
+              JOIN character_items ci ON ci.character_id = t.character_id AND ci.spec_id = t.spec_id
               WHERE ci.enchantment_id IS NOT NULL
               GROUP BY t.bracket, t.spec_id, ci.slot
             )
@@ -51,7 +51,7 @@ module Pvp
               NOW()                                     AS snapshot_at
             FROM top_chars t
             JOIN character_items ci
-              ON ci.character_id = t.character_id AND ci.enchantment_id IS NOT NULL
+              ON ci.character_id = t.character_id AND ci.spec_id = t.spec_id AND ci.enchantment_id IS NOT NULL
             JOIN slot_totals st
               ON st.bracket = t.bracket AND st.spec_id = t.spec_id AND st.slot = ci.slot
             GROUP BY t.bracket, t.spec_id, ci.slot, ci.enchantment_id, st.total

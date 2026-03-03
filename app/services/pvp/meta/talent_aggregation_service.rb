@@ -72,7 +72,7 @@ module Pvp
                 t.character_id,
                 array_agg(ct.talent_id ORDER BY ct.talent_id) AS build
               FROM top_chars t
-              JOIN character_talents ct ON ct.character_id = t.character_id AND ct.rank > 0
+              JOIN character_talents ct ON ct.character_id = t.character_id AND ct.spec_id = t.spec_id AND ct.rank > 0
               GROUP BY t.bracket, t.spec_id, t.character_id
             ),
             build_counts AS (
@@ -105,7 +105,7 @@ module Pvp
                 ct.rank,
                 COUNT(*) AS cnt
               FROM best_build_chars bbc
-              JOIN character_talents ct ON ct.character_id = bbc.character_id AND ct.rank > 0
+              JOIN character_talents ct ON ct.character_id = bbc.character_id AND ct.spec_id = bbc.spec_id AND ct.rank > 0
               GROUP BY bbc.bracket, bbc.spec_id, ct.talent_id, ct.rank
             ),
             top_build_modal_rank AS (
@@ -136,7 +136,7 @@ module Pvp
                 ROUND(COUNT(*) * 100.0 / st.total, 4)  AS usage_pct,
                 NOW()                                   AS snapshot_at
               FROM top_chars t
-              JOIN character_talents ct ON ct.character_id = t.character_id
+              JOIN character_talents ct ON ct.character_id = t.character_id AND ct.spec_id = t.spec_id
               JOIN talents tal ON tal.id = ct.talent_id
               JOIN spec_totals st
                 ON st.bracket = t.bracket AND st.spec_id = t.spec_id

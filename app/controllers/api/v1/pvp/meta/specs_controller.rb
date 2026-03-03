@@ -57,11 +57,11 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
       total = entries.count.to_f
       return [] if total.zero?
 
-      # Group by talent_loadout_code from character
+      # Extract the loadout code for the entry's spec from the per-spec JSONB map
       loadout_counts = entries
         .joins(:character)
-        .where.not(characters: { talent_loadout_code: nil })
-        .group("characters.talent_loadout_code")
+        .where("characters.spec_talent_loadout_codes -> CAST(pvp_leaderboard_entries.spec_id AS TEXT) IS NOT NULL")
+        .group(Arel.sql("characters.spec_talent_loadout_codes ->> CAST(pvp_leaderboard_entries.spec_id AS TEXT)"))
         .count
 
       loadout_counts

@@ -48,7 +48,7 @@ class Avo::Resources::Character < Avo::BaseResource
     field :avatar_url, as: :text
 
     field :equipment_last_modified, as: :text
-    field :equipment_fingerprint, as: :text
+    field :spec_equipment_fingerprints, as: :code, language: :json
 
     field :inset_url, as: :text
 
@@ -59,7 +59,7 @@ class Avo::Resources::Character < Avo::BaseResource
 
     field :race_id, as: :number
 
-    field :talent_loadout_code, as: :text
+    field :spec_talent_loadout_codes, as: :code, language: :json
     field :talents_last_modified, as: :text
     field :unavailable_until, as: :date_time
     field :character_talents, as: :has_many

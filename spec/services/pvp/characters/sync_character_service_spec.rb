@@ -28,6 +28,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     create(
       :pvp_leaderboard_entry,
       character:       character,
+      spec_id:         nil,
       pvp_leaderboard: create(
                                   :pvp_leaderboard,
                                   pvp_season: create(:pvp_season),
@@ -42,6 +43,7 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     create(
       :pvp_leaderboard_entry,
       character:       character,
+      spec_id:         nil,
       pvp_leaderboard: create(
                                   :pvp_leaderboard,
                                   pvp_season: create(:pvp_season),
@@ -167,8 +169,9 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
     def stub_spec_service_success
       allow(Pvp::Entries::ProcessSpecializationService).to receive(:call).and_return(
         ServiceResult.success(nil, context: {
-          entry_attrs: { specialization_processed_at: Time.current, spec_id: 71 },
-          char_attrs:  {}
+          entry_attrs:         { specialization_processed_at: Time.current, spec_id: 71 },
+          char_attrs:          {},
+          per_spec_hero_trees: {}
         })
       )
     end
