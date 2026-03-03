@@ -19,7 +19,7 @@ module Pvp
           PvpMetaTalentPopularity.upsert_all(
             records,
             unique_by:   %i[pvp_season_id bracket spec_id talent_id],
-            update_only: %i[talent_type usage_count usage_pct in_top_build snapshot_at]
+            update_only: %i[talent_type usage_count usage_pct in_top_build top_build_rank snapshot_at]
           )
           # rubocop:enable Rails/SkipsModelValidations
         end
@@ -61,7 +61,8 @@ module Pvp
         end
 
         # Builds the top-build CTEs: fingerprint each character's full talent loadout,
-        # find the single most common loadout per bracket/spec, and expose its talent ids.
+        # find the single most common loadout per bracket/spec, expose its talent ids,
+        # and compute the modal rank each talent is taken at within that top build.
         def top_build_cte
           <<~SQL
             char_builds AS (
@@ -87,6 +88,31 @@ module Pvp
             top_build_talents AS (
               SELECT bracket, spec_id, unnest(build) AS talent_id
               FROM best_build
+            ),
+            best_build_chars AS (
+              SELECT cb.character_id, cb.bracket, cb.spec_id
+              FROM char_builds cb
+              JOIN best_build bb
+                ON bb.bracket = cb.bracket
+               AND bb.spec_id = cb.spec_id
+               AND bb.build   = cb.build
+            ),
+            top_build_talent_ranks AS (
+              SELECT
+                bbc.bracket,
+                bbc.spec_id,
+                ct.talent_id,
+                ct.rank,
+                COUNT(*) AS cnt
+              FROM best_build_chars bbc
+              JOIN character_talents ct ON ct.character_id = bbc.character_id AND ct.rank > 0
+              GROUP BY bbc.bracket, bbc.spec_id, ct.talent_id, ct.rank
+            ),
+            top_build_modal_rank AS (
+              SELECT DISTINCT ON (bracket, spec_id, talent_id)
+                bracket, spec_id, talent_id, rank AS top_build_rank
+              FROM top_build_talent_ranks
+              ORDER BY bracket, spec_id, talent_id, cnt DESC
             )
           SQL
         end
@@ -130,8 +156,13 @@ module Pvp
                 WHERE tbt.bracket = tu.bracket
                   AND tbt.spec_id = tu.spec_id
                   AND tbt.talent_id = tu.talent_id
-              ) AS in_top_build
+              ) AS in_top_build,
+              COALESCE(tbmr.top_build_rank, 0) AS top_build_rank
             FROM talent_usage tu
+            LEFT JOIN top_build_modal_rank tbmr
+              ON  tbmr.bracket   = tu.bracket
+              AND tbmr.spec_id   = tu.spec_id
+              AND tbmr.talent_id = tu.talent_id
             ORDER BY tu.bracket, tu.spec_id, tu.talent_type, tu.usage_count DESC
           SQL
 
@@ -152,8 +183,9 @@ module Pvp
               talent_type:   r["talent_type"],
               usage_count:   r["usage_count"],
               usage_pct:     r["usage_pct"],
-              in_top_build:  r["in_top_build"],
-              snapshot_at:   r["snapshot_at"] || now,
+              in_top_build:   r["in_top_build"],
+              top_build_rank: r["top_build_rank"].to_i,
+              snapshot_at:    r["snapshot_at"] || now,
               created_at:    now,
               updated_at:    now
             }

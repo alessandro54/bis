@@ -43,23 +43,25 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
     def serialize(record, prereqs)
       t = record.talent
       {
-        id:           record.id,
-        talent:       serialize_talent_fields(t, record.talent_type, prereqs),
-        usage_count:  record.usage_count,
-        usage_pct:    record.usage_pct.to_f,
-        in_top_build: record.in_top_build,
-        snapshot_at:  record.snapshot_at
+        id:             record.id,
+        talent:         serialize_talent_fields(t, record.talent_type, prereqs),
+        usage_count:    record.usage_count,
+        usage_pct:      record.usage_pct.to_f,
+        in_top_build:   record.in_top_build,
+        top_build_rank: record.top_build_rank,
+        snapshot_at:    record.snapshot_at
       }
     end
 
     def serialize_zero(talent, prereqs)
       {
-        id:           nil,
-        talent:       serialize_talent_fields(talent, talent.talent_type, prereqs),
-        usage_count:  0,
-        usage_pct:    0.0,
-        in_top_build: false,
-        snapshot_at:  nil
+        id:             nil,
+        talent:         serialize_talent_fields(talent, talent.talent_type, prereqs),
+        usage_count:    0,
+        usage_pct:      0.0,
+        in_top_build:   false,
+        top_build_rank: 0,
+        snapshot_at:    nil
       }
     end
 

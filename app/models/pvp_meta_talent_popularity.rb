@@ -3,18 +3,19 @@
 # Table name: pvp_meta_talent_popularity
 # Database name: primary
 #
-#  id            :bigint           not null, primary key
-#  bracket       :string           not null
-#  in_top_build  :boolean          default(FALSE), not null
-#  snapshot_at   :datetime         not null
-#  talent_type   :string           not null
-#  usage_count   :integer          default(0), not null
-#  usage_pct     :decimal(8, 4)
-#  created_at    :datetime         not null
-#  updated_at    :datetime         not null
-#  pvp_season_id :bigint           not null
-#  spec_id       :integer          not null
-#  talent_id     :bigint           not null
+#  id             :bigint           not null, primary key
+#  bracket        :string           not null
+#  in_top_build   :boolean          default(FALSE), not null
+#  snapshot_at    :datetime         not null
+#  talent_type    :string           not null
+#  top_build_rank :integer          default(0), not null
+#  usage_count    :integer          default(0), not null
+#  usage_pct      :decimal(8, 4)
+#  created_at     :datetime         not null
+#  updated_at     :datetime         not null
+#  pvp_season_id  :bigint           not null
+#  spec_id        :integer          not null
+#  talent_id      :bigint           not null
 #
 # Indexes
 #
