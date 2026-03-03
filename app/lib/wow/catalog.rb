@@ -103,6 +103,11 @@ module Wow
 
       str.to_i
     end
+
+    def self.all_specs_with_slugs
+      SPECS.map { |id, data| data.merge(id: id) }
+    end
+
     private_class_method :normalize_integer_id
   end
 end

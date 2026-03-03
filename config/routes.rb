@@ -13,6 +13,10 @@ Rails.application.routes.draw do
       resources :characters, only: [ :index ]
 
       namespace :pvp do
+        scope ":season/:region", as: "season_region_bracket" do
+          resources :leaderboards, only: [ :show ], param: :bracket
+        end
+
         namespace :meta do
           resources :items, only: [ :index ]
           resources :enchants, only: [ :index ]

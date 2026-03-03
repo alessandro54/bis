@@ -10,6 +10,7 @@ class Avo::Resources::PvpLeaderboardEntry < Avo::BaseResource
 
   def filters
     filter Avo::Filters::PvpLeaderboardFilter
+    filter Avo::Filters::SpecIdFilter
     filter Avo::Filters::ItemLevelFilter
   end
 
