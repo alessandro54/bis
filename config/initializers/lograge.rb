@@ -1,15 +1,16 @@
 # frozen_string_literal: true
 
 # Colorized Lograge formatter for development.
-# Paints HTTP methods, status codes, and durations with ANSI colors.
+# Uses background-color badges for HTTP methods, status codes, and log level.
 class ColorizedLogrageFormatter
-  METHOD_COLORS = {
-    "GET"    => "\e[32m",    # green
-    "POST"   => "\e[36m",    # cyan
-    "PUT"    => "\e[33m",    # yellow
-    "PATCH"  => "\e[33m",    # yellow
-    "DELETE" => "\e[31m",    # red
-    "HEAD"   => "\e[2m"      # dim
+  # Background colors for HTTP methods
+  METHOD_BADGES = {
+    "GET" => "\e[42;30m", # green bg, black text
+    "POST" => "\e[46;30m", # cyan bg, black text
+    "PUT" => "\e[43;30m", # yellow bg, black text
+    "PATCH" => "\e[43;30m", # yellow bg, black text
+    "DELETE" => "\e[41;37m", # red bg, white text
+    "HEAD" => "\e[47;30m" # white bg, black text
   }.freeze
 
   RESET = "\e[0m"
@@ -17,9 +18,10 @@ class ColorizedLogrageFormatter
   DIM   = "\e[2m"
 
   def call(data)
-    method   = colorize_method(data[:method])
+    info     = badge("INFO", "\e[44;37m") # blue bg, white text
+    method   = badge(data[:method], METHOD_BADGES.fetch(data[:method].to_s, "\e[47;30m"))
     path     = "#{BOLD}#{data[:path]}#{RESET}"
-    status   = colorize_status(data[:status])
+    status   = status_badge(data[:status])
     duration = colorize_duration(data[:duration])
     db       = data[:db] ? " #{DIM}db=#{data[:db].round(1)}ms#{RESET}" : ""
     view     = data[:view] ? " #{DIM}view=#{data[:view].round(1)}ms#{RESET}" : ""
@@ -27,26 +29,25 @@ class ColorizedLogrageFormatter
     extras = data.except(:method, :path, :status, :duration, :db, :view, :format, :controller, :action, :allocations)
     extra_str = extras.any? ? " #{DIM}#{extras.map { |k, v| "#{k}=#{v}" }.join(" ")}#{RESET}" : ""
 
-    "#{method} #{path} #{status} #{duration}#{db}#{view}#{extra_str}"
+    "#{info} #{method} #{path} #{status} #{duration}#{db}#{view}#{extra_str}"
   end
 
   private
 
-    def colorize_method(method)
-      color = METHOD_COLORS.fetch(method.to_s, "")
-      "#{color}#{BOLD}#{method}#{RESET}"
+    def badge(text, bg_color)
+      "#{bg_color}#{BOLD} #{text} #{RESET}"
     end
 
-    def colorize_status(status)
+    def status_badge(status)
       code = status.to_i
-      color = case code
-              when 200..299 then "\e[32m"   # green
-              when 300..399 then "\e[36m"   # cyan
-              when 400..499 then "\e[33m"   # yellow
-              when 500..599 then "\e[31;1m" # bold red
-              else ""
-              end
-      "#{color}#{code}#{RESET}"
+      bg = case code
+      when 200..299 then "\e[42;30m"   # green bg
+      when 300..399 then "\e[46;30m"   # cyan bg
+      when 400..499 then "\e[43;30m"   # yellow bg, black text
+      when 500..599 then "\e[41;37m"   # red bg, white text
+      else "\e[47;30m"
+      end
+      badge(code, bg)
     end
 
     def colorize_duration(ms)
@@ -54,10 +55,10 @@ class ColorizedLogrageFormatter
 
       rounded = ms.round(1)
       color = case rounded
-              when 0..100   then "\e[32m"   # green — fast
-              when 100..500 then "\e[33m"   # yellow — moderate
-              else               "\e[31m"   # red — slow
-              end
+      when 0..100   then "\e[32m"   # green — fast
+      when 100..500 then "\e[33m"   # yellow — moderate
+      else "\e[31m" # red — slow
+      end
       "#{color}#{rounded}ms#{RESET}"
     end
 end

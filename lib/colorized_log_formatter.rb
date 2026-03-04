@@ -3,12 +3,12 @@
 # Colorized log formatter for development. Adds ANSI colors by severity
 # and a compact timestamp. Production uses the default formatter.
 class ColorizedLogFormatter < ActiveSupport::Logger::SimpleFormatter
-  SEVERITY_COLORS = {
-    "DEBUG" => "\e[36m",  # cyan
-    "INFO"  => "\e[32m",  # green
-    "WARN"  => "\e[33m",  # yellow
-    "ERROR" => "\e[31m",  # red
-    "FATAL" => "\e[35;1m" # bold magenta
+  SEVERITY_BADGES = {
+    "DEBUG" => "\e[47;30m",   # white bg, black text
+    "INFO"  => "\e[44;37m",   # blue bg, white text
+    "WARN"  => "\e[43;30m",   # yellow bg, black text
+    "ERROR" => "\e[41;37m",   # red bg, white text
+    "FATAL" => "\e[45;37m"    # magenta bg, white text
   }.freeze
 
   DIM   = "\e[2m"
@@ -18,11 +18,11 @@ class ColorizedLogFormatter < ActiveSupport::Logger::SimpleFormatter
   def call(severity, timestamp, _progname, msg)
     return "" if msg.blank?
 
-    color = SEVERITY_COLORS.fetch(severity, "")
     ts    = timestamp.strftime("%H:%M:%S.%L")
-    tag   = severity[0] # D, I, W, E, F
+    bg    = SEVERITY_BADGES.fetch(severity, "")
+    tag   = severity.center(5)
 
-    "#{DIM}#{ts}#{RESET} #{color}#{BOLD}#{tag}#{RESET} #{colorize_message(severity, msg)}\n"
+    "#{DIM}#{ts}#{RESET} #{bg}#{BOLD} #{tag} #{RESET} #{colorize_message(severity, msg)}\n"
   end
 
   private
@@ -30,7 +30,7 @@ class ColorizedLogFormatter < ActiveSupport::Logger::SimpleFormatter
     def colorize_message(severity, msg)
       case severity
       when "DEBUG" then "#{DIM}#{msg}#{RESET}"
-      when "ERROR", "FATAL" then "#{SEVERITY_COLORS[severity]}#{msg}#{RESET}"
+      when "ERROR", "FATAL" then "\e[31m#{msg}#{RESET}"
       else msg.to_s
       end
     end
