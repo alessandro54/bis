@@ -31,6 +31,9 @@ module WowBis
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
 
+    # Gzip compress all responses > 1KB
+    config.middleware.use Rack::Deflater
+
     # Each fiber gets its own ActiveRecord connection checkout,
     # preventing fibers from sharing/corrupting each other's queries.
     config.active_support.isolation_level = :fiber

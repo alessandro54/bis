@@ -305,19 +305,22 @@ module Pvp
         # would find no source entry and leave new entries unprocessed.
         # rubocop:disable Metrics/AbcSize
         def clear_stale_last_modified!
-          needs_eq_clear   = character.equipment_last_modified.present? &&
-                             !@eq_fallback_source &&
-                             !PvpLeaderboardEntry.where(character_id: character.id)
-                                                 .where.not(equipment_processed_at: nil).exists?
+          has_eq_last_mod   = character.equipment_last_modified.present? && !@eq_fallback_source
+          has_spec_last_mod = character.talents_last_modified.present? && !@spec_fallback_source
 
-          needs_spec_clear = character.talents_last_modified.present? &&
-                             !@spec_fallback_source &&
-                             !PvpLeaderboardEntry.where(character_id: character.id)
-                                                 .where.not(specialization_processed_at: nil).exists?
+          return unless has_eq_last_mod || has_spec_last_mod
+
+          counts = PvpLeaderboardEntry.where(character_id: character.id)
+            .pick(
+              Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at IS NOT NULL)"),
+              Arel.sql("COUNT(*) FILTER (WHERE specialization_processed_at IS NOT NULL)")
+            )
+
+          eq_count, spec_count = counts || [0, 0]
 
           attrs = {}
-          attrs[:equipment_last_modified] = nil if needs_eq_clear
-          attrs[:talents_last_modified]   = nil if needs_spec_clear
+          attrs[:equipment_last_modified] = nil if has_eq_last_mod && eq_count.zero?
+          attrs[:talents_last_modified]   = nil if has_spec_last_mod && spec_count.zero?
 
           return unless attrs.any?
 

@@ -19,6 +19,7 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
     end
 
     render json: json
+    set_cache_headers
 
     enqueue_unsynced_items
   end

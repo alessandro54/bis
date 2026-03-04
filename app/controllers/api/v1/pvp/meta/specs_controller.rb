@@ -18,6 +18,7 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
     end
 
     render json: json
+    set_cache_headers
   end
 
   # GET /api/v1/pvp/meta/specs/:spec_id
@@ -43,6 +44,7 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
     end
 
     render json: json
+    set_cache_headers
   end
 
   private

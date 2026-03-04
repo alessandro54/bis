@@ -16,6 +16,7 @@
 # Indexes
 #
 #  idx_character_talents_on_char_and_type     (character_id,talent_type)
+#  idx_character_talents_on_char_spec         (character_id,spec_id)
 #  idx_character_talents_on_char_talent_spec  (character_id,talent_id,spec_id) UNIQUE
 #  index_character_talents_on_talent_id       (talent_id)
 #

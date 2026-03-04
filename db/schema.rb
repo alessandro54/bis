@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_03_174500) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_04_060000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -30,6 +30,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_03_174500) do
     t.integer "spec_id", null: false
     t.datetime "updated_at", null: false
     t.index ["character_id", "slot", "spec_id"], name: "idx_character_items_on_char_slot_spec", unique: true
+    t.index ["character_id", "spec_id"], name: "idx_character_items_on_char_spec"
     t.index ["enchantment_id"], name: "index_character_items_on_enchantment_id", where: "(enchantment_id IS NOT NULL)"
     t.index ["item_id"], name: "index_character_items_on_item_id"
   end
@@ -43,6 +44,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_03_174500) do
     t.bigint "talent_id", null: false
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
+    t.index ["character_id", "spec_id"], name: "idx_character_talents_on_char_spec"
     t.index ["character_id", "talent_id", "spec_id"], name: "idx_character_talents_on_char_talent_spec", unique: true
     t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
     t.index ["talent_id"], name: "index_character_talents_on_talent_id"

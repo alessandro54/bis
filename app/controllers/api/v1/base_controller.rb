@@ -11,6 +11,11 @@ class Api::V1::BaseController < ApplicationController
       "pvp_meta/v#{version}/#{segments.compact.join("/")}"
     end
 
+    # Sets Cache-Control for CDN/browser caching.
+    def set_cache_headers(max_age: 5.minutes, stale_while_revalidate: 1.hour)
+      expires_in max_age, public: true, stale_while_revalidate: stale_while_revalidate
+    end
+
     def current_season
       @current_season ||= PvpSeason.current
     end

@@ -29,6 +29,7 @@ module Api
             end
 
             render json: json
+            set_cache_headers
           end
         end
       end
