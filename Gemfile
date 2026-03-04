@@ -23,6 +23,9 @@ gem "kamal", "~> 2.9", require: false
 # Mission Control UI for jobs
 gem "mission_control-jobs", "~> 1.1"
 
+# Clean, single-line request logging
+gem "lograge", "~> 0.14"
+
 # Fast, optimized JSON parser/serializer
 gem "oj", "~> 3.16"
 

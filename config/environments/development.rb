@@ -41,6 +41,10 @@ Rails.application.configure do
   # Print deprecation notices to the Rails logger.
   config.active_support.deprecation = :log
 
+  # Colorized log output
+  require_relative "../../lib/colorized_log_formatter"
+  config.log_formatter = ColorizedLogFormatter.new
+
   # Raise an error on page load if there are pending migrations.
   config.active_record.migration_error = :page_load
 
