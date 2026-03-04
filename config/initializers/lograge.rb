@@ -16,7 +16,7 @@ Rails.application.configure do
 
   config.lograge.custom_options = lambda do |event|
     extras = {}
-    extras[:time] = event.time.iso8601
+    extras[:time] = Time.at(event.time).utc.iso8601 rescue nil
     extras[:host] = event.payload[:host]
     extras[:request_id] = event.payload[:request_id]
     extras[:ip] = event.payload[:remote_ip]
