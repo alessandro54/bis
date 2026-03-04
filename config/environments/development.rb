@@ -42,7 +42,6 @@ Rails.application.configure do
   config.active_support.deprecation = :log
 
   # Colorized log output
-  require_relative "../../lib/colorized_log_formatter"
   config.log_formatter = ColorizedLogFormatter.new
 
   # Raise an error on page load if there are pending migrations.
@@ -80,5 +79,10 @@ Rails.application.configure do
   config.after_initialize do
     require "amazing_print"
     AmazingPrint.irb!
+
+    Bullet.enable        = true
+    Bullet.console       = true
+    Bullet.rails_logger  = true
+    Bullet.add_footer    = true
   end
 end

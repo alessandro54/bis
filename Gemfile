@@ -56,6 +56,9 @@ group :development do
   # Auto-add schema annotations to models
   gem "annotaterb", "~> 4.20"
 
+  # N+1 query detection
+  gem "bullet"
+
   gem "rbs", require: false
 
   # Static type checking

@@ -1,19 +1,25 @@
 class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
   def index
-    records = PvpMetaTalentPopularity
-      .includes(talent: :translations)
-      .where(pvp_season: current_season)
-      .where(bracket: bracket_param)
-      .where(spec_id: spec_id_param)
-      .order(usage_pct: :desc)
+    cache_key = meta_cache_key("talents", bracket_param, spec_id_param, locale_param)
 
-    zero_talents = load_zero_fill_talents(records)
-    all_talents  = records.map(&:talent) + zero_talents
+    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+      records = PvpMetaTalentPopularity
+        .includes(talent: :translations)
+        .where(pvp_season: current_season)
+        .where(bracket: bracket_param)
+        .where(spec_id: spec_id_param)
+        .order(usage_pct: :desc)
 
-    prereqs = load_prerequisites(all_talents)
+      zero_talents = load_zero_fill_talents(records)
+      all_talents  = records.map(&:talent) + zero_talents
 
-    render json: records.map { |r| serialize(r, prereqs) } +
-                 zero_talents.map { |t| serialize_zero(t, prereqs) }
+      prereqs = load_prerequisites(all_talents)
+
+      records.map { |r| serialize(r, prereqs) } +
+        zero_talents.map { |t| serialize_zero(t, prereqs) }
+    end
+
+    render json: json
   end
 
   private
@@ -80,10 +86,6 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         icon_url:              t.icon_url,
         prerequisite_node_ids: prereqs[t.node_id] || []
       }
-    end
-
-    def current_season
-      @current_season ||= PvpSeason.current
     end
 
     def bracket_param

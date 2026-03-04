@@ -1,21 +1,26 @@
 class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
   def index
-    items = PvpMetaItemPopularity
-      .includes(item: :translations)
-      .where(pvp_season: current_season)
-      .where(bracket: bracket_param)
-      .where(spec_id: spec_id_param)
-      .order(usage_pct: :desc)
+    cache_key = meta_cache_key("items", bracket_param, spec_id_param, slot_param, locale_param)
 
-    items = items.where(slot: slot_param) if slot_param.present?
+    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+      items = PvpMetaItemPopularity
+        .includes(item: :translations)
+        .where(pvp_season: current_season)
+        .where(bracket: bracket_param)
+        .where(spec_id: spec_id_param)
+        .order(usage_pct: :desc)
 
-    item_ids = items.map(&:item_id)
-    crafting_map = crafting_stats_for(item_ids)
+      items = items.where(slot: slot_param) if slot_param.present?
 
-    render json: items.map { |record| serialize_item(record, crafting_map) }
+      item_ids = items.map(&:item_id)
+      crafting_map = crafting_stats_for(item_ids)
 
-    unsynced_ids = items.map(&:item).reject(&:meta_synced?).map(&:id)
-    Items::SyncItemMetaBatchJob.perform_later(item_ids: unsynced_ids) if unsynced_ids.any?
+      items.map { |record| serialize_item(record, crafting_map) }
+    end
+
+    render json: json
+
+    enqueue_unsynced_items
   end
 
   private
@@ -61,10 +66,6 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
       result
     end
 
-    def current_season
-      @current_season ||= PvpSeason.current
-    end
-
     def bracket_param
       params.require(:bracket)
     end
@@ -79,5 +80,14 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
 
     def locale_param
       params[:locale] || "en_US"
+    end
+
+    def enqueue_unsynced_items
+      items = PvpMetaItemPopularity
+        .includes(:item)
+        .where(pvp_season: current_season, bracket: bracket_param, spec_id: spec_id_param)
+
+      unsynced_ids = items.map(&:item).reject(&:meta_synced?).map(&:id)
+      Items::SyncItemMetaBatchJob.perform_later(item_ids: unsynced_ids) if unsynced_ids.any?
     end
 end

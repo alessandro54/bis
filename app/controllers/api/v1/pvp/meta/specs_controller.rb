@@ -2,35 +2,47 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
   # GET /api/v1/pvp/meta/specs
   # Returns spec distribution and popular talent builds for a bracket
   def index
-    entries = PvpLeaderboardEntry
-      .latest_snapshot_for_bracket(bracket_param)
-      .where.not(spec_id: nil)
-      .includes(:character)
+    cache_key = meta_cache_key("specs", bracket_param)
 
-    render json: {
-      bracket:     bracket_param,
-      specs:       build_spec_stats(entries),
-      snapshot_at: entries.first&.snapshot_at
-    }
+    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+      entries = PvpLeaderboardEntry
+        .latest_snapshot_for_bracket(bracket_param)
+        .where.not(spec_id: nil)
+        .includes(:character)
+
+      {
+        bracket:     bracket_param,
+        specs:       build_spec_stats(entries),
+        snapshot_at: entries.first&.snapshot_at
+      }
+    end
+
+    render json: json
   end
 
   # GET /api/v1/pvp/meta/specs/:spec_id
   # Returns detailed meta for a specific spec including talent builds
   def show
-    entries = PvpLeaderboardEntry
-      .latest_snapshot_for_bracket(bracket_param)
-      .where(spec_id: spec_id_param)
-      .includes(:character)
+    cache_key = meta_cache_key("specs", bracket_param, spec_id_param, limit_param)
 
-    render json: {
-      spec_id:       spec_id_param,
-      bracket:       bracket_param,
-      total_players: entries.count,
-      talent_builds: build_talent_stats(entries),
-      hero_talents:  build_hero_talent_stats(entries),
-      tier_sets:     build_tier_set_stats(entries),
-      snapshot_at:   entries.first&.snapshot_at
-    }
+    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+      entries = PvpLeaderboardEntry
+        .latest_snapshot_for_bracket(bracket_param)
+        .where(spec_id: spec_id_param)
+        .includes(:character)
+
+      {
+        spec_id:       spec_id_param,
+        bracket:       bracket_param,
+        total_players: entries.count,
+        talent_builds: build_talent_stats(entries),
+        hero_talents:  build_hero_talent_stats(entries),
+        tier_sets:     build_tier_set_stats(entries),
+        snapshot_at:   entries.first&.snapshot_at
+      }
+    end
+
+    render json: json
   end
 
   private

@@ -84,6 +84,13 @@ module Pvp
           gems:     results[:gems],
           talents:  results[:talents]
         )
+
+        clear_meta_cache
+      end
+
+      def clear_meta_cache
+        Rails.cache.increment(Api::V1::BaseController::META_CACHE_VERSION_KEY)
+        Rails.logger.info("[BuildAggregationsJob] Meta cache version bumped")
       end
 
       def end_cycle_if_needed(sync_cycle_id, cycle_started_at)
