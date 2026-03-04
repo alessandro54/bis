@@ -9,14 +9,14 @@ Rails.application.configure do
   # Production: JSON logs for aggregation (ELK, Datadog, etc.)
   # Development: key=value with colors
   config.lograge.formatter = if Rails.env.production?
-                               Lograge::Formatters::Json.new
-                             else
-                               Lograge::Formatters::KeyValue.new
-                             end
+    Lograge::Formatters::Json.new
+  else
+    Lograge::Formatters::KeyValue.new
+  end
 
-  config.lograge.custom_options = lambda do |event|
+  config.lograge.custom_options = ->(event) do
     extras = {}
-    extras[:time] = Time.at(event.time).utc.iso8601 rescue nil
+    extras[:time] = Time.current.iso8601
     extras[:host] = event.payload[:host]
     extras[:request_id] = event.payload[:request_id]
     extras[:ip] = event.payload[:remote_ip]
@@ -31,9 +31,9 @@ Rails.application.configure do
 
   config.lograge.custom_payload do |controller|
     {
-      host: controller.request.host,
+      host:       controller.request.host,
       request_id: controller.request.request_id,
-      remote_ip: controller.request.remote_ip
+      remote_ip:  controller.request.remote_ip
     }
   end
 end
