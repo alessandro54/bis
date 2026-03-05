@@ -13,7 +13,7 @@ jobs:
   rubocop:
     name: RuboCop
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -31,7 +31,7 @@ jobs:
   rspec:
     name: RSpec
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:15

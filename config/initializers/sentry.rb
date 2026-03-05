@@ -13,7 +13,7 @@ Sentry.init do |config|
   config.sample_rate = 1.0
 
   # Breadcrumbs for debugging context
-  config.breadcrumbs_logger = [:active_support_logger, :http_logger]
+  config.breadcrumbs_logger = %i[active_support_logger http_logger]
 
   # Background job integration
   config.excluded_exceptions += [

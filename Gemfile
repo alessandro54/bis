@@ -59,6 +59,9 @@ group :development do
 
   # Static type checking
   gem "steep", require: false
+
+  # Git hooks manager
+  gem "lefthook", require: false
 end
 
 group :development, :test do

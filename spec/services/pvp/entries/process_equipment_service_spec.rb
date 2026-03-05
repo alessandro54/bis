@@ -105,8 +105,9 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
       context "when equipment fingerprint is already current" do
         before do
           # Fingerprint: slot:blizzard_id:ilvl:enchantment_id:crafting_stats(sorted)
+          fingerprint = "head:#{blizzard_item_id}:540:#{enchantment_blizzard_id}:HASTE_RATING+MASTERY_RATING"
           character.update_columns(
-            spec_equipment_fingerprints: { "262" => "head:#{blizzard_item_id}:540:#{enchantment_blizzard_id}:HASTE_RATING+MASTERY_RATING" }
+            spec_equipment_fingerprints: { "262" => fingerprint }
           )
         end
 

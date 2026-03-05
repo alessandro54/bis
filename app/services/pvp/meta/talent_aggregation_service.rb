@@ -176,18 +176,18 @@ module Pvp
           now = Time.current
           rows.map do |r|
             {
-              pvp_season_id: season.id,
-              bracket:       r["bracket"],
-              spec_id:       r["spec_id"],
-              talent_id:     r["talent_id"],
-              talent_type:   r["talent_type"],
-              usage_count:   r["usage_count"],
-              usage_pct:     r["usage_pct"],
+              pvp_season_id:  season.id,
+              bracket:        r["bracket"],
+              spec_id:        r["spec_id"],
+              talent_id:      r["talent_id"],
+              talent_type:    r["talent_type"],
+              usage_count:    r["usage_count"],
+              usage_pct:      r["usage_pct"],
               in_top_build:   r["in_top_build"],
               top_build_rank: r["top_build_rank"].to_i,
               snapshot_at:    r["snapshot_at"] || now,
-              created_at:    now,
-              updated_at:    now
+              created_at:     now,
+              updated_at:     now
             }
           end
         end

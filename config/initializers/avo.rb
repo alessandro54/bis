@@ -19,8 +19,12 @@ Avo.configure do |config|
 
   ## == Authentication ==
   # config.current_user_method = :current_user
-  # config.authenticate_with do
-  # end
+  config.authenticate_with do
+    unless session[:admin_authenticated]
+      session[:return_to] = request.fullpath
+      redirect_to("/admin/login")
+    end
+  end
 
   ## == Authorization ==
   # config.is_admin_method = :is_admin

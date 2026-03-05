@@ -3,6 +3,7 @@ module Api
     module Pvp
       module Meta
         class ClassDistributionsController < BaseController
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           def show
             season  = PvpSeason.find_by!(blizzard_id: params.fetch(:season_id).to_i)
             bracket = params.fetch(:bracket)
@@ -31,6 +32,7 @@ module Api
             render json: json
             set_cache_headers
           end
+          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
         end
       end
     end

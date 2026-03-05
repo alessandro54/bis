@@ -24,9 +24,11 @@ module Items
         icon_url = response.dig("assets")&.find { |a| a["key"] == "icon" }&.dig("value")
         return unless icon_url
 
+        # rubocop:disable Rails/SkipsModelValidations
         item.update_columns(icon_url: icon_url, meta_synced_at: Time.current)
       rescue Blizzard::Client::NotFoundError
         item.update_columns(meta_synced_at: Time.current)
+        # rubocop:enable Rails/SkipsModelValidations
       rescue Blizzard::Client::Error => e
         Rails.logger.warn("[Items::SyncItemMetaBatchJob] Failed for item #{item.id}: #{e.message}")
       end

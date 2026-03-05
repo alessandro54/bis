@@ -1,4 +1,5 @@
 class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
+  # rubocop:disable Metrics/AbcSize
   def index
     cache_key = meta_cache_key("gems", bracket_param, spec_id_param, slot_param, socket_type_param, locale_param)
 
@@ -19,6 +20,7 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
     render json: json
     set_cache_headers
   end
+  # rubocop:enable Metrics/AbcSize
 
   private
 

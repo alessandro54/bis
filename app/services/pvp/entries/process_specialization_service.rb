@@ -59,9 +59,9 @@ module Pvp
         }
 
         success(nil, context: {
-          entry_attrs:          entry_attrs,
-          char_attrs:           char_attrs,
-          per_spec_hero_trees:  per_spec_hero_trees
+          entry_attrs:         entry_attrs,
+          char_attrs:          char_attrs,
+          per_spec_hero_trees: per_spec_hero_trees
         })
       rescue => e
         failure(e)
@@ -74,6 +74,7 @@ module Pvp
 
         # Process talents for ALL specs returned by the API, not just the active one.
         # Each spec's talents are stored independently, keyed by spec_id.
+        # rubocop:disable Metrics/AbcSize
         def process_all_specs_talents(spec_service, char_attrs)
           current_codes = character.spec_talent_loadout_codes || {}
           new_codes = current_codes.dup
@@ -88,7 +89,7 @@ module Pvp
             next if current_code == new_code
 
             talent_hash = spec_data[:talents].merge(
-              "pvp_talents"         => spec_data[:pvp_talents],
+              "pvp_talents" => spec_data[:pvp_talents],
               "talent_loadout_code" => new_code
             ).stringify_keys!
 
@@ -103,6 +104,7 @@ module Pvp
 
           char_attrs[:spec_talent_loadout_codes] = new_codes if new_codes != current_codes
         end
+        # rubocop:enable Metrics/AbcSize
 
         def rebuild_character_talents(talent_upsert, spec_id)
           character.character_talents.where(spec_id: spec_id).delete_all

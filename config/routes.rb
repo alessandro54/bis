@@ -30,6 +30,10 @@ Rails.application.routes.draw do
     end
   end
 
+  get "/admin/login",    to: "admin/sessions#new", as: :admin_login
+  post "/admin/login",   to: "admin/sessions#create"
+  delete "/admin/logout", to: "admin/sessions#destroy", as: :admin_logout
+
   mount MissionControl::Jobs::Engine, at: "/jobs"
   mount_avo
 end
