@@ -10,7 +10,8 @@ class Avo::Resources::PvpLeaderboardEntry < Avo::BaseResource
 
   def filters
     filter Avo::Filters::PvpLeaderboardFilter
-    filter Avo::Filters::ItemLevelFilter
+    filter Avo::Filters::SpecIdFilter
+    filter Avo::Filters::EntriesByCharacterFilter
   end
 
   # rubocop:disable Metrics/MethodLength, Metrics/AbcSize

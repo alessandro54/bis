@@ -26,13 +26,11 @@
 #
 # Indexes
 #
+#  idx_entries_unique_char_leaderboard                     (character_id,pvp_leaderboard_id) UNIQUE
 #  index_entries_for_batch_processing                      (id,equipment_processed_at)
 #  index_entries_for_spec_meta                             (pvp_leaderboard_id,spec_id,rating)
 #  index_entries_on_leaderboard_and_rating                 (pvp_leaderboard_id,rating)
-#  index_entries_on_leaderboard_and_snapshot               (pvp_leaderboard_id,snapshot_at)
 #  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
-#  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
-#  index_pvp_entries_on_snapshot_at                        (snapshot_at)
 #  index_pvp_leaderboard_entries_on_character_id           (character_id)
 #  index_pvp_leaderboard_entries_on_hero_talent_tree_id    (hero_talent_tree_id)
 #  index_pvp_leaderboard_entries_on_pvp_leaderboard_id     (pvp_leaderboard_id)
@@ -49,29 +47,12 @@ class PvpLeaderboardEntry < ApplicationRecord
   belongs_to :character
 
   scope :latest_snapshot_for_bracket, ->(bracket, season_id: nil) {
-    season_filter =
-      if season_id.present?
-        season_id
-      else
-        PvpSeason.where(is_current: true).select(:id).limit(1)
-      end
-
-    leaderboard_ids = PvpLeaderboard
-      .where(bracket: bracket)
-      .where(pvp_season_id: season_filter)
-      .select(:id)
-
-    # Use the latest snapshot that has at least one processed entry (spec_id set).
-    # Falls back to previous snapshot when the current sync is still in progress or failed.
-    latest_processed = PvpLeaderboardEntry
-      .where(pvp_leaderboard_id: leaderboard_ids)
-      .where.not(spec_id: nil)
-      .select("MAX(pvp_leaderboard_entries.snapshot_at)")
+    season_filter = season_id.present? ? season_id : PvpSeason.where(is_current: true).select(:id).limit(1)
 
     joins(pvp_leaderboard: :pvp_season)
       .where(pvp_leaderboards: { bracket: bracket })
       .where(pvp_seasons: { id: season_filter })
-      .where("pvp_leaderboard_entries.snapshot_at = (#{latest_processed.to_sql})")
+      .where.not(spec_id: nil)
   }
 
   def winrate

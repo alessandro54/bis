@@ -1,0 +1,8 @@
+class Character
+  def print_loadout: -> void
+  def print_talents: -> void
+  def print_sync_status: -> void
+
+  def spec: -> string
+  def meta_synced?: -> bool
+end

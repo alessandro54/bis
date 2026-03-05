@@ -37,7 +37,7 @@ module Pvp
             slot_totals AS (
               SELECT t.bracket, t.spec_id, ci.slot, COUNT(*) AS total
               FROM top_chars t
-              JOIN character_items ci ON ci.character_id = t.character_id
+              JOIN character_items ci ON ci.character_id = t.character_id AND ci.spec_id = t.spec_id
               GROUP BY t.bracket, t.spec_id, ci.slot
             )
             SELECT
@@ -49,7 +49,7 @@ module Pvp
               ROUND(COUNT(*) * 100.0 / st.total, 2)    AS usage_pct,
               NOW()                                     AS snapshot_at
             FROM top_chars t
-            JOIN character_items ci ON ci.character_id = t.character_id
+            JOIN character_items ci ON ci.character_id = t.character_id AND ci.spec_id = t.spec_id
             JOIN slot_totals st
               ON st.bracket = t.bracket AND st.spec_id = t.spec_id AND st.slot = ci.slot
             GROUP BY t.bracket, t.spec_id, ci.slot, ci.item_id, st.total

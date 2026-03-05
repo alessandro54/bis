@@ -93,11 +93,14 @@ RSpec.describe Blizzard::Auth do
         )
       end
 
+      let(:httpx_client) { instance_double(HTTPX::Session) }
+
       before do
         allow(Rails.cache).to receive(:read).with(cache_key).and_return(nil)
 
-        # Stub HTTPX.post in a loose way; we'll assert args later
-        allow(HTTPX).to receive(:post).and_return(http_response)
+        # Stub HTTPX.with(...).post in a loose way; we'll assert args later
+        allow(HTTPX).to receive(:with).and_return(httpx_client)
+        allow(httpx_client).to receive(:post).and_return(http_response)
 
         allow(Rails.cache).to receive(:write)
       end
@@ -108,7 +111,7 @@ RSpec.describe Blizzard::Auth do
 
           expect(token).to eq(new_token)
 
-          expect(HTTPX).to have_received(:post).with(
+          expect(httpx_client).to have_received(:post).with(
             Blizzard::Auth::OAUTH_URL,
             hash_including(
               form:    { grant_type: "client_credentials" },
@@ -156,7 +159,7 @@ RSpec.describe Blizzard::Auth do
           }
         )
 
-        allow(HTTPX).to receive(:post).and_return(http_response)
+        allow(HTTPX).to receive(:with).and_return(instance_double(HTTPX::Session, post: http_response))
         allow(Rails.cache).to receive(:write)
       end
 
@@ -164,14 +167,6 @@ RSpec.describe Blizzard::Auth do
         token = auth.access_token
 
         expect(token).to eq(new_token)
-
-        expect(HTTPX).to have_received(:post).with(
-          Blizzard::Auth::OAUTH_URL,
-          hash_including(
-            form:    { grant_type: "client_credentials" },
-            headers: hash_including(Authorization: a_kind_of(String))
-          )
-        )
       end
     end
 
@@ -188,7 +183,7 @@ RSpec.describe Blizzard::Auth do
 
       before do
         allow(Rails.cache).to receive(:read).with(cache_key).and_return(nil)
-        allow(HTTPX).to receive(:post).and_return(http_response)
+        allow(HTTPX).to receive(:with).and_return(instance_double(HTTPX::Session, post: http_response))
       end
 
       it "raises Blizzard::Auth::Error" do
@@ -211,7 +206,7 @@ RSpec.describe Blizzard::Auth do
 
       before do
         allow(Rails.cache).to receive(:read).with(cache_key).and_return(nil)
-        allow(HTTPX).to receive(:post).and_return(http_response)
+        allow(HTTPX).to receive(:with).and_return(instance_double(HTTPX::Session, post: http_response))
       end
 
       it "raises Blizzard::Auth::Error" do

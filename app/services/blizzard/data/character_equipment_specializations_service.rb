@@ -16,6 +16,29 @@ module Blizzard
         talents.is_a?(Hash) && talents.any?
       end
 
+      # Returns talent data for every spec the character has loadouts for,
+      # not just the active one. Each element is a Hash with:
+      #   :spec_id, :hero_tree, :talent_loadout_code, :talents (Hash),
+      #   :pvp_talents, :class_slug
+      def all_specializations
+        specializations.filter_map do |spec_data|
+          spec_id = spec_data.dig("specialization", "id")
+          next unless spec_id
+
+          loadout = active_loadout(spec_data)
+          next unless loadout
+
+          {
+            spec_id:             spec_id,
+            hero_tree:           loadout["selected_hero_talent_tree"],
+            talent_loadout_code: loadout["talent_loadout_code"] || "",
+            talents:             build_talent_trees(loadout),
+            pvp_talents:         spec_data["pvp_talent_slots"],
+            class_slug:          loadout.dig("selected_class_talent_tree", "name")&.downcase
+          }
+        end
+      end
+
       private
 
         attr_reader :specializations

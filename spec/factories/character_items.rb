@@ -17,10 +17,12 @@
 #  enchantment_id             :bigint
 #  enchantment_source_item_id :bigint
 #  item_id                    :bigint           not null
+#  spec_id                    :integer          not null
 #
 # Indexes
 #
-#  idx_character_items_on_char_and_slot     (character_id,slot) UNIQUE
+#  idx_character_items_on_char_slot_spec    (character_id,slot,spec_id) UNIQUE
+#  idx_character_items_on_char_spec         (character_id,spec_id)
 #  index_character_items_on_enchantment_id  (enchantment_id) WHERE (enchantment_id IS NOT NULL)
 #  index_character_items_on_item_id         (item_id)
 #
@@ -40,5 +42,6 @@ FactoryBot.define do
     context    { Faker::Number.between(from: 1, to: 50) }
     bonus_list { [] }
     sockets    { [] }
+    spec_id    { 262 }
   end
 end

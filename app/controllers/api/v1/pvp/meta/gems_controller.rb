@@ -1,16 +1,23 @@
 class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
   def index
-    gems = PvpMetaGemPopularity
-      .includes(item: :translations)
-      .where(pvp_season: current_season)
-      .where(bracket: bracket_param)
-      .where(spec_id: spec_id_param)
-      .order(usage_pct: :desc)
+    cache_key = meta_cache_key("gems", bracket_param, spec_id_param, slot_param, socket_type_param, locale_param)
 
-    gems = gems.where(slot: slot_param) if slot_param.present?
-    gems = gems.where(socket_type: socket_type_param) if socket_type_param.present?
+    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+      gems = PvpMetaGemPopularity
+        .includes(item: :translations)
+        .where(pvp_season: current_season)
+        .where(bracket: bracket_param)
+        .where(spec_id: spec_id_param)
+        .order(usage_pct: :desc)
 
-    render json: gems.map { |record| serialize_gem(record) }
+      gems = gems.where(slot: slot_param) if slot_param.present?
+      gems = gems.where(socket_type: socket_type_param) if socket_type_param.present?
+
+      gems.map { |record| serialize_gem(record) }
+    end
+
+    render json: json
+    set_cache_headers
   end
 
   private
@@ -31,10 +38,6 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
         usage_pct:   record.usage_pct.to_f,
         snapshot_at: record.snapshot_at
       }
-    end
-
-    def current_season
-      @current_season ||= PvpSeason.current
     end
 
     def bracket_param

@@ -1,0 +1,3 @@
+module Blizzard
+  def self.client: (?region: String, ?locale: String) -> Client
+end

@@ -13,12 +13,18 @@ Rails.application.routes.draw do
       resources :characters, only: [ :index ]
 
       namespace :pvp do
+        scope ":season/:region", as: "season_region_bracket" do
+          resources :leaderboards, only: [ :show ], param: :bracket
+        end
+
         namespace :meta do
           resources :items, only: [ :index ]
           resources :enchants, only: [ :index ]
           resources :gems, only: [ :index ]
           resources :specs, only: %i[index show]
+          resources :talents, only: [ :index ]
           get :class_distribution, to: "class_distributions#show"
+          get :top_players, to: "top_players#index"
         end
       end
     end

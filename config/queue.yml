@@ -29,19 +29,22 @@ production: &production
 
   workers:
     # US characters — dedicated worker so a Blizzard US rate-limit never stalls EU.
-    # PVP_SYNC_THREADS controls both SolidQueue parallelism AND safe_concurrency math
-    # inside SyncCharacterBatchJob. Must stay in sync. With DB_POOL=130:
-    #   per_thread = floor(130 / PVP_SYNC_THREADS) - 1
-    #   8 threads → 15 chars/batch → 120 peak connections (safe under pool of 130)
+    # PVP_SYNC_THREADS controls SolidQueue parallelism AND safe_concurrency math inside
+    # SyncCharacterBatchJob. PVP_CHARACTER_SYNC_PROCESSES adds parallel OS processes for
+    # the same queue (sharding). safe_concurrency divides by THREADS * PROCESSES so the
+    # total peak DB connections stays within DB_POOL across all processes:
+    #   per_thread = floor(DB_POOL / (PVP_SYNC_THREADS * PVP_CHARACTER_SYNC_PROCESSES)) - 1
+    #   8 threads, 1 process  → 15 chars/job → 120 peak connections (safe under pool of 130)
+    #   8 threads, 2 processes → 7 chars/job → 112 peak connections (safe, 2× throughput)
     - queues: [character_sync_us]
       threads: <%= ENV.fetch("PVP_SYNC_THREADS", 8) %>
-      processes: 1
+      processes: <%= ENV.fetch("PVP_CHARACTER_SYNC_PROCESSES", 1) %>
       polling_interval: 0.25
 
     # EU characters — independent from US, separate Blizzard rate-limit bucket.
     - queues: [character_sync_eu]
       threads: <%= ENV.fetch("PVP_SYNC_THREADS", 8) %>
-      processes: 1
+      processes: <%= ENV.fetch("PVP_CHARACTER_SYNC_PROCESSES", 1) %>
       polling_interval: 0.25
 
     # Leaderboard sync + bracket-specific queues

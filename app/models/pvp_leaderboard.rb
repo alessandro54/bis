@@ -24,4 +24,10 @@ class PvpLeaderboard < ApplicationRecord
   belongs_to :pvp_season
 
   has_many :entries, class_name: "PvpLeaderboardEntry", dependent: :destroy
+
+  def get_top_n(n, spec_id: nil)
+    scope = entries
+    scope = scope.where(spec_id: spec_id) if spec_id.present?
+    scope.order(rank: :asc).limit(n)
+  end
 end

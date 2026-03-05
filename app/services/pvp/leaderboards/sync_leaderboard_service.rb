@@ -72,13 +72,16 @@ module Pvp
             region:        region
           )
 
+          bracket_spec_id  = Wow::Catalog.spec_id_from_bracket(bracket)
+          bracket_class_id = Wow::Catalog.class_id_for_spec(bracket_spec_id) if bracket_spec_id
+
           leaderboard.with_lock do
             now = Time.current
             entry_records = entries.map do |entry_json|
               character_data = entry_json.fetch("character")
               stats          = entry_json.fetch("season_match_statistics")
 
-              {
+              record = {
                 pvp_leaderboard_id: leaderboard.id,
                 character_id:       char_id_map[character_data["id"].to_s],
                 rank:               entry_json["rank"],
@@ -89,6 +92,10 @@ module Pvp
                 created_at:         now,
                 updated_at:         now
               }
+
+              record[:spec_id]  = bracket_spec_id  if bracket_spec_id
+              record[:class_id] = bracket_class_id if bracket_class_id
+              record
             end
 
             # Deduplicate by character_id — shuffle-overall leaderboards return the
@@ -99,14 +106,21 @@ module Pvp
               .values
 
             ActiveRecord::Base.transaction do
+              update_cols = %i[rank rating wins losses snapshot_at]
+              update_cols.push(:spec_id, :class_id) if bracket_spec_id
+
               # rubocop:disable Rails/SkipsModelValidations
-              PvpLeaderboardEntry.insert_all!(entry_records)
+              PvpLeaderboardEntry.upsert_all(
+                entry_records,
+                unique_by:   %i[character_id pvp_leaderboard_id],
+                update_only: update_cols
+              )
               # rubocop:enable Rails/SkipsModelValidations
 
               character_ids = char_id_map.values
               leaderboard.update!(last_synced_at: snapshot_at)
 
-              prune_old_entries(leaderboard.id, character_ids)
+              remove_dropped_entries(leaderboard.id, character_ids)
             end
           end
         end
@@ -136,26 +150,13 @@ module Pvp
           end
         end
 
-        MAX_SNAPSHOTS_PER_CHARACTER = 3
-
-        # Delete entries older than the N most recent snapshots per character
-        # for the given leaderboard. Keeps the table from growing unbounded
-        # since the real equipment/talent data lives on the characters.
-        def prune_old_entries(leaderboard_id, character_ids)
-          return if character_ids.empty?
-
-          ranked = PvpLeaderboardEntry
-            .select("id, ROW_NUMBER() OVER (PARTITION BY character_id ORDER BY snapshot_at DESC, id DESC) AS rn")
-            .where(pvp_leaderboard_id: leaderboard_id, character_id: character_ids)
-
-          keep_ids = PvpLeaderboardEntry
-            .from(ranked, :ranked)
-            .where("ranked.rn <= ?", MAX_SNAPSHOTS_PER_CHARACTER)
-            .select("ranked.id")
+        # Delete entries for characters no longer present on the leaderboard.
+        def remove_dropped_entries(leaderboard_id, active_character_ids)
+          return if active_character_ids.empty?
 
           PvpLeaderboardEntry
-            .where(pvp_leaderboard_id: leaderboard_id, character_id: character_ids)
-            .where.not(id: keep_ids)
+            .where(pvp_leaderboard_id: leaderboard_id)
+            .where.not(character_id: active_character_ids)
             .delete_all
         end
 

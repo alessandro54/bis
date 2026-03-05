@@ -4,13 +4,15 @@ module Pvp
     queue_as :character_sync_us # overridden per-region via .set(queue:) when enqueued
 
     CONCURRENCY = ENV.fetch("PVP_SYNC_CONCURRENCY", 15).to_i
-    # Threads dedicated to character_sync queues — NOT the total worker thread
-    # count. In production each region queue has its own worker (default 8
-    # threads). Set PVP_SYNC_THREADS to match that worker's thread count so
-    # safe_concurrency divides the pool correctly.
+    # Threads per SolidQueue worker process for character_sync queues.
+    # Must match PVP_SYNC_THREADS in queue.yml so the DB pool math is correct.
     THREADS     = ENV.fetch("PVP_SYNC_THREADS", 8).to_i
+    # Number of parallel OS processes per region queue (PVP_CHARACTER_SYNC_PROCESSES
+    # in queue.yml). safe_concurrency multiplies by this so total peak DB connections
+    # across all processes stays within DB_POOL.
+    PROCESSES   = ENV.fetch("PVP_CHARACTER_SYNC_PROCESSES", 1).to_i
 
-    retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3 do |_job, error|
+    retry_on Blizzard::Client::Error, wait: :exponentially_longer, attempts: 3 do |_job, error|
       Rails.logger.warn("[SyncCharacterBatchJob] API error, will retry: #{error.message}")
     end
 
@@ -31,11 +33,6 @@ module Pvp
         .index_by(&:id)
 
       enqueue_meta_sync_for_stale(ids)
-
-      # Characters on cooldown still need their new entries populated
-      # with cached data from the latest processed entry.
-      skipped_ids = ids - characters_by_id.keys
-      propagate_cached_entry_data(skipped_ids) if skipped_ids.any?
 
       return if characters_by_id.empty?
 
@@ -69,7 +66,7 @@ module Pvp
         eq_fallbacks_by_character_id = batch_load_eq_fallbacks(character_ids)
         sp_fallbacks_by_character_id = batch_load_spec_fallbacks(character_ids)
 
-        concurrency = safe_concurrency(CONCURRENCY, characters.size, threads: THREADS)
+        concurrency = safe_concurrency(CONCURRENCY, characters.size, threads: THREADS * PROCESSES)
 
         run_with_threads(characters, concurrency: concurrency) do |character|
           sync_one(
@@ -104,19 +101,11 @@ module Pvp
           .index_by(&:character_id)
       end
 
-      # Single DISTINCT ON query for all characters; groups results by character_id.
+      # One entry per leaderboard per character — group by character_id to
+      # support characters appearing on multiple brackets/regions.
       def batch_load_entries(character_ids)
         PvpLeaderboardEntry
-          .joins(:pvp_leaderboard)
           .where(character_id: character_ids)
-          .select(
-            "DISTINCT ON (pvp_leaderboard_entries.character_id, pvp_leaderboards.bracket) " \
-            "pvp_leaderboard_entries.*"
-          )
-          .order(
-            "pvp_leaderboard_entries.character_id, pvp_leaderboards.bracket, " \
-            "pvp_leaderboard_entries.snapshot_at DESC, pvp_leaderboard_entries.id DESC"
-          )
           .group_by(&:character_id)
       end
 
@@ -155,58 +144,11 @@ module Pvp
       end
       # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
-      # Bulk-copy equipment & spec attrs from the latest processed entry to
-      # any unprocessed entries for characters that were skipped (cooldown or
-      # TTL). A single UPDATE … FROM keeps this to one round-trip.
-      # rubocop:disable Metrics/MethodLength
-      def propagate_cached_entry_data(skipped_ids)
-        return if skipped_ids.empty?
-
-        sql = <<~SQL.squish
-          UPDATE pvp_leaderboard_entries AS target
-          SET
-            item_level                  = source.item_level,
-            tier_set_id                 = source.tier_set_id,
-            tier_set_name               = source.tier_set_name,
-            tier_set_pieces             = source.tier_set_pieces,
-            tier_4p_active              = source.tier_4p_active,
-            equipment_processed_at      = source.equipment_processed_at,
-            spec_id                     = source.spec_id,
-            hero_talent_tree_name       = source.hero_talent_tree_name,
-            hero_talent_tree_id         = source.hero_talent_tree_id,
-            specialization_processed_at = source.specialization_processed_at,
-            updated_at                  = NOW()
-          FROM (
-            SELECT DISTINCT ON (character_id)
-              character_id, item_level, tier_set_id, tier_set_name, tier_set_pieces,
-              tier_4p_active, equipment_processed_at, spec_id, hero_talent_tree_name,
-              hero_talent_tree_id, specialization_processed_at
-            FROM pvp_leaderboard_entries
-            WHERE character_id IN (?)
-              AND equipment_processed_at IS NOT NULL
-            ORDER BY character_id, equipment_processed_at DESC
-          ) AS source
-          WHERE target.character_id = source.character_id
-            AND target.equipment_processed_at IS NULL
-        SQL
-
-        sanitized = ApplicationRecord.sanitize_sql_array([ sql, skipped_ids ])
-        count = ApplicationRecord.connection.exec_update(sanitized, "PropagateCache")
-
-        return unless count > 0
-
-        Rails.logger.info(
-          "[SyncCharacterBatchJob] Propagated cached data to #{count} entries " \
-          "for skipped characters (cooldown/TTL)"
-        )
-      end
-      # rubocop:enable Metrics/MethodLength
-
       def enqueue_meta_sync_for_stale(character_ids)
         stale_ids = Character
           .where(id: character_ids)
           .where(is_private: false)
-          .where("meta_synced_at IS NULL OR meta_synced_at < ?", 1.week.ago)
+          .where("meta_synced_at IS NULL OR meta_synced_at < ?", Pvp::SyncConfig::META_TTL.ago)
           .pluck(:id)
 
         return if stale_ids.empty?

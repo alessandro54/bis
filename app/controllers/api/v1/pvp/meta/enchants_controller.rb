@@ -1,15 +1,22 @@
 class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
   def index
-    enchants = PvpMetaEnchantPopularity
-      .includes(enchantment: :translations)
-      .where(pvp_season: current_season)
-      .where(bracket: bracket_param)
-      .where(spec_id: spec_id_param)
-      .order(usage_pct: :desc)
+    cache_key = meta_cache_key("enchants", bracket_param, spec_id_param, slot_param, locale_param)
 
-    enchants = enchants.where(slot: slot_param) if slot_param.present?
+    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+      enchants = PvpMetaEnchantPopularity
+        .includes(enchantment: :translations)
+        .where(pvp_season: current_season)
+        .where(bracket: bracket_param)
+        .where(spec_id: spec_id_param)
+        .order(usage_pct: :desc)
 
-    render json: enchants.map { |record| serialize_enchant(record) }
+      enchants = enchants.where(slot: slot_param) if slot_param.present?
+
+      enchants.map { |record| serialize_enchant(record) }
+    end
+
+    render json: json
+    set_cache_headers
   end
 
   private
@@ -27,10 +34,6 @@ class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
         usage_pct:   record.usage_pct.to_f,
         snapshot_at: record.snapshot_at
       }
-    end
-
-    def current_season
-      @current_season ||= PvpSeason.current
     end
 
     def bracket_param

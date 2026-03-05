@@ -46,6 +46,16 @@ module Blizzard
       end
     end
 
+    # Clears both caches so the next access_token call fetches a fresh token.
+    # Called by the API client when Blizzard returns 401 Unauthorized.
+    def invalidate!
+      PROCESS_TOKEN_MUTEX.synchronize do
+        @process_tokens.delete(@client_id)
+        @process_expires_at.delete(@client_id)
+      end
+      Rails.cache&.delete(self.class.cache_key_for(@client_id))
+    end
+
     attr_reader :client_id
 
     def initialize(
@@ -96,13 +106,17 @@ module Blizzard
       end
 
       def perform_oauth_request
-        response = HTTPX.post(
+        response = HTTPX.with(timeout: { request_timeout: 30 }).post(
           OAUTH_URL,
           form:    { grant_type: "client_credentials" },
           headers: {
             "Authorization": "Basic #{Base64.strict_encode64("#{@client_id}:#{@client_secret}")}"
           }
         )
+
+        if response.is_a?(HTTPX::ErrorResponse)
+          raise Error, "Blizzard OAuth error: network/transport error: #{response.error}"
+        end
 
         return response if response.status == 200
 

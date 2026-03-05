@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_04_060000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -27,8 +27,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
     t.integer "item_level"
     t.string "slot", null: false
     t.jsonb "sockets", default: []
+    t.integer "spec_id", null: false
     t.datetime "updated_at", null: false
-    t.index ["character_id", "slot"], name: "idx_character_items_on_char_and_slot", unique: true
+    t.index ["character_id", "slot", "spec_id"], name: "idx_character_items_on_char_slot_spec", unique: true
+    t.index ["character_id", "spec_id"], name: "idx_character_items_on_char_spec"
     t.index ["enchantment_id"], name: "index_character_items_on_enchantment_id", where: "(enchantment_id IS NOT NULL)"
     t.index ["item_id"], name: "index_character_items_on_item_id"
   end
@@ -38,10 +40,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
     t.datetime "created_at", null: false
     t.integer "rank", default: 1
     t.integer "slot_number"
+    t.integer "spec_id", null: false
     t.bigint "talent_id", null: false
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
-    t.index ["character_id", "talent_id"], name: "idx_character_talents_on_char_and_talent", unique: true
+    t.index ["character_id", "spec_id"], name: "idx_character_talents_on_char_spec"
+    t.index ["character_id", "talent_id", "spec_id"], name: "idx_character_talents_on_char_talent_spec", unique: true
     t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
     t.index ["talent_id"], name: "index_character_talents_on_talent_id"
   end
@@ -52,7 +56,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
     t.bigint "class_id"
     t.string "class_slug"
     t.datetime "created_at", null: false
-    t.string "equipment_fingerprint"
     t.datetime "equipment_last_modified", precision: nil
     t.integer "faction"
     t.string "inset_url"
@@ -65,15 +68,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
     t.integer "race_id"
     t.string "realm"
     t.string "region"
-    t.string "talent_loadout_code"
+    t.jsonb "spec_equipment_fingerprints", default: {}
+    t.jsonb "spec_talent_loadout_codes", default: {}
     t.datetime "talents_last_modified", precision: nil
     t.datetime "unavailable_until"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
-    t.index ["equipment_fingerprint"], name: "index_characters_on_equipment_fingerprint"
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
-    t.index ["talent_loadout_code"], name: "index_characters_on_talent_loadout_code"
     t.index ["unavailable_until"], name: "index_characters_on_unavailable_until_active", where: "(unavailable_until IS NOT NULL)"
   end
 
@@ -132,16 +134,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
     t.datetime "updated_at", null: false
     t.integer "wins", default: 0
     t.index ["character_id", "equipment_processed_at"], name: "index_pvp_entries_on_character_and_equipment_processed", where: "(equipment_processed_at IS NOT NULL)"
-    t.index ["character_id", "snapshot_at"], name: "index_pvp_entries_on_character_and_snapshot"
+    t.index ["character_id", "pvp_leaderboard_id"], name: "idx_entries_unique_char_leaderboard", unique: true
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["id", "equipment_processed_at"], name: "index_entries_for_batch_processing"
     t.index ["pvp_leaderboard_id", "rating"], name: "index_entries_on_leaderboard_and_rating"
-    t.index ["pvp_leaderboard_id", "snapshot_at"], name: "index_entries_on_leaderboard_and_snapshot"
     t.index ["pvp_leaderboard_id", "spec_id", "rating"], name: "index_entries_for_spec_meta"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"
-    t.index ["snapshot_at"], name: "index_pvp_entries_on_snapshot_at"
     t.index ["tier_set_id"], name: "index_pvp_leaderboard_entries_on_tier_set_id"
   end
 
@@ -208,6 +208,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
     t.index ["pvp_season_id"], name: "index_pvp_meta_item_popularity_on_pvp_season_id"
   end
 
+  create_table "pvp_meta_talent_popularity", force: :cascade do |t|
+    t.string "bracket", null: false
+    t.datetime "created_at", null: false
+    t.boolean "in_top_build", default: false, null: false
+    t.bigint "pvp_season_id", null: false
+    t.datetime "snapshot_at", null: false
+    t.integer "spec_id", null: false
+    t.bigint "talent_id", null: false
+    t.string "talent_type", null: false
+    t.integer "top_build_rank", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.integer "usage_count", default: 0, null: false
+    t.decimal "usage_pct", precision: 8, scale: 4
+    t.index ["pvp_season_id", "bracket", "spec_id", "talent_id"], name: "idx_meta_talent_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "talent_type"], name: "idx_meta_talent_lookup"
+    t.index ["pvp_season_id"], name: "index_pvp_meta_talent_popularity_on_pvp_season_id"
+    t.index ["talent_id"], name: "index_pvp_meta_talent_popularity_on_talent_id"
+  end
+
   create_table "pvp_seasons", force: :cascade do |t|
     t.integer "blizzard_id"
     t.datetime "created_at", null: false
@@ -235,13 +254,37 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
     t.index ["pvp_season_id"], name: "index_pvp_sync_cycles_on_pvp_season_id"
   end
 
+  create_table "talent_prerequisites", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "node_id", null: false
+    t.bigint "prerequisite_node_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["node_id", "prerequisite_node_id"], name: "idx_talent_prerequisites_unique", unique: true
+    t.index ["node_id"], name: "index_talent_prerequisites_on_node_id"
+  end
+
+  create_table "talent_spec_assignments", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "spec_id", null: false
+    t.bigint "talent_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["spec_id"], name: "index_talent_spec_assignments_on_spec_id"
+    t.index ["talent_id", "spec_id"], name: "index_talent_spec_assignments_on_talent_id_and_spec_id", unique: true
+  end
+
   create_table "talents", force: :cascade do |t|
     t.bigint "blizzard_id", null: false
     t.datetime "created_at", null: false
+    t.integer "display_col"
+    t.integer "display_row"
+    t.string "icon_url"
+    t.integer "max_rank", default: 1, null: false
+    t.bigint "node_id"
     t.integer "spell_id"
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
     t.index ["blizzard_id"], name: "index_talents_on_blizzard_id", unique: true
+    t.index ["node_id"], name: "index_talents_on_node_id"
     t.index ["talent_type", "blizzard_id"], name: "index_talents_on_talent_type_and_blizzard_id"
   end
 
@@ -275,5 +318,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_02_27_003807) do
   add_foreign_key "pvp_meta_gem_popularity", "pvp_seasons"
   add_foreign_key "pvp_meta_item_popularity", "items"
   add_foreign_key "pvp_meta_item_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_talent_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_talent_popularity", "talents"
   add_foreign_key "pvp_sync_cycles", "pvp_seasons"
+  add_foreign_key "talent_spec_assignments", "talents"
 end

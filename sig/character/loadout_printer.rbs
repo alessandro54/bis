@@ -1,0 +1,21 @@
+class Character::LoadoutPrinter
+  @character: Character
+
+  QUALITY_COLORS : Hash[string, string]
+
+  def self.call: (Character character) -> nil
+
+  def initialize: (Character character) -> void
+
+  def call: -> nil
+
+  private
+
+  def build_children: (Array[string] ci, Array[string] gems_by_id)-> Array[string]
+  def reset: -> string
+  def bold: -> string
+  def quality_color: (String quality) -> string
+
+  def cyan: -> string
+  def teal: -> string
+end

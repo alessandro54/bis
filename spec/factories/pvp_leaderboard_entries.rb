@@ -27,13 +27,11 @@
 #
 # Indexes
 #
+#  idx_entries_unique_char_leaderboard                     (character_id,pvp_leaderboard_id) UNIQUE
 #  index_entries_for_batch_processing                      (id,equipment_processed_at)
 #  index_entries_for_spec_meta                             (pvp_leaderboard_id,spec_id,rating)
 #  index_entries_on_leaderboard_and_rating                 (pvp_leaderboard_id,rating)
-#  index_entries_on_leaderboard_and_snapshot               (pvp_leaderboard_id,snapshot_at)
 #  index_pvp_entries_on_character_and_equipment_processed  (character_id,equipment_processed_at) WHERE (equipment_processed_at IS NOT NULL)
-#  index_pvp_entries_on_character_and_snapshot             (character_id,snapshot_at)
-#  index_pvp_entries_on_snapshot_at                        (snapshot_at)
 #  index_pvp_leaderboard_entries_on_character_id           (character_id)
 #  index_pvp_leaderboard_entries_on_hero_talent_tree_id    (hero_talent_tree_id)
 #  index_pvp_leaderboard_entries_on_pvp_leaderboard_id     (pvp_leaderboard_id)

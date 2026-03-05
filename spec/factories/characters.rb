@@ -3,37 +3,35 @@
 # Table name: characters
 # Database name: primary
 #
-#  id                         :bigint           not null, primary key
-#  avatar_url                 :string
-#  class_slug                 :string
-#  equipment_fingerprint      :string
-#  equipment_last_modified    :datetime
-#  faction                    :integer
-#  inset_url                  :string
-#  is_private                 :boolean          default(FALSE)
-#  last_equipment_snapshot_at :datetime
-#  main_raw_url               :string
-#  meta_synced_at             :datetime
-#  name                       :string
-#  race                       :string
-#  realm                      :string
-#  region                     :string
-#  talent_loadout_code        :string
-#  talents_last_modified      :datetime
-#  unavailable_until          :datetime
-#  created_at                 :datetime         not null
-#  updated_at                 :datetime         not null
-#  blizzard_id                :bigint
-#  class_id                   :bigint
-#  race_id                    :integer
+#  id                          :bigint           not null, primary key
+#  avatar_url                  :string
+#  class_slug                  :string
+#  equipment_last_modified     :datetime
+#  faction                     :integer
+#  inset_url                   :string
+#  is_private                  :boolean          default(FALSE)
+#  last_equipment_snapshot_at  :datetime
+#  main_raw_url                :string
+#  meta_synced_at              :datetime
+#  name                        :string
+#  race                        :string
+#  realm                       :string
+#  region                      :string
+#  spec_equipment_fingerprints :jsonb
+#  spec_talent_loadout_codes   :jsonb
+#  talents_last_modified       :datetime
+#  unavailable_until           :datetime
+#  created_at                  :datetime         not null
+#  updated_at                  :datetime         not null
+#  blizzard_id                 :bigint
+#  class_id                    :bigint
+#  race_id                     :integer
 #
 # Indexes
 #
 #  index_characters_on_blizzard_id_and_region     (blizzard_id,region) UNIQUE
-#  index_characters_on_equipment_fingerprint      (equipment_fingerprint)
 #  index_characters_on_is_private                 (is_private) WHERE (is_private = true)
 #  index_characters_on_name_and_realm_and_region  (name,realm,region)
-#  index_characters_on_talent_loadout_code        (talent_loadout_code)
 #  index_characters_on_unavailable_until_active   (unavailable_until) WHERE (unavailable_until IS NOT NULL)
 #
 
@@ -65,7 +63,10 @@ module FixtureParser
   # Items, enchantments, and gem items are found-or-created by blizzard_id so the
   # method is safe to invoke in parallel test runs without unique-constraint errors.
   # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
-  def self.build_equipment(character, char_name)
+  def self.build_equipment(character, char_name, spec_id: nil)
+    raw = load("specialization/#{char_name}.json")
+    spec_id ||= raw.dig("active_specialization", "id") || 262
+
     raw_items = load("equipment/#{char_name}.json")["equipped_items"].reject { |i|
       EXCLUDED_SLOTS.include?(i.dig("slot", "type")) || i.dig("level", "value").to_i <= 0
     }
@@ -73,22 +74,23 @@ module FixtureParser
     item_map    = build_item_map(raw_items)
     enchant_map = build_enchant_map(raw_items)
 
-    raw_items.each do |raw|
-      permanent = Array(raw["enchantments"]).find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
-      sockets   = Array(raw["sockets"]).map { |s|
+    raw_items.each do |raw_item|
+      permanent = Array(raw_item["enchantments"]).find { |e| e.dig("enchantment_slot", "type") == "PERMANENT" }
+      sockets   = Array(raw_item["sockets"]).map { |s|
         { "type" => s.dig("socket_type", "type"), "item_id" => item_map[s.dig("item", "id")]&.id,
 "display_string" => s["display_string"] }
       }
 
       CharacterItem.create!(
         character:               character,
-        item:                    item_map[raw.dig("item", "id")],
-        slot:                    raw.dig("slot", "type"),
-        item_level:              raw.dig("level", "value").to_i,
-        context:                 raw["context"],
+        item:                    item_map[raw_item.dig("item", "id")],
+        slot:                    raw_item.dig("slot", "type"),
+        spec_id:                 spec_id,
+        item_level:              raw_item.dig("level", "value").to_i,
+        context:                 raw_item["context"],
         enchantment:             enchant_map[permanent&.dig("enchantment_id")],
         enchantment_source_item: item_map[permanent&.dig("source_item", "id")],
-        bonus_list:              raw["bonus_list"] || [],
+        bonus_list:              raw_item["bonus_list"] || [],
         sockets:                 sockets,
         crafting_stats:          []
       )
@@ -108,13 +110,15 @@ module FixtureParser
     loadout = spec["loadouts"].find { |l| l["is_active"] } || spec["loadouts"].first
     return unless loadout
 
-    character.update_columns(talent_loadout_code: loadout["talent_loadout_code"]) # rubocop:disable Rails/SkipsModelValidations
+    new_codes = (character.spec_talent_loadout_codes || {}).merge(spec_id.to_s => loadout["talent_loadout_code"])
+    character.update_columns(spec_talent_loadout_codes: new_codes) # rubocop:disable Rails/SkipsModelValidations
 
     { "selected_class_talents" => "class", "selected_spec_talents" => "spec",
 "selected_hero_talents" => "hero" }.each do |key, type|
       Array(loadout[key]).each do |t|
         talent = Talent.find_or_create_by!(blizzard_id: t["id"]) { |rec| rec.talent_type = type }
-        CharacterTalent.create!(character: character, talent: talent, talent_type: type, rank: t["rank"])
+        CharacterTalent.create!(character: character, talent: talent, talent_type: type, rank: t["rank"],
+spec_id: spec_id)
       end
     end
   end

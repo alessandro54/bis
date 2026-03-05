@@ -4,9 +4,9 @@
 # Database name: primary
 #
 #  id          :bigint           not null, primary key
-#  blizzard_id :bigint           not null
 #  created_at  :datetime         not null
 #  updated_at  :datetime         not null
+#  blizzard_id :bigint           not null
 #
 # Indexes
 #

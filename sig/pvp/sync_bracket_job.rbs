@@ -1,0 +1,5 @@
+module Pvp
+  class SyncBracketJob < ApplicationJob
+    def perform: (?region: String, season: PvpSeason, bracket: String, ?locale: String) -> void
+  end
+end

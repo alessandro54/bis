@@ -31,7 +31,17 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
       active_specialization: { "id" => 262 },
       active_hero_tree:      { "id" => 123, "name" => "Stormbringer" },
       talents:               fixture_talents,
-      class_slug:            "Shaman"
+      class_slug:            "Shaman",
+      all_specializations:   [
+        {
+          spec_id:             262,
+          hero_tree:           { "id" => 123, "name" => "Stormbringer" },
+          talent_loadout_code: fixture_talents["talent_loadout_code"],
+          talents:             fixture_talents.slice("class_talents", "spec_talents", "hero_talents"),
+          pvp_talents:         fixture_talents["pvp_talents"],
+          class_slug:          "shaman"
+        }
+      ]
     )
   end
 
@@ -93,7 +103,7 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
       end
 
       context "when talent_loadout_code has changed" do
-        before { character.update_columns(talent_loadout_code: "old_code") }
+        before { character.update_columns(spec_talent_loadout_codes: { "262" => "old_code" }) }
 
         it "creates character_talents for all talent types" do
           result; character.reload
@@ -110,14 +120,14 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
           expect(pvp.pluck(:slot_number).compact).not_to be_empty
         end
 
-        it "returns talent_loadout_code in char_attrs" do
-          expect(result.context[:char_attrs][:talent_loadout_code])
-            .to eq(fixture_talents["talent_loadout_code"])
+        it "returns spec_talent_loadout_codes in char_attrs" do
+          expect(result.context[:char_attrs][:spec_talent_loadout_codes])
+            .to eq({ "262" => fixture_talents["talent_loadout_code"] })
         end
 
         it "replaces stale character_talents" do
           stale = create(:talent, blizzard_id: 999_999, talent_type: "class")
-          character.character_talents.create!(talent: stale, talent_type: "class", rank: 1)
+          character.character_talents.create!(talent: stale, talent_type: "class", rank: 1, spec_id: 262)
 
           result
 
@@ -126,14 +136,15 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
       end
 
       context "when talent_loadout_code is already current" do
-        before { character.update_columns(talent_loadout_code: fixture_talents["talent_loadout_code"]) }
+        before {
+ character.update_columns(spec_talent_loadout_codes: { "262" => fixture_talents["talent_loadout_code"] }) }
 
         it "does not rebuild character_talents" do
           expect { result }.not_to change { character.character_talents.count }
         end
 
-        it "does not include talent_loadout_code in char_attrs" do
-          expect(result.context[:char_attrs]).not_to have_key(:talent_loadout_code)
+        it "does not include spec_talent_loadout_codes in char_attrs" do
+          expect(result.context[:char_attrs]).not_to have_key(:spec_talent_loadout_codes)
         end
       end
     end

@@ -26,6 +26,8 @@ class PvpSeason < ApplicationRecord
   validates :blizzard_id, numericality: { only_integer: true }
 
   def self.current
-    find_by(is_current: true) || order(blizzard_id: :desc).first
+    Rails.cache.fetch("pvp_season/current", expires_in: 1.hour) do
+      find_by(is_current: true) || order(blizzard_id: :desc).first
+    end
   end
 end

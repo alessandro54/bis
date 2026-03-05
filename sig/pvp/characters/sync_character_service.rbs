@@ -1,0 +1,60 @@
+module Pvp
+  module Characters
+    class SyncCharacterService < BaseService
+      class FetchResult < Struct[untyped]
+        attr_accessor json: untyped
+        attr_accessor last_modified: Time?
+        attr_accessor changed: bool
+
+        def initialize: (json: untyped, last_modified: Time?, changed: bool) -> void
+        def changed?: () -> bool
+        def unchanged?: () -> bool
+      end
+
+      def initialize: (
+        character: Character,
+        ?locale: String,
+        ?entries: Array[PvpLeaderboardEntry]?,
+        ?eq_fallback_source: PvpLeaderboardEntry?,
+        ?spec_fallback_source: PvpLeaderboardEntry?
+      ) -> void
+
+      def call: () -> ServiceResult
+
+      private
+
+        attr_reader character: Character
+        attr_reader locale: String
+        attr_reader preloaded_entries: Array[PvpLeaderboardEntry]?
+
+        @eq_fallback_source: PvpLeaderboardEntry?
+        @spec_fallback_source: PvpLeaderboardEntry?
+        @profile_not_found: bool
+
+        def process_inline: (
+          Array[PvpLeaderboardEntry] entries,
+          FetchResult eq_fetch,
+          FetchResult spec_fetch
+        ) -> void
+
+        def equipment_entry_attrs_from_latest: () -> Hash[Symbol, untyped]
+        def spec_entry_attrs_from_latest: () -> Hash[Symbol, untyped]
+
+        def fetch_remote_data: () -> [FetchResult?, FetchResult?]
+        def fetch_equipment_with_last_modified: () -> FetchResult
+        def fetch_talents_with_last_modified: () -> FetchResult
+
+        def parse_last_modified: (untyped value) -> Time?
+        def region_locale: () -> String
+
+        def safe_fetch: () { () -> FetchResult } -> FetchResult?
+
+        def handle_blizzard_error: (Blizzard::Client::Error error) -> void
+        def clear_stale_last_modified!: () -> void
+
+        def latest_entries_per_bracket: () -> untyped
+        def log_service_failure: (String stage, Character character, untyped error) -> void
+        def logger: () -> untyped
+    end
+  end
+end

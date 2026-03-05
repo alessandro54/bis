@@ -33,6 +33,11 @@ end
 
 # ActiveSupport
 module ActiveSupport
+  class Duration
+    def ago: () -> untyped
+    def freeze: () -> self
+  end
+
   class TimeWithZone
     def -: (::Time | TimeWithZone) -> Float
   end

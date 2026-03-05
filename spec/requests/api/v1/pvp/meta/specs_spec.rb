@@ -7,8 +7,8 @@ RSpec.describe "Api::V1::Pvp::Meta::Specs", type: :request do
 
   describe "GET /api/v1/pvp/meta/specs" do
     context "with valid params" do
-      let!(:character1) { create(:character, talent_loadout_code: "ABC123") }
-      let!(:character2) { create(:character, talent_loadout_code: "XYZ789") }
+      let!(:character1) { create(:character, spec_talent_loadout_codes: { "62" => "ABC123" }) }
+      let!(:character2) { create(:character, spec_talent_loadout_codes: { "63" => "XYZ789" }) }
       let!(:entry1) do
         create(:pvp_leaderboard_entry,
           pvp_leaderboard: leaderboard,
@@ -49,9 +49,9 @@ RSpec.describe "Api::V1::Pvp::Meta::Specs", type: :request do
   end
 
   describe "GET /api/v1/pvp/meta/specs/:id" do
-    let!(:character1) { create(:character, talent_loadout_code: "ABC123") }
-    let!(:character2) { create(:character, talent_loadout_code: "ABC123") }
-    let!(:character3) { create(:character, talent_loadout_code: "XYZ789") }
+    let!(:character1) { create(:character, spec_talent_loadout_codes: { "62" => "ABC123" }) }
+    let!(:character2) { create(:character, spec_talent_loadout_codes: { "62" => "ABC123" }) }
+    let!(:character3) { create(:character, spec_talent_loadout_codes: { "62" => "XYZ789" }) }
 
     let!(:entry1) do
       create(:pvp_leaderboard_entry,
@@ -140,7 +140,7 @@ RSpec.describe "Api::V1::Pvp::Meta::Specs", type: :request do
       before do
         # Create more entries with different loadout codes
         5.times do |i|
-          char = create(:character, talent_loadout_code: "UNIQUE#{i}")
+          char = create(:character, spec_talent_loadout_codes: { "62" => "UNIQUE#{i}" })
           create(:pvp_leaderboard_entry,
             pvp_leaderboard: leaderboard,
             character:       char,

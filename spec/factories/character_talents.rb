@@ -10,13 +10,15 @@
 #  created_at   :datetime         not null
 #  updated_at   :datetime         not null
 #  character_id :bigint           not null
+#  spec_id      :integer          not null
 #  talent_id    :bigint           not null
 #
 # Indexes
 #
-#  idx_character_talents_on_char_and_talent  (character_id,talent_id) UNIQUE
-#  idx_character_talents_on_char_and_type    (character_id,talent_type)
-#  index_character_talents_on_talent_id      (talent_id)
+#  idx_character_talents_on_char_and_type     (character_id,talent_type)
+#  idx_character_talents_on_char_spec         (character_id,spec_id)
+#  idx_character_talents_on_char_talent_spec  (character_id,talent_id,spec_id) UNIQUE
+#  index_character_talents_on_talent_id       (talent_id)
 #
 # Foreign Keys
 #
@@ -30,5 +32,6 @@ FactoryBot.define do
     talent_type { talent.talent_type }
     rank        { 1 }
     slot_number { nil }
+    spec_id     { 262 }
   end
 end

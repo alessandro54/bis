@@ -14,14 +14,11 @@ gem "async", "~> 2.21"
 # HTTP client
 gem "httpx", "~> 1.6"
 
-# Image transformations (Active Storage)
-gem "image_processing", "~> 1.14"
-
-# Simple deployment using containers
-gem "kamal", "~> 2.9", require: false
-
 # Mission Control UI for jobs
 gem "mission_control-jobs", "~> 1.1"
+
+# Clean, single-line request logging
+gem "lograge", "~> 0.14"
 
 # Fast, optimized JSON parser/serializer
 gem "oj", "~> 3.16"
@@ -43,15 +40,20 @@ gem "solid_cable"          # ActionCable over PostgreSQL
 gem "solid_cache"          # Rails.cache backed by PostgreSQL
 gem "solid_queue"          # Background jobs backed by PostgreSQL
 
-# HTTP caching + compression middleware
-gem "thruster", "~> 0.1", require: false
 
 # Timezone data for Windows/JRuby
 gem "tzinfo-data", platforms: %i[windows jruby]
 
+# Error tracking and performance monitoring
+gem "sentry-rails"
+gem "sentry-ruby"
+
 group :development do
   # Auto-add schema annotations to models
   gem "annotaterb", "~> 4.20"
+
+  # N+1 query detection
+  gem "bullet"
 
   gem "rbs", require: false
 

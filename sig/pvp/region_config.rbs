@@ -1,0 +1,7 @@
+module Pvp
+  module RegionConfig
+    REGIONS: Array[String]
+    REGION_QUEUES: Hash[String, Symbol]
+    REGION_LOCALES: Hash[String, String]
+  end
+end
