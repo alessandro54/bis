@@ -108,6 +108,7 @@ Set `QUEUE_PROFILE=low_resource` for a single-worker low-thread profile.
 | `PVP_SYNC_BATCH_SIZE` | 50 | Characters per batch job |
 | `PVP_SYNC_CONCURRENCY` | 15 | Fiber/thread concurrency in batch job |
 | `PVP_SYNC_THREADS` | 8 | SolidQueue threads for character_sync workers |
+| `PVP_CHARACTER_SYNC_PROCESSES` | 1 | Parallel OS processes per region character_sync queue (sharding); increase to 2–4 when jobs pile up — `safe_concurrency` scales down per-job DB usage automatically |
 | `PVP_LEADERBOARD_CONCURRENCY` | 10 | Concurrent leaderboard HTTP fetches |
 | `PVP_BLIZZARD_RPS` | 95.0 | Blizzard API requests per second |
 

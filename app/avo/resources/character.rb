@@ -6,6 +6,13 @@ class Avo::Resources::Character < Avo::BaseResource
   # self.search = {
   #   query: -> { query.ransack(id_eq: q, m: "or").result(distinct: false) }
   # }
+  #
+
+  self.search = {
+    query: -> {
+      query.like_name(q).distinct
+    }
+  }
 
   self.profile_photo = {
     source: -> {

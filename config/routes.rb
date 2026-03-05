@@ -24,6 +24,7 @@ Rails.application.routes.draw do
           resources :specs, only: %i[index show]
           resources :talents, only: [ :index ]
           get :class_distribution, to: "class_distributions#show"
+          get :top_players, to: "top_players#index"
         end
       end
     end

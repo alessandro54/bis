@@ -5,6 +5,7 @@ module Blizzard
     class Error < StandardError; end
     class NotFoundError < Error; end
     class RateLimitedError < Error; end
+    class UnauthorizedError < Error; end
 
     # Shared HTTP client instance with connection pooling
     # Thread-safe: HTTPX handles concurrent requests internally
@@ -86,7 +87,7 @@ module Blizzard
       # Shared rate-limit + retry wrapper used by both #get and #get_with_etag.
       # Yields the raw HTTPX response to the caller's block, which is responsible
       # for parsing and raising RateLimitedError on 429.
-      # rubocop:disable Metrics/AbcSize
+      # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       def perform_request(path, namespace:, params: {}, extra_headers: {})
         attempts = 0
 
@@ -100,7 +101,17 @@ module Blizzard
             headers: auth_header.merge(extra_headers)
           )
 
+          raise UnauthorizedError if response.status == 401
+
           yield response
+        rescue UnauthorizedError
+          # Token expired or revoked mid-flight. Invalidate both caches so the
+          # next auth_header call fetches a fresh token, then retry once.
+          raise if attempts >= 2
+
+          Rails.logger.warn("[Blizzard::Client] 401 on #{region}, invalidating token and retrying")
+          auth.invalidate!
+          retry
         rescue RateLimitedError => e
           # Retry once after sleeping the Retry-After period.
           # A second consecutive 429 means something is wrong — propagate.
@@ -116,7 +127,7 @@ module Blizzard
           retry
         end
       end
-      # rubocop:enable Metrics/AbcSize
+      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
       # Parses a response for Last-Modified-aware requests.
       # Returns [body_or_nil, last_modified, changed].

@@ -2,12 +2,12 @@ module Pvp
   module BracketConfig
     FAMILY_DEFAULTS = {
       two_v_two:     {
-        top_n:      1000,
+        top_n:      2500,
         rating_min: 2200,
         job_queue:  :pvp_sync_2v2
       },
       three_v_three: {
-        top_n:      1000,
+        top_n:      2500,
         rating_min: 2500,
         job_queue:  :pvp_sync_3v3
       },
@@ -27,6 +27,10 @@ module Pvp
         job_queue:  :default
       }
     }.freeze
+
+    # Brackets to skip entirely during discovery — redundant because their
+    # characters are fully covered by the per-spec brackets we already sync.
+    SKIP_BRACKETS = %w[shuffle-overall].freeze
 
     EXPLICIT = {
       # "2v2"                    => { top_n: 500, rating_min: 2050, job_queue: :pvp_sync_2v2_fast },

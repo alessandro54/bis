@@ -56,9 +56,14 @@ class Character < ApplicationRecord
 
   self.filter_attributes += [ :spec_equipment_fingerprints ]
 
-  def print_loadout     = Character::LoadoutPrinter.call(self)
-  def print_talents     = Character::TalentPrinter.call(self)
-  def print_sync_status = Character::SyncStatusPrinter.call(self)
+  def print_loadout          = Character::LoadoutPrinter.call(self)
+  def print_talents          = Character::TalentPrinter.call(self)
+  def print_sync_status      = Character::SyncStatusPrinter.call(self)
+  def print_tree(spec_id: nil) = Character::TalentTreePrinter.call(self, spec_id: spec_id)
+
+  def self.like_name(query)
+    where("name ILIKE :q", q: "%#{query}%")
+  end
 
   def enqueue_sync_meta_job
     return if meta_synced?

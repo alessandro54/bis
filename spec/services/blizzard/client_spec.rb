@@ -2,7 +2,7 @@
 require "rails_helper"
 
 RSpec.describe Blizzard::Client do
-  let(:auth_double) { instance_double("Blizzard::Auth", access_token: "fake-token", client_id: "test_client_id") }
+  let(:auth_double) { instance_double("Blizzard::Auth", access_token: "fake-token", client_id: "test_client_id", invalidate!: nil) }
 
   describe "#initialize" do
     it "sets region, locale and auth for valid values" do
@@ -93,6 +93,41 @@ RSpec.describe Blizzard::Client do
              Blizzard::Client::Error,
              /Blizzard API error: invalid JSON:/
            )
+    end
+  end
+
+  describe "401 token rotation" do
+    let(:region)  { "us" }
+    let(:locale)  { "en_US" }
+    let(:client)  { described_class.new(region: region, locale: locale, auth: auth_double) }
+    let(:path)    { "/data/wow/pvp-season/37/pvp-leaderboard/3v3" }
+    let(:namespace) { "dynamic-us" }
+
+    let(:unauthorized_response) do
+      instance_double("HTTPX::Response", status: 401, body: double("body", to_s: "Unauthorized"))
+    end
+    let(:ok_response) do
+      instance_double("HTTPX::Response", status: 200, body: double("body", to_s: '{"ok":true}'))
+    end
+
+    it "invalidates the token and retries once on 401, succeeding on the second attempt" do
+      allow(Blizzard::Client::HTTP_CLIENT).to receive(:get)
+        .and_return(unauthorized_response, ok_response)
+
+      result = client.get(path, namespace: namespace)
+
+      expect(auth_double).to have_received(:invalidate!).once
+      expect(result).to eq({ "ok" => true })
+    end
+
+    it "raises UnauthorizedError if the retry also returns 401" do
+      allow(Blizzard::Client::HTTP_CLIENT).to receive(:get).and_return(unauthorized_response)
+
+      expect {
+        client.get(path, namespace: namespace)
+      }.to raise_error(Blizzard::Client::UnauthorizedError)
+
+      expect(auth_double).to have_received(:invalidate!).once
     end
   end
 

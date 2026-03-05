@@ -115,8 +115,8 @@ module Pvp
         leaderboards  = response.fetch("leaderboards", [])
         bracket_names = leaderboards.map { |lb| lb.dig("name") }.compact
 
-        # Accept 2v2, 3v3, and all shuffle-like brackets; reject RBG/blitz.
-        bracket_names.select do |name|
+        # Accept 2v2, 3v3, and all shuffle-like brackets; reject RBG/blitz and redundant overalls.
+        bracket_names.reject { |name| Pvp::BracketConfig::SKIP_BRACKETS.include?(name) }.select do |name|
           config = Pvp::BracketConfig.for(name)
           config.present? && config[:job_queue] != :pvp_sync_rbg
         end
