@@ -5,7 +5,9 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
 
   describe "GET /api/v1/pvp/:season/:region/leaderboards/:bracket" do
     context "with a mixed bracket (3v3)" do
-      let!(:leaderboard) { create(:pvp_leaderboard, pvp_season: current_season, bracket: "3v3", region: "us") }
+      let!(:leaderboard) {
+        create(:pvp_leaderboard, pvp_season: current_season, bracket: "3v3", region: "us")
+      }
 
       let!(:frost_entries) do
         Array.new(3) do |i|
@@ -30,7 +32,9 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
       end
 
       it "returns top entries filtered by spec_id" do
-        get "/api/v1/pvp/#{current_season.blizzard_id}/us/leaderboards/3v3", params: { spec_id: 251 }
+        get "/api/v1/pvp/#{current_season.blizzard_id}/us/leaderboards/3v3", params: {
+          spec_id: 251
+        }
 
         expect(response).to have_http_status(:ok)
         json = JSON.parse(response.body)
@@ -40,7 +44,9 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
       end
 
       it "returns entries ordered by rank" do
-        get "/api/v1/pvp/#{current_season.blizzard_id}/us/leaderboards/3v3", params: { spec_id: 251 }
+        get "/api/v1/pvp/#{current_season.blizzard_id}/us/leaderboards/3v3", params: {
+          spec_id: 251
+        }
 
         json = JSON.parse(response.body)
         ranks = json.map { |e| e["rank"] }
@@ -77,7 +83,11 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
 
     context "with a shuffle bracket" do
       let!(:leaderboard) {
- create(:pvp_leaderboard, pvp_season: current_season, bracket: "shuffle-frost-deathknight", region: "eu") }
+          create(:pvp_leaderboard,
+           pvp_season: current_season,
+           bracket:    "shuffle-frost-deathknight",
+           region:     "eu")
+        }
 
       let!(:entries) do
         Array.new(5) do |i|
@@ -102,7 +112,11 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
 
     context "with limit of 10" do
       let!(:leaderboard) {
- create(:pvp_leaderboard, pvp_season: current_season, bracket: "shuffle-arms-warrior", region: "us") }
+          create(:pvp_leaderboard,
+           pvp_season: current_season,
+           bracket:    "shuffle-arms-warrior",
+           region:     "us")
+        }
 
       let!(:entries) do
         Array.new(15) do |i|
