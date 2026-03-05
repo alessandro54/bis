@@ -18,6 +18,7 @@
       <h2>Admin Access</h2>
       <% if flash[:alert] %><p class="alert"><%= flash[:alert] %></p><% end %>
       <%= hidden_field_tag :authenticity_token, form_authenticity_token %>
+      <label for="admin_password">Password</label>
       <input type="password" name="password" placeholder="Password" autofocus>
       <button type="submit">Sign in</button>
     </form>
