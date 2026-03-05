@@ -42,5 +42,5 @@ class CharacterItem < ApplicationRecord
              foreign_key: :enchantment_source_item_id,
              optional:    true
 
-  validates :slot, uniqueness: { scope: [:character_id, :spec_id] }
+  validates :slot, uniqueness: { scope: %i[character_id spec_id] }
 end

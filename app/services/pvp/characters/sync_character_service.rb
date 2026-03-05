@@ -147,6 +147,7 @@ module Pvp
         # Entries whose spec matches the active spec get full attrs (equipment + talents).
         # Entries with a different spec (e.g., shuffle bracket) get talent attrs only —
         # equipment_processed_at is NOT set because the gear doesn't match.
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def update_entries_with_spec_awareness(entries, entry_attrs, active_spec_id, per_spec_hero_trees)
           return if entry_attrs.empty?
 
@@ -170,21 +171,24 @@ module Pvp
             )
           end
 
-          if non_matching_ids.any?
-            talent_only_attrs = entry_attrs.except(*EQUIPMENT_ENTRY_ATTRS)
-            if talent_only_attrs.any?
-              # Apply per-spec hero tree info if available
-              entries.select { |e| non_matching_ids.include?(e.id) }.group_by(&:spec_id).each do |sid, group|
-                hero_info = per_spec_hero_trees[sid] || {}
-                attrs = talent_only_attrs.merge(hero_info).merge(updated_at: now)
-                # Don't overwrite the bracket-derived spec_id
-                attrs.delete(:spec_id)
-                PvpLeaderboardEntry.where(id: group.map(&:id)).update_all(attrs)
-              end
-            end
+          return unless non_matching_ids.any?
+
+          talent_only_attrs = entry_attrs.except(*EQUIPMENT_ENTRY_ATTRS)
+          return unless talent_only_attrs.any?
+
+          # Apply per-spec hero tree info if available
+          entries.select { |e| non_matching_ids.include?(e.id) }.group_by(&:spec_id).each do |sid, group|
+            hero_info = per_spec_hero_trees[sid] || {}
+            attrs = talent_only_attrs.merge(hero_info).merge(updated_at: now)
+            # Don't overwrite the bracket-derived spec_id
+            attrs.delete(:spec_id)
+            PvpLeaderboardEntry.where(id: group.map(&:id)).update_all(attrs)
           end
+
+
           # rubocop:enable Rails/SkipsModelValidations
         end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
         # ------------------------------------------------------------------
         # 304 fallback: copy entry-level attrs from latest processed entry
@@ -316,7 +320,7 @@ module Pvp
               Arel.sql("COUNT(*) FILTER (WHERE specialization_processed_at IS NOT NULL)")
             )
 
-          eq_count, spec_count = counts || [0, 0]
+          eq_count, spec_count = counts || [ 0, 0 ]
 
           attrs = {}
           attrs[:equipment_last_modified] = nil if has_eq_last_mod && eq_count.zero?

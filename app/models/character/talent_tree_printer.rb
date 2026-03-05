@@ -1,5 +1,5 @@
 class Character::TalentTreePrinter
-  CELL_W = 14  # chars per cell including brackets
+  CELL_W = 14 # chars per cell including brackets
 
   COLORS = {
     class: "\e[33m",
@@ -15,6 +15,7 @@ class Character::TalentTreePrinter
     @character = character
   end
 
+  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def call(spec_id: nil)
     char_data = fetch_char_spec_data
     return puts "#{bold}No specialization data found.#{reset}" unless char_data
@@ -22,6 +23,7 @@ class Character::TalentTreePrinter
     specs = char_data["specializations"] || []
     specs = specs.select { |s| s["specialization"]["id"] == spec_id } if spec_id
 
+    # rubocop:disable Metrics/BlockLength
     specs.each do |spec_data|
       spec    = spec_data["specialization"]
       loadout = spec_data["loadouts"]&.find { |l| l["is_active"] }
@@ -58,7 +60,7 @@ class Character::TalentTreePrinter
         .to_set
 
       section "CLASS TALENTS", :class
-      render_grid(game_tree["class_talent_nodes"],  selected_class, chosen_blizzard_ids, :class)
+      render_grid(game_tree["class_talent_nodes"], selected_class, chosen_blizzard_ids, :class)
 
       # Blizzard includes all hero tree nodes inside spec_talent_nodes — exclude them
       hero_node_ids = (game_tree["hero_talent_trees"] || [])
@@ -77,9 +79,11 @@ class Character::TalentTreePrinter
         render_grid(hero_data["hero_talent_nodes"], selected_hero, chosen_blizzard_ids, :hero)
       end
     end
+    # rubocop:enable Metrics/BlockLength
 
     nil
   end
+  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
   private
 
@@ -89,6 +93,7 @@ class Character::TalentTreePrinter
       puts "  #{dim}#{"─" * 68}#{reset}"
     end
 
+    # rubocop:disable Metrics/AbcSize
     def render_grid(nodes, selected, chosen_blizzard_ids, color_key)
       return puts "  #{dim}(empty)#{reset}" if nodes.nil? || nodes.empty?
 
@@ -117,9 +122,10 @@ class Character::TalentTreePrinter
         puts "  " + line.rstrip
       end
     end
+    # rubocop:enable Metrics/AbcSize
 
     def render_cell(node, selected, chosen_blizzard_ids, color)
-      rank     = selected[node["id"]]  # nil if not selected
+      rank     = selected[node["id"]] # nil if not selected
       is_sel   = !rank.nil?
 
       name, max_rank = node_name_and_max(node, chosen_blizzard_ids)
@@ -178,7 +184,7 @@ class Character::TalentTreePrinter
       client.get(
         "/data/wow/talent-tree/#{tree_id}/playable-specialization/#{spec_id}",
         namespace: client.static_namespace,
-        params: { locale: "en_US" }
+        params:    { locale: "en_US" }
       )
     rescue => e
       Rails.logger.error("[TalentTreePrinter] #{e.message}")

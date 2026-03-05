@@ -54,6 +54,7 @@ class ColorizedLogrageFormatter
   BOLD  = "\e[1m"
   DIM   = "\e[2m"
 
+  # rubocop:disable Metrics/AbcSize
   def call(data)
     method   = badge(data[:method], METHOD_BADGES.fetch(data[:method].to_s, "\e[47;30m"))
     path     = "#{BOLD}#{data[:path]}#{RESET}"
@@ -67,6 +68,7 @@ class ColorizedLogrageFormatter
 
     "#{method} #{path} #{status} #{duration}#{db}#{view}#{extra_str}"
   end
+  # rubocop:enable Metrics/AbcSize
 
   private
 

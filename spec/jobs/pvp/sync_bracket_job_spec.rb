@@ -28,7 +28,7 @@ RSpec.describe Pvp::SyncBracketJob, type: :job do
           },
           "faction" => { "type" => "HORDE" },
           "rank" => 1,
-          "rating" => 2400,
+          "rating" => 2600,
           "season_match_statistics" => { "won" => 100, "lost" => 50 }
         },
         {
@@ -39,7 +39,7 @@ RSpec.describe Pvp::SyncBracketJob, type: :job do
           },
           "faction" => { "type" => "ALLIANCE" },
           "rank" => 2,
-          "rating" => 2350,
+          "rating" => 2550,
           "season_match_statistics" => { "won" => 90, "lost" => 60 }
         }
       ]
@@ -187,7 +187,7 @@ RSpec.describe Pvp::SyncBracketJob, type: :job do
         perform_job
         existing_entry.reload
         expect(existing_entry.rank).to   eq(1)
-        expect(existing_entry.rating).to eq(2400)
+        expect(existing_entry.rating).to eq(2600)
       end
 
       it "preserves equipment and spec data on the existing entry" do
@@ -229,7 +229,7 @@ RSpec.describe Pvp::SyncBracketJob, type: :job do
       let(:bracket) { "3v3" }
 
       before do
-        # 3v3 has a rating_min of 2000
+        # 3v3 has a rating_min of 2500
         api_response["entries"] << {
           "character" => {
             "id" => 11_111,
@@ -238,7 +238,7 @@ RSpec.describe Pvp::SyncBracketJob, type: :job do
           },
           "faction" => { "type" => "HORDE" },
           "rank" => 100,
-          "rating" => 1500, # Below 2000 threshold
+          "rating" => 1500, # Below 2500 threshold
           "season_match_statistics" => { "won" => 50, "lost" => 50 }
         }
       end

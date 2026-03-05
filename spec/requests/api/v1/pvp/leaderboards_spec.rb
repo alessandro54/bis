@@ -8,7 +8,7 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
       let!(:leaderboard) { create(:pvp_leaderboard, pvp_season: current_season, bracket: "3v3", region: "us") }
 
       let!(:frost_entries) do
-        3.times.map do |i|
+        Array.new(3) do |i|
           create(:pvp_leaderboard_entry,
             pvp_leaderboard: leaderboard,
             spec_id:         251,
@@ -19,7 +19,7 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
       end
 
       let!(:fire_entries) do
-        3.times.map do |i|
+        Array.new(3) do |i|
           create(:pvp_leaderboard_entry,
             pvp_leaderboard: leaderboard,
             spec_id:         63,
@@ -76,10 +76,11 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
     end
 
     context "with a shuffle bracket" do
-      let!(:leaderboard) { create(:pvp_leaderboard, pvp_season: current_season, bracket: "shuffle-frost-deathknight", region: "eu") }
+      let!(:leaderboard) {
+ create(:pvp_leaderboard, pvp_season: current_season, bracket: "shuffle-frost-deathknight", region: "eu") }
 
       let!(:entries) do
-        5.times.map do |i|
+        Array.new(5) do |i|
           create(:pvp_leaderboard_entry,
             pvp_leaderboard: leaderboard,
             spec_id:         251,
@@ -100,10 +101,11 @@ RSpec.describe "Api::V1::Pvp::Leaderboards", type: :request do
     end
 
     context "with limit of 10" do
-      let!(:leaderboard) { create(:pvp_leaderboard, pvp_season: current_season, bracket: "shuffle-arms-warrior", region: "us") }
+      let!(:leaderboard) {
+ create(:pvp_leaderboard, pvp_season: current_season, bracket: "shuffle-arms-warrior", region: "us") }
 
       let!(:entries) do
-        15.times.map do |i|
+        Array.new(15) do |i|
           create(:pvp_leaderboard_entry,
             pvp_leaderboard: leaderboard,
             rank:            i + 1,

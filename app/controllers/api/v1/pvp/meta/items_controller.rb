@@ -1,4 +1,5 @@
 class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
+  # rubocop:disable Metrics/AbcSize
   def index
     cache_key = meta_cache_key("items", bracket_param, spec_id_param, slot_param, locale_param)
 
@@ -20,12 +21,14 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
 
     render json: json
     set_cache_headers
+    # rubocop:enable Metrics/AbcSize
 
     enqueue_unsynced_items
   end
 
   private
 
+    # rubocop:disable Metrics/AbcSize
     def serialize_item(record, crafting_map)
       stats = crafting_map[record.item_id]
       {
@@ -45,6 +48,7 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
         top_crafting_stats: stats || []
       }
     end
+    # rubocop:enable Metrics/AbcSize
 
     # Returns a map of item_id => most popular crafting_stats array for crafted items only.
     def crafting_stats_for(item_ids)
@@ -62,7 +66,7 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
 
       result = {}
       rows.each do |item_id, stats|
-        result[item_id] ||= stats  # first row per item_id is the most popular (ORDER BY COUNT DESC)
+        result[item_id] ||= stats # first row per item_id is the most popular (ORDER BY COUNT DESC)
       end
       result
     end

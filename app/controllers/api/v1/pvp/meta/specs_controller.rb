@@ -23,6 +23,7 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
 
   # GET /api/v1/pvp/meta/specs/:spec_id
   # Returns detailed meta for a specific spec including talent builds
+  # rubocop:disable Metrics/AbcSize
   def show
     cache_key = meta_cache_key("specs", bracket_param, spec_id_param, limit_param)
 
@@ -46,6 +47,7 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
     render json: json
     set_cache_headers
   end
+  # rubocop:enable Metrics/AbcSize
 
   private
 
