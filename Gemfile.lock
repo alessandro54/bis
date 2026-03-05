@@ -91,7 +91,7 @@ GEM
       io-event (~> 1.11)
       metrics (~> 0.12)
       traces (~> 0.18)
-    avo (3.29.1)
+    avo (3.30.0)
       actionview (>= 6.1)
       active_link_to
       activerecord (>= 6.1)
@@ -303,7 +303,7 @@ GEM
     psych (5.3.1)
       date
       stringio
-    public_suffix (7.0.2)
+    public_suffix (7.0.5)
     puma (7.2.0)
       nio4r (~> 2.0)
     raabro (1.4.0)
