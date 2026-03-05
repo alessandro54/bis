@@ -31,6 +31,7 @@ gem "pg", "~> 1.6"
 
 # Production web server
 gem "puma", "~> 7.1"
+gem "thruster", require: false
 
 # Asset pipeline replacement for Rails 7+/8
 gem "propshaft", "~> 1.3"
