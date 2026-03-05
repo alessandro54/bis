@@ -20,8 +20,8 @@
 #
 FactoryBot.define do
   factory :pvp_season do
+    sequence(:blizzard_id) { |n| n }
     display_name { "Season Test" }
-    blizzard_id  { Faker::Number.between(from: 1, to: 1000) }
     is_current   { false }
     start_time   { Time.current - 30.days }
     end_time     { Time.current + 30.days }
