@@ -33,6 +33,9 @@ gem "pg", "~> 1.6"
 gem "puma", "~> 7.1"
 gem "thruster", require: false
 
+# Rack-level request throttling and blocking
+gem "rack-attack", "~> 6.7"
+
 # Asset pipeline replacement for Rails 7+/8
 gem "propshaft", "~> 1.3"
 

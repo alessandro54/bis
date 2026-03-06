@@ -31,6 +31,9 @@ module WowBis
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
 
+    # Rack::Attack for throttling and blocking scanners
+    config.middleware.use Rack::Attack
+
     # Gzip compress all responses > 1KB
     config.middleware.use Rack::Deflater
 

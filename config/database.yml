@@ -97,22 +97,21 @@ test:
 # for a full overview on how database connection configuration can be specified.
 #
 production:
-  primary: &primary_production
+  primary:
     adapter: postgresql
-
     url: <%= ENV['DATABASE_URL'] %>
     pool: <%= ENV.fetch("DB_POOL", 130) %>
     prepared_statements: true
     reaping_frequency: 10
 
   queue:
-    <<: *primary_production
+    adapter: postgresql
+    url: <%= ENV['DATABASE_URL'].sub(/\/[^\/]+$/, '/wow_meta_queue') %>
+    pool: <%= ENV.fetch("DB_POOL", 130) %>
     migrations_paths: db/queue_migrate
 
   cache:
-    <<: *primary_production
+    adapter: postgresql
+    url: <%= ENV['DATABASE_URL'].sub(/\/[^\/]+$/, '/wow_meta_cache') %>
+    pool: 5
     migrations_paths: db/cache_migrate
-
-  cable:
-    <<: *primary_production
-    migrations_paths: db/cable_migrate
