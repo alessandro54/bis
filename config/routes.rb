@@ -36,4 +36,6 @@ Rails.application.routes.draw do
 
   mount MissionControl::Jobs::Engine, at: "/jobs"
   mount_avo
+
+  match "*unmatched", to: "errors#not_found", via: :all, constraints: ->(req) { req.path.start_with?("/api/") }
 end
