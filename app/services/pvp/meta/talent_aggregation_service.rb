@@ -136,16 +136,18 @@ module Pvp
                 t.spec_id,
                 ct.talent_id,
                 tal.talent_type,
-                tal.default_points,
+                COALESCE(tsa.default_points, 0) AS default_points,
                 COUNT(*)                                AS usage_count,
                 ROUND(COUNT(*) * 100.0 / st.total, 4)  AS usage_pct,
                 NOW()                                   AS snapshot_at
               FROM top_chars t
               JOIN character_talents ct ON ct.character_id = t.character_id AND ct.spec_id = t.spec_id
               JOIN talents tal ON tal.id = ct.talent_id
+              LEFT JOIN talent_spec_assignments tsa
+                ON tsa.talent_id = ct.talent_id AND tsa.spec_id = t.spec_id
               JOIN spec_totals st
                 ON st.bracket = t.bracket AND st.spec_id = t.spec_id
-              GROUP BY t.bracket, t.spec_id, ct.talent_id, tal.talent_type, tal.default_points, st.total
+              GROUP BY t.bracket, t.spec_id, ct.talent_id, tal.talent_type, tsa.default_points, st.total
             ),
             #{top_build_cte}
             SELECT

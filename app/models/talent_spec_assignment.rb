@@ -3,11 +3,12 @@
 # Table name: talent_spec_assignments
 # Database name: primary
 #
-#  id         :bigint           not null, primary key
-#  created_at :datetime         not null
-#  updated_at :datetime         not null
-#  spec_id    :integer          not null
-#  talent_id  :bigint           not null
+#  id             :bigint           not null, primary key
+#  default_points :integer          default(0), not null
+#  created_at     :datetime         not null
+#  updated_at     :datetime         not null
+#  spec_id        :integer          not null
+#  talent_id      :bigint           not null
 #
 # Indexes
 #

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_06_090000) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_06_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -266,6 +266,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_06_090000) do
 
   create_table "talent_spec_assignments", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.integer "default_points", default: 0, null: false
     t.integer "spec_id", null: false
     t.bigint "talent_id", null: false
     t.datetime "updated_at", null: false
@@ -276,7 +277,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_06_090000) do
   create_table "talents", force: :cascade do |t|
     t.bigint "blizzard_id", null: false
     t.datetime "created_at", null: false
-    t.integer "default_points", default: 0, null: false
     t.integer "display_col"
     t.integer "display_row"
     t.string "icon_url"

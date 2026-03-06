@@ -3,18 +3,17 @@
 # Table name: talents
 # Database name: primary
 #
-#  id             :bigint           not null, primary key
-#  default_points :integer          default(0), not null
-#  display_col    :integer
-#  display_row    :integer
-#  icon_url       :string
-#  max_rank       :integer          default(1), not null
-#  talent_type    :string           not null
-#  created_at     :datetime         not null
-#  updated_at     :datetime         not null
-#  blizzard_id    :bigint           not null
-#  node_id        :bigint
-#  spell_id       :integer
+#  id          :bigint           not null, primary key
+#  display_col :integer
+#  display_row :integer
+#  icon_url    :string
+#  max_rank    :integer          default(1), not null
+#  talent_type :string           not null
+#  created_at  :datetime         not null
+#  updated_at  :datetime         not null
+#  blizzard_id :bigint           not null
+#  node_id     :bigint
+#  spell_id    :integer
 #
 # Indexes
 #

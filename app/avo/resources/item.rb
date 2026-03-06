@@ -5,6 +5,10 @@ class Avo::Resources::Item < Avo::BaseResource
   #   query: -> { query.ransack(id_eq: q, m: "or").result(distinct: false) }
   # }
 
+  def actions
+    action Avo::Actions::SyncTalentTreesAction
+  end
+
   def fields
     field :id, as: :id
     field :blizzard_id, as: :number

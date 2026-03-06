@@ -14,10 +14,11 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
       zero_talents = load_zero_fill_talents(records)
       all_talents  = records.map(&:talent) + zero_talents
 
-      prereqs = load_prerequisites(all_talents)
+      prereqs        = load_prerequisites(all_talents)
+      default_points = load_default_points(all_talents)
 
-      records.map { |r| serialize(r, prereqs) } +
-        zero_talents.map { |t| serialize_zero(t, prereqs) }
+      records.map { |r| serialize(r, prereqs, default_points) } +
+        zero_talents.map { |t| serialize_zero(t, prereqs, default_points) }
     end
 
     render json: json
@@ -61,11 +62,21 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         .transform_values { |ps| ps.map(&:prerequisite_node_id) }
     end
 
-    def serialize(record, prereqs)
+    def load_default_points(talents)
+      talent_ids = talents.map(&:id).uniq
+      return {} if talent_ids.empty?
+
+      TalentSpecAssignment
+        .where(talent_id: talent_ids, spec_id: spec_id_param)
+        .pluck(:talent_id, :default_points)
+        .to_h
+    end
+
+    def serialize(record, prereqs, default_points)
       t = record.talent
       {
         id:             record.id,
-        talent:         serialize_talent_fields(t, record.talent_type, prereqs),
+        talent:         serialize_talent_fields(t, record.talent_type, prereqs, default_points),
         usage_count:    record.usage_count,
         usage_pct:      record.usage_pct.to_f,
         in_top_build:   record.in_top_build,
@@ -75,20 +86,21 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
       }
     end
 
-    def serialize_zero(talent, prereqs)
+    def serialize_zero(talent, prereqs, default_points)
+      dp = default_points[talent.id] || 0
       {
         id:             nil,
-        talent:         serialize_talent_fields(talent, talent.talent_type, prereqs),
+        talent:         serialize_talent_fields(talent, talent.talent_type, prereqs, default_points),
         usage_count:    0,
         usage_pct:      0.0,
         in_top_build:   false,
         top_build_rank: 0,
-        tier:           talent.default_points > 0 ? "bis" : "common",
+        tier:           dp > 0 ? "bis" : "common",
         snapshot_at:    nil
       }
     end
 
-    def serialize_talent_fields(t, talent_type, prereqs)
+    def serialize_talent_fields(t, talent_type, prereqs, default_points)
       {
         id:                    t.id,
         blizzard_id:           t.blizzard_id,
@@ -101,7 +113,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         display_col:           t.display_col,
         max_rank:              t.max_rank,
         icon_url:              t.icon_url,
-        default_points:        t.default_points,
+        default_points:        default_points[t.id] || 0,
         prerequisite_node_ids: prereqs[t.node_id] || []
       }
     end

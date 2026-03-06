@@ -8,6 +8,10 @@ class Avo::Resources::PvpLeaderboardEntry < Avo::BaseResource
   self.default_sort_column = :rank
   self.default_sort_direction = :asc
 
+  def actions
+    action Avo::Actions::SyncLeaderboardsAction
+  end
+
   def filters
     filter Avo::Filters::PvpLeaderboardFilter
     filter Avo::Filters::SpecIdFilter

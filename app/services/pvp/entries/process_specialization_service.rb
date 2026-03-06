@@ -74,7 +74,7 @@ module Pvp
 
         # Process talents for ALL specs returned by the API, not just the active one.
         # Each spec's talents are stored independently, keyed by spec_id.
-        # rubocop:disable Metrics/AbcSize
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def process_all_specs_talents(spec_service, char_attrs)
           current_codes = character.spec_talent_loadout_codes || {}
           new_codes = current_codes.dup
@@ -99,12 +99,42 @@ module Pvp
             )
 
             rebuild_character_talents(talent_upsert, sid)
+            upsert_spec_default_points(talent_upsert, sid)
             new_codes[sid.to_s] = new_code
           end
 
           char_attrs[:spec_talent_loadout_codes] = new_codes if new_codes != current_codes
         end
-        # rubocop:enable Metrics/AbcSize
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+        def upsert_spec_default_points(talent_upsert, spec_id)
+          now     = Time.current
+          records = []
+
+          talent_upsert.each do |_type, talents|
+            Array(talents).each do |td|
+              next unless td[:talent_id]
+
+              records << {
+                talent_id:      td[:talent_id],
+                spec_id:        spec_id,
+                default_points: td[:default_points].to_i,
+                created_at:     now,
+                updated_at:     now
+              }
+            end
+          end
+
+          return if records.empty?
+
+          # rubocop:disable Rails/SkipsModelValidations
+          TalentSpecAssignment.upsert_all(
+            records.uniq { |r| [ r[:talent_id], r[:spec_id] ] },
+            unique_by:   %i[talent_id spec_id],
+            update_only: %i[default_points]
+          )
+          # rubocop:enable Rails/SkipsModelValidations
+        end
 
         def rebuild_character_talents(talent_upsert, spec_id)
           character.character_talents.where(spec_id: spec_id).delete_all

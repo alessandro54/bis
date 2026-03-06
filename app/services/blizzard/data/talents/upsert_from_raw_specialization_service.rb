@@ -30,15 +30,15 @@ module Blizzard
               next unless blizzard_id
 
               talent_records << {
-                blizzard_id:    blizzard_id,
-                name:           talent[:name] || talent["name"],
-                talent_type:    type,
-                spell_id:       nil,
-                default_points: (talent[:default_points] || talent["default_points"]).to_i
+                blizzard_id: blizzard_id,
+                name:        talent[:name] || talent["name"],
+                talent_type: type,
+                spell_id:    nil
               }
 
-              rank = talent[:rank] || talent["rank"] || 1
-              type_records << { blizzard_id: blizzard_id, rank: rank }
+              rank           = talent[:rank] || talent["rank"] || 1
+              default_points = (talent[:default_points] || talent["default_points"]).to_i
+              type_records << { blizzard_id: blizzard_id, rank: rank, default_points: default_points }
             end
 
             junction_data[type] = type_records
@@ -57,11 +57,10 @@ module Blizzard
             next unless blizzard_id
 
             talent_records << {
-              blizzard_id:    blizzard_id,
-              name:           talent_info["name"],
-              talent_type:    "pvp",
-              spell_id:       selected.dig("spell_tooltip", "spell", "id"),
-              default_points: 0
+              blizzard_id: blizzard_id,
+              name:        talent_info["name"],
+              talent_type: "pvp",
+              spell_id:    selected.dig("spell_tooltip", "spell", "id")
             }
 
             pvp_records << { blizzard_id: blizzard_id, rank: 1, slot_number: index + 2 }
@@ -98,10 +97,11 @@ module Blizzard
               next unless talent_id
 
               {
-                talent_id:   talent_id,
-                talent_type: type,
-                rank:        rec[:rank],
-                slot_number: rec[:slot_number]
+                talent_id:      talent_id,
+                talent_type:    type,
+                rank:           rec[:rank],
+                slot_number:    rec[:slot_number],
+                default_points: rec[:default_points] || 0
               }
             end
           end

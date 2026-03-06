@@ -37,10 +37,12 @@ class Rack::Attack
     [ 429, { "content-type" => "text/plain", "retry-after" => retry_after.to_s }, [ "Rate limit exceeded" ] ]
   }
 
-  # Use CF-Connecting-IP when behind Cloudflare
+  # Use CF-Connecting-IP when behind Cloudflare, fall back to Rails' remote_ip
+  # which filters trusted proxies. Never trust raw X-Forwarded-For directly
+  # as it's trivially spoofable by clients not behind Cloudflare.
   class Request < ::Rack::Request
     def ip
-      @ip ||= env["HTTP_CF_CONNECTING_IP"] || env["HTTP_X_FORWARDED_FOR"]&.split(",")&.first&.strip || super
+      @ip ||= env["HTTP_CF_CONNECTING_IP"] || super
     end
   end
 end
