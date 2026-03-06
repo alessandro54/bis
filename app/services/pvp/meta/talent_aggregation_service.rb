@@ -5,6 +5,10 @@ module Pvp
 
       TOP_N = ENV.fetch("PVP_META_TOP_N", 1000).to_i
 
+      # Tier thresholds (usage_pct)
+      BIS_THRESHOLD          = 50.0
+      SITUATIONAL_THRESHOLD  = 15.0
+
       def initialize(season:, top_n: TOP_N)
         @season = season
         @top_n  = top_n
@@ -19,7 +23,7 @@ module Pvp
           PvpMetaTalentPopularity.upsert_all(
             records,
             unique_by:   %i[pvp_season_id bracket spec_id talent_id],
-            update_only: %i[talent_type usage_count usage_pct in_top_build top_build_rank snapshot_at]
+            update_only: %i[talent_type usage_count usage_pct in_top_build top_build_rank tier snapshot_at]
           )
           # rubocop:enable Rails/SkipsModelValidations
         end
@@ -132,6 +136,7 @@ module Pvp
                 t.spec_id,
                 ct.talent_id,
                 tal.talent_type,
+                tal.default_points,
                 COUNT(*)                                AS usage_count,
                 ROUND(COUNT(*) * 100.0 / st.total, 4)  AS usage_pct,
                 NOW()                                   AS snapshot_at
@@ -140,7 +145,7 @@ module Pvp
               JOIN talents tal ON tal.id = ct.talent_id
               JOIN spec_totals st
                 ON st.bracket = t.bracket AND st.spec_id = t.spec_id
-              GROUP BY t.bracket, t.spec_id, ct.talent_id, tal.talent_type, st.total
+              GROUP BY t.bracket, t.spec_id, ct.talent_id, tal.talent_type, tal.default_points, st.total
             ),
             #{top_build_cte}
             SELECT
@@ -157,7 +162,13 @@ module Pvp
                   AND tbt.spec_id = tu.spec_id
                   AND tbt.talent_id = tu.talent_id
               ) AS in_top_build,
-              COALESCE(tbmr.top_build_rank, 0) AS top_build_rank
+              COALESCE(tbmr.top_build_rank, 0) AS top_build_rank,
+              CASE
+                WHEN tu.default_points > 0      THEN 'bis'
+                WHEN tu.usage_pct > :bis_pct     THEN 'bis'
+                WHEN tu.usage_pct > :sit_pct     THEN 'situational'
+                ELSE 'common'
+              END AS tier
             FROM talent_usage tu
             LEFT JOIN top_build_modal_rank tbmr
               ON  tbmr.bracket   = tu.bracket
@@ -167,7 +178,14 @@ module Pvp
           SQL
 
           ApplicationRecord.connection.select_all(
-            ApplicationRecord.sanitize_sql_array([ sql, { season_id: season.id, top_n: top_n } ])
+            ApplicationRecord.sanitize_sql_array(
+              [ sql, {
+                season_id: season.id,
+                top_n:     top_n,
+                bis_pct:   BIS_THRESHOLD,
+                sit_pct:   SITUATIONAL_THRESHOLD
+              } ]
+            )
           )
         end
         # rubocop:enable Metrics/MethodLength
@@ -185,6 +203,7 @@ module Pvp
               usage_pct:      r["usage_pct"],
               in_top_build:   r["in_top_build"],
               top_build_rank: r["top_build_rank"].to_i,
+              tier:           r["tier"],
               snapshot_at:    r["snapshot_at"] || now,
               created_at:     now,
               updated_at:     now

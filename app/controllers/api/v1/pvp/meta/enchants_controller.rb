@@ -3,7 +3,7 @@ class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
   def index
     cache_key = meta_cache_key("enchants", bracket_param, spec_id_param, slot_param, locale_param)
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       enchants = PvpMetaEnchantPopularity
         .includes(enchantment: :translations)
         .where(pvp_season: current_season)

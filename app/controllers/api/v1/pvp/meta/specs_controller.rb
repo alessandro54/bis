@@ -4,7 +4,7 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
   def index
     cache_key = meta_cache_key("specs", bracket_param)
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       entries = PvpLeaderboardEntry
         .latest_snapshot_for_bracket(bracket_param)
         .where.not(spec_id: nil)
@@ -27,7 +27,7 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
   def show
     cache_key = meta_cache_key("specs", bracket_param, spec_id_param, limit_param)
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       entries = PvpLeaderboardEntry
         .latest_snapshot_for_bracket(bracket_param)
         .where(spec_id: spec_id_param)

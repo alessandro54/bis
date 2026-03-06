@@ -1,16 +1,37 @@
 class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
   DEFAULT_REGIONS  = %w[us eu].freeze
   LIMIT            = 10
-  MIN_GAMES        = 50
-  # Composite score: rating + CLAMP((winrate% - 50) * 4, 0, 100)
-  # Adds up to +100 pts for exceptional winrate (≥75%), 0 for ≤50%.
-  # Players below MIN_GAMES are included only when the scored pool < LIMIT.
+  MIN_GAMES              = 50
+  GRINDER_GAME_THRESHOLD = 200
+
+  # Composite score:
+  #   rating
+  #   + winrate_bonus    (up to +120 for ≥75% winrate, 0 at 55%)
+  #   - grinder_penalty  (up to -200 for sub-55% winrate with many games)
+  #
+  # Winrate bonus: rewards players ABOVE 55% winrate (not 50%).
+  #   55% = neutral, 65% = +48, 75% = +96, 80% = +120.
+  #
+  # Grinder penalty: scales with (a) how far below 55% winrate, and
+  #   (b) how many games beyond GRINDER_GAME_THRESHOLD.
+  #   52% with 783 games → penalty ≈ -52 pts.
+  #   48% with 600 games → penalty ≈ -42 pts.
+  #   A 110-game player below threshold gets no penalty.
   SCORE_SQL = Arel.sql(<<~SQL.squish)
     pvp_leaderboard_entries.rating
-    + LEAST(100, GREATEST(0,
+    + LEAST(120, GREATEST(0,
         (pvp_leaderboard_entries.wins * 100.0
           / NULLIF(pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses, 0)
-        - 50) * 4
+        - 55) * 4.8
+      ))
+    - LEAST(200, GREATEST(0,
+        (55 - pvp_leaderboard_entries.wins * 100.0
+          / NULLIF(pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses, 0)
+        ) * 4.0
+        * LEAST(1.0, GREATEST(0,
+            (pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses - #{GRINDER_GAME_THRESHOLD})::float
+            / #{GRINDER_GAME_THRESHOLD}
+          ))
       ))
   SQL
 
@@ -24,7 +45,7 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
     regions   = region_params
     cache_key = meta_cache_key("top_players", bracket_param, spec_id_param, regions.join("+"))
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       rows = query_top_players(regions)
 
       {

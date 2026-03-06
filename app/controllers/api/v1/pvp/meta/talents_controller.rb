@@ -3,7 +3,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
   def index
     cache_key = meta_cache_key("talents", bracket_param, spec_id_param, locale_param)
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       records = PvpMetaTalentPopularity
         .includes(talent: :translations)
         .where(pvp_season: current_season)
@@ -27,17 +27,29 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
 
   private
 
+    # rubocop:disable Metrics/AbcSize
     def load_zero_fill_talents(records)
       existing_ids = records.map(&:talent_id)
 
-      base = Talent
+      # Class/spec/hero talents from tree assignments
+      tree_talents = Talent
         .includes(:translations)
         .joins(:talent_spec_assignments)
         .where(talent_spec_assignments: { spec_id: spec_id_param })
+      tree_talents = tree_talents.where.not(id: existing_ids) if existing_ids.any?
 
-      base = base.where.not(id: existing_ids) if existing_ids.any?
-      base.to_a
+      # PvP talents known for this spec (from character loadouts)
+      pvp_talent_ids = CharacterTalent
+        .where(spec_id: spec_id_param, talent_type: "pvp")
+        .distinct.pluck(:talent_id)
+      pvp_talent_ids -= existing_ids if existing_ids.any?
+      pvp_talent_ids -= tree_talents.pluck(:id)
+
+      pvp_talents = pvp_talent_ids.any? ? Talent.includes(:translations).where(id: pvp_talent_ids).to_a : []
+
+      tree_talents.to_a + pvp_talents
     end
+    # rubocop:enable Metrics/AbcSize
 
     def load_prerequisites(talents)
       node_ids = talents.filter_map(&:node_id).uniq
@@ -58,6 +70,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         usage_pct:      record.usage_pct.to_f,
         in_top_build:   record.in_top_build,
         top_build_rank: record.top_build_rank,
+        tier:           record.tier,
         snapshot_at:    record.snapshot_at
       }
     end
@@ -70,6 +83,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         usage_pct:      0.0,
         in_top_build:   false,
         top_build_rank: 0,
+        tier:           talent.default_points > 0 ? "bis" : "common",
         snapshot_at:    nil
       }
     end
@@ -87,6 +101,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         display_col:           t.display_col,
         max_rank:              t.max_rank,
         icon_url:              t.icon_url,
+        default_points:        t.default_points,
         prerequisite_node_ids: prereqs[t.node_id] || []
       }
     end

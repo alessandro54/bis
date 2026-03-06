@@ -1,8 +1,8 @@
 class SyncTalentTreesJob < ApplicationJob
   queue_as :default
 
-  def perform(region: "us")
-    result = Blizzard::Data::Talents::SyncTreeService.call(region: region)
+  def perform(region: "us", force: false)
+    result = Blizzard::Data::Talents::SyncTreeService.call(region:, force:)
 
     if result.success?
       ctx = result.context

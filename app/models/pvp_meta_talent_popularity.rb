@@ -8,6 +8,7 @@
 #  in_top_build   :boolean          default(FALSE), not null
 #  snapshot_at    :datetime         not null
 #  talent_type    :string           not null
+#  tier           :string           default("common"), not null
 #  top_build_rank :integer          default(0), not null
 #  usage_count    :integer          default(0), not null
 #  usage_pct      :decimal(8, 4)

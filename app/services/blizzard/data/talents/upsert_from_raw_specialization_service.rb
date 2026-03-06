@@ -30,10 +30,11 @@ module Blizzard
               next unless blizzard_id
 
               talent_records << {
-                blizzard_id: blizzard_id,
-                name:        talent[:name] || talent["name"],
-                talent_type: type,
-                spell_id:    nil
+                blizzard_id:    blizzard_id,
+                name:           talent[:name] || talent["name"],
+                talent_type:    type,
+                spell_id:       nil,
+                default_points: (talent[:default_points] || talent["default_points"]).to_i
               }
 
               rank = talent[:rank] || talent["rank"] || 1
@@ -56,10 +57,11 @@ module Blizzard
             next unless blizzard_id
 
             talent_records << {
-              blizzard_id: blizzard_id,
-              name:        talent_info["name"],
-              talent_type: "pvp",
-              spell_id:    selected.dig("spell_tooltip", "spell", "id")
+              blizzard_id:    blizzard_id,
+              name:           talent_info["name"],
+              talent_type:    "pvp",
+              spell_id:       selected.dig("spell_tooltip", "spell", "id"),
+              default_points: 0
             }
 
             pvp_records << { blizzard_id: blizzard_id, rank: 1, slot_number: index + 2 }

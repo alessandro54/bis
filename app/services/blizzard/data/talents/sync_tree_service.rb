@@ -10,8 +10,9 @@ module Blizzard
       #   SyncTalentTreesJob.perform_later
       # rubocop:disable Metrics/ClassLength
       class SyncTreeService < BaseService
-        def initialize(region: "us")
+        def initialize(region: "us", force: false)
           @region = region
+          @force  = force
           @client = Blizzard::Client.new(region: region, locale: "en_US")
         end
 
@@ -34,8 +35,14 @@ module Blizzard
             )
           end
 
-          apply_positions(talent_attrs)
-          apply_prerequisites(edges)
+          if force?
+            apply_positions(talent_attrs)
+            apply_prerequisites(edges)
+          else
+            apply_positions_for_incomplete(talent_attrs)
+            apply_prerequisites(edges) if TalentPrerequisite.none?
+          end
+
           apply_spec_assignments(spec_assignments)
           fetch_missing_media
 
@@ -48,6 +55,8 @@ module Blizzard
         private
 
           attr_reader :region, :client
+
+          def force? = @force
 
           def fetch_index
             client.get("/data/wow/talent-tree/index", namespace: client.static_namespace)
@@ -122,6 +131,19 @@ module Blizzard
                 []
               end
             end.uniq { |blizzard_id, _| blizzard_id }.compact
+          end
+
+          def apply_positions_for_incomplete(talent_attrs)
+            return if talent_attrs.empty?
+
+            incomplete_ids = Talent
+              .where(blizzard_id: talent_attrs.keys)
+              .where("node_id IS NULL OR spell_id IS NULL")
+              .pluck(:blizzard_id)
+
+            return if incomplete_ids.empty?
+
+            apply_positions(talent_attrs.slice(*incomplete_ids))
           end
 
           # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
@@ -217,14 +239,31 @@ module Blizzard
           def sync_talent_media(talent)
             talent_data = fetch_talent_data(talent.blizzard_id)
             spell_id    = talent.spell_id || talent_data[:spell_id]
-            return unless spell_id
 
             save_description(talent, talent_data[:description])
-            sync_icon(talent, spell_id) if talent.icon_url.nil?
+            sync_icon(talent, spell_id) if spell_id && talent.icon_url.nil?
           rescue Blizzard::Client::NotFoundError
-            # no entry in Blizzard's API — skip silently
+            sync_pvp_talent_media(talent)
           rescue Blizzard::Client::Error => e
             Rails.logger.warn("[SyncTreeService] Media fetch failed for talent #{talent.blizzard_id}: #{e.message}")
+          end
+
+          # PvP talents live at /data/wow/pvp-talent/{id} instead of /data/wow/talent/{id}.
+          # Falls back to the already-stored spell_id when the PvP endpoint also fails.
+          def sync_pvp_talent_media(talent)
+            talent_data = fetch_pvp_talent_data(talent.blizzard_id)
+            spell_id    = talent.spell_id || talent_data[:spell_id]
+
+            save_description(talent, talent_data[:description])
+            sync_icon(talent, spell_id) if spell_id && talent.icon_url.nil?
+          rescue Blizzard::Client::NotFoundError
+            # Neither endpoint has this talent — fall back to stored spell_id for icon
+            sync_icon(talent, talent.spell_id) if talent.spell_id && talent.icon_url.nil?
+          rescue Blizzard::Client::Error => e
+            message = "PvP talent media fetch failed for talent #{talent.blizzard_id}: #{e.message}"
+            Rails.logger.warn(
+              "[SyncTreeService] #{message}"
+              )
           end
 
           def sync_icon(talent, spell_id)
@@ -232,6 +271,8 @@ module Blizzard
             # rubocop:disable Rails/SkipsModelValidations
             Talent.where(id: talent.id).update_all(icon_url: url, spell_id: spell_id) if url
             # rubocop:enable Rails/SkipsModelValidations
+          rescue Blizzard::Client::Error => e
+            Rails.logger.warn("[SyncTreeService] Icon fetch failed for spell #{spell_id}: #{e.message}")
           end
 
           # Fetches /data/wow/talent/{id} and returns { spell_id:, description: }.
@@ -242,6 +283,15 @@ module Blizzard
             desc  = ranks.max_by { |r| r["rank"].to_i }&.dig("description")
 
             { spell_id: data.dig("spell", "id"), description: desc }
+          end
+
+          # Fetches /data/wow/pvp-talent/{id} — PvP talents use a separate endpoint.
+          def fetch_pvp_talent_data(blizzard_id)
+            data     = client.get("/data/wow/pvp-talent/#{blizzard_id}", namespace: client.static_namespace)
+            desc     = data["description"]
+            spell_id = data.dig("spell", "id")
+
+            { spell_id: spell_id, description: desc }
           end
 
           def save_description(talent, description)
