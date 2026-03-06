@@ -1,6 +1,5 @@
 module Admin
   class SessionsController < ActionController::Base
-    skip_forgery_protection
     layout false
     def new; end
 

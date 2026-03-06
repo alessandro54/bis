@@ -1,6 +1,12 @@
 class AdminController < ActionController::Base
-  http_basic_authenticate_with(
-    name:     "admin",
-    password: Rails.application.credentials.admin_password
-  )
+  before_action :authenticate_admin!
+
+  private
+
+    def authenticate_admin!
+      return if session[:admin_authenticated]
+
+      session[:return_to] = request.fullpath
+      redirect_to "/admin/login"
+    end
 end
