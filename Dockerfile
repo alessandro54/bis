@@ -50,6 +50,9 @@ COPY . .
 # -j 1 disable parallel compilation to avoid a QEMU bug: https://github.com/rails/bootsnap/issues/495
 RUN bundle exec bootsnap precompile -j 1 app/ lib/
 
+# Precompile assets (Mission Control, Avo, etc.)
+RUN SECRET_KEY_BASE_DUMMY=1 bundle exec rails assets:precompile
+
 
 
 
