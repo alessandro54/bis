@@ -6,29 +6,30 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
 
   # Composite score:
   #   rating
-  #   + winrate_bonus    (up to +120 for ≥75% winrate, 0 at 55%)
-  #   - grinder_penalty  (up to -200 for sub-55% winrate with many games)
+  #   + winrate_bonus    (up to +120 for ≥80% winrate, 0 at 60%)
+  #   - grinder_penalty  (up to -300 for sub-60% winrate with many games)
   #
-  # Winrate bonus: rewards players ABOVE 55% winrate (not 50%).
-  #   55% = neutral, 65% = +48, 75% = +96, 80% = +120.
+  # Winrate bonus: rewards players ABOVE 60% winrate.
+  #   60% = neutral, 70% = +60, 80% = +120.
   #
-  # Grinder penalty: scales with (a) how far below 55% winrate, and
-  #   (b) how many games beyond GRINDER_GAME_THRESHOLD.
-  #   52% with 783 games → penalty ≈ -52 pts.
-  #   48% with 600 games → penalty ≈ -42 pts.
-  #   A 110-game player below threshold gets no penalty.
+  # Grinder penalty: scales with (a) how far below 60% winrate, and
+  #   (b) how many games beyond GRINDER_GAME_THRESHOLD. Factor caps at 1.5×
+  #   so deep grinders (400+ games) get up to 50% extra penalty.
+  #   57% with 532 games → penalty ≈ -36 pts.
+  #   52% with 400 games → penalty ≈ -64 pts.
+  #   A 150-game player below threshold gets no penalty.
   SCORE_SQL = Arel.sql(<<~SQL.squish)
     pvp_leaderboard_entries.rating
     + LEAST(120, GREATEST(0,
         (pvp_leaderboard_entries.wins * 100.0
           / NULLIF(pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses, 0)
-        - 55) * 4.8
+        - 60) * 6.0
       ))
-    - LEAST(200, GREATEST(0,
-        (55 - pvp_leaderboard_entries.wins * 100.0
+    - LEAST(300, GREATEST(0,
+        (60 - pvp_leaderboard_entries.wins * 100.0
           / NULLIF(pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses, 0)
-        ) * 4.0
-        * LEAST(1.0, GREATEST(0,
+        ) * 8.0
+        * LEAST(1.5, GREATEST(0,
             (pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses - #{GRINDER_GAME_THRESHOLD})::float
             / #{GRINDER_GAME_THRESHOLD}
           ))
@@ -96,7 +97,6 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
           "pvp_leaderboard_entries.wins",
           "pvp_leaderboard_entries.losses",
           "pvp_leaderboard_entries.rank",
-          "pvp_leaderboard_entries.hero_talent_tree_name",
           "pvp_leaderboard_entries.snapshot_at",
           "ROUND((#{SCORE_SQL})::numeric, 1) AS score",
           "characters.name",
@@ -115,18 +115,25 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
     def serialize_players(rows)
       rows.map do |row|
         {
-          name:                  row.name,
-          realm:                 row.realm,
-          region:                row.region,
-          rating:                row.rating,
-          wins:                  row.wins,
-          losses:                row.losses,
-          rank:                  row.rank,
-          score:                 row.score.to_f,
-          avatar_url:            row.avatar_url,
-          class_slug:            row.class_slug,
-          hero_talent_tree_name: row.hero_talent_tree_name
+          name:       row.name,
+          realm:      format_realm(row.realm),
+          region:     format_region(row.region),
+          rating:     row.rating,
+          wins:       row.wins,
+          losses:     row.losses,
+          rank:       row.rank,
+          score:      row.score.to_f,
+          avatar_url: row.avatar_url,
+          class_slug: row.class_slug
         }
       end
+    end
+
+    def format_realm(realm)
+      realm.to_s.tr("-", " ").titleize
+    end
+
+    def format_region(region)
+      region.to_s.upcase
     end
 end

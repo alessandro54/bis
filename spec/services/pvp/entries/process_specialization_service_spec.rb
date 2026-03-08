@@ -15,13 +15,14 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
     described_class.call(character: character, raw_specialization: raw_specialization, locale: locale)
   end
 
-  # talents_raw_1.json is the normalized talent payload produced by
+  # fixture_talents is the normalized talent payload produced by
   # CharacterEquipmentSpecializationsService#talents — it contains
   # class_talents, spec_talents, hero_talents, pvp_talents, and
   # talent_loadout_code. This is what UpsertFromRawSpecializationService
   # consumes directly.
   let(:fixture_talents) do
-    JSON.parse(File.read(Rails.root.join("spec/fixtures/pvp_leaderboard_entries/talents_raw_1.json")))
+    raw = JSON.parse(File.read(Rails.root.join("spec/fixtures/specialization/egirlbooster.json")))
+    Blizzard::Data::CharacterEquipmentSpecializationsService.new(raw).talents
   end
 
   let(:spec_service_double) do

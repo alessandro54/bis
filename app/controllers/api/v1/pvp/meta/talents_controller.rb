@@ -1,5 +1,5 @@
 class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
-  # rubocop:disable Metrics/AbcSize
+  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def index
     cache_key = meta_cache_key("talents", bracket_param, spec_id_param, locale_param)
 
@@ -17,14 +17,28 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
       prereqs        = load_prerequisites(all_talents)
       default_points = load_default_points(all_talents)
 
-      records.map { |r| serialize(r, prereqs, default_points) } +
+      talents = records.map { |r| serialize(r, prereqs, default_points) } +
         zero_talents.map { |t| serialize_zero(t, prereqs, default_points) }
+
+      total_weighted = records.sum(&:usage_count).to_i
+      total_players  = count_raw_players
+
+      {
+        meta:    {
+          bracket:        bracket_param,
+          spec_id:        spec_id_param,
+          total_players:  total_players,
+          total_weighted: total_weighted,
+          snapshot_at:    records.first&.snapshot_at
+        },
+        talents: talents
+      }
     end
 
     render json: json
     set_cache_headers
   end
-  # rubocop:enable Metrics/AbcSize
+  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
   private
 
@@ -51,6 +65,15 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
       tree_talents.to_a + pvp_talents
     end
     # rubocop:enable Metrics/AbcSize
+
+    def count_raw_players
+      PvpLeaderboardEntry
+        .joins(:pvp_leaderboard)
+        .where(pvp_leaderboards: { pvp_season_id: current_season.id, bracket: bracket_param })
+        .where(spec_id: spec_id_param)
+        .where.not(specialization_processed_at: nil)
+        .select(:character_id).distinct.count
+    end
 
     def load_prerequisites(talents)
       node_ids = talents.filter_map(&:node_id).uniq

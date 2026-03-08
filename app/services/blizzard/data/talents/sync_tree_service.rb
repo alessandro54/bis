@@ -250,6 +250,7 @@ module Blizzard
 
           # PvP talents live at /data/wow/pvp-talent/{id} instead of /data/wow/talent/{id}.
           # Falls back to the already-stored spell_id when the PvP endpoint also fails.
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           def sync_pvp_talent_media(talent)
             talent_data = fetch_pvp_talent_data(talent.blizzard_id)
             spell_id    = talent.spell_id || talent_data[:spell_id]
@@ -257,14 +258,14 @@ module Blizzard
             save_description(talent, talent_data[:description])
             sync_icon(talent, spell_id) if spell_id && talent.icon_url.nil?
           rescue Blizzard::Client::NotFoundError
-            # Neither endpoint has this talent — fall back to stored spell_id for icon
+            # Neither Blizzard endpoint has this talent — try stored spell_id, then WoWHead
             sync_icon(talent, talent.spell_id) if talent.spell_id && talent.icon_url.nil?
+            sync_icon_from_wowhead(talent) if talent.reload.icon_url.nil? && talent.spell_id
           rescue Blizzard::Client::Error => e
-            message = "PvP talent media fetch failed for talent #{talent.blizzard_id}: #{e.message}"
-            Rails.logger.warn(
-              "[SyncTreeService] #{message}"
-              )
+            message = "[SyncTreeService] PvP talent media fetch failed for talent #{talent.blizzard_id}: #{e.message}"
+            Rails.logger.warn(message)
           end
+          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
           def sync_icon(talent, spell_id)
             url = fetch_spell_icon_url(spell_id)
@@ -298,6 +299,48 @@ module Blizzard
             return unless description.present?
 
             talent.set_translation("description", client.locale, description, meta: { source: "blizzard" })
+          end
+
+          # Last-resort fallback: fetch icon name from WoWHead tooltip API
+          # and build a Blizzard CDN URL from it.
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+          def sync_icon_from_wowhead(talent)
+            data = fetch_wowhead_tooltip(talent.spell_id)
+            return unless data
+
+            if data[:icon_url] && talent.icon_url.nil?
+              # rubocop:disable Rails/SkipsModelValidations
+              Talent.where(id: talent.id).update_all(icon_url: data[:icon_url])
+              # rubocop:enable Rails/SkipsModelValidations
+              message = "[SyncTreeService] WoWHead fallback icon for talent #{talent.blizzard_id}: #{data[:icon_url]}"
+              Rails.logger.info(message)
+            end
+
+            save_description(talent, data[:description]) if data[:description].present?
+          rescue => e
+            message = "[SyncTreeService] WoWHead fallback failed for spell #{talent.spell_id}: #{e.message}"
+            Rails.logger.warn(message)
+          end
+          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+          def fetch_wowhead_tooltip(spell_id)
+            uri  = URI("https://nether.wowhead.com/tooltip/spell/#{spell_id}")
+            resp = Net::HTTP.get_response(uri)
+            return nil unless resp.is_a?(Net::HTTPSuccess)
+
+            body = JSON.parse(resp.body)
+            icon = body["icon"]
+            # WoWHead returns HTML tooltip — convert to readable plain text
+            desc = body["tooltip"]
+              &.gsub(/<br\s*\/?>|<\/(?:div|p|td|tr|li)>/i, "\n")
+              &.gsub(/<[^>]+>/, "")
+              &.gsub(/\n{3,}/, "\n\n")
+              &.strip&.presence
+
+            {
+              icon_url:    icon.present? ? "https://render.worldofwarcraft.com/us/icons/56/#{icon}.jpg" : nil,
+              description: desc
+            }
           end
 
           def fetch_spell_icon_url(spell_id)
