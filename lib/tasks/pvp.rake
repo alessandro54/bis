@@ -34,8 +34,8 @@ namespace :pvp do
 
     # rubocop:disable Rails/SkipsModelValidations
     Character.update_all(
-      last_equipment_snapshot_at: nil,
-      equipment_fingerprint:      nil
+      last_equipment_snapshot_at:  nil,
+      spec_equipment_fingerprints: nil
     )
     # rubocop:enable Rails/SkipsModelValidations
 
@@ -49,5 +49,51 @@ namespace :pvp do
     end
 
     puts "Done. #{enqueued} characters queued across #{(enqueued.to_f / batch_size).ceil} jobs."
+  end
+
+  desc "Reset specialization_processed_at so all characters get their talents re-synced on next run"
+  task reset_specialization: :environment do
+    batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+
+    scope = PvpLeaderboardEntry
+      .joins(:pvp_leaderboard)
+      .where(pvp_leaderboards: { pvp_season: PvpSeason.current })
+      .where.not(specialization_processed_at: nil)
+    # rubocop:disable Rails/SkipsModelValidations
+    updated = scope.update_all(specialization_processed_at: nil)
+    # rubocop:enable Rails/SkipsModelValidations
+
+    puts "Reset specialization_processed_at for #{updated} leaderboard entries."
+    puts "Enqueueing character batch jobs to re-sync talents..."
+
+    char_ids = PvpLeaderboardEntry
+      .joins(:pvp_leaderboard)
+      .where(pvp_leaderboards: { pvp_season: PvpSeason.current })
+      .joins(:character)
+      .where(characters: { is_private: false })
+      .distinct
+      .pluck(:character_id)
+
+    enqueued = 0
+    char_ids.each_slice(batch_size) do |batch|
+      Pvp::SyncCharacterBatchJob.perform_later(character_ids: batch)
+      enqueued += batch.size
+    end
+
+    puts "Done. #{enqueued} characters queued across #{(enqueued.to_f / batch_size).ceil} jobs."
+  end
+
+  desc "Re-run talent aggregation for the current season and bust the meta cache"
+  task reaggregate_talents: :environment do
+    season = PvpSeason.current
+    puts "Running TalentAggregationService for season #{season.id}..."
+    result = Pvp::Meta::TalentAggregationService.call(season: season)
+    if result.success?
+      puts "Done. #{result.context[:count]} records upserted."
+    else
+      puts "Failed: #{result.error}"
+    end
+    Rails.cache.increment("pvp_meta/version")
+    puts "Meta cache busted."
   end
 end

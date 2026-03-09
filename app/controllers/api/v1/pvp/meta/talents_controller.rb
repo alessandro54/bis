@@ -11,11 +11,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         .where(spec_id: spec_id_param)
         .order(usage_pct: :desc)
 
-      # Blizzard assigns a distinct talent_id per rank, so the same tree node
-      # can produce multiple records. Merge them into one per node+name.
-      records = merge_ranked_records(records.to_a)
-
-      zero_talents = load_zero_fill_talents(records)
+      zero_talents = load_zero_fill_talents(records.to_a)
       all_talents  = records.map(&:talent) + zero_talents
 
       prereqs        = load_prerequisites(all_talents)
@@ -47,25 +43,6 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
   private
 
     # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    def merge_ranked_records(records)
-      records
-        .group_by { |r| [ r.talent.node_id, r.talent.t("name", locale: "en_US") ] }
-        .flat_map do |(node_id, _name), group|
-          next group if node_id.nil? || group.size == 1
-
-          # Same node + same name = different Blizzard rank IDs for the same talent.
-          # Merge into the highest-usage record, summing counts and pcts.
-          primary = group.max_by { |r| r.usage_pct.to_f }
-          primary.usage_count    = group.sum(&:usage_count)
-          primary.usage_pct      = group.sum { |r| r.usage_pct.to_f }
-          primary.in_top_build   = group.any?(&:in_top_build)
-          non_zero_ranks         = group.map(&:top_build_rank).select { |r| r > 0 }
-          primary.top_build_rank = non_zero_ranks.min || 0
-          [ primary ]
-        end
-        .sort_by { |r| -r.usage_pct.to_f }
-    end
-
     def load_zero_fill_talents(records)
       existing_ids = records.map(&:talent_id)
 

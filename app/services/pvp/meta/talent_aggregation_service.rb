@@ -35,10 +35,13 @@ module Pvp
 
       def call
         rows    = execute_query
+        rows    = merge_ranked_rows(rows)
         rows    = apply_budget_tiers(rows)
         records = build_records(rows)
 
         if records.any?
+          kept_ids = records.map { |r| r[:talent_id] }
+
           # rubocop:disable Rails/SkipsModelValidations
           PvpMetaTalentPopularity.upsert_all(
             records,
@@ -46,6 +49,12 @@ module Pvp
             update_only: %i[talent_type usage_count usage_pct in_top_build top_build_rank tier snapshot_at]
           )
           # rubocop:enable Rails/SkipsModelValidations
+
+          # Remove stale rank-variant rows that were merged into a primary record.
+          PvpMetaTalentPopularity
+            .where(pvp_season_id: season.id)
+            .where.not(talent_id: kept_ids)
+            .delete_all
         end
 
         success(records.size, context: { count: records.size })
@@ -226,6 +235,47 @@ module Pvp
           )
         end
         # rubocop:enable Metrics/MethodLength
+
+        # ── Ranked-variant deduplication ────────────────────────────────
+        #
+        # Blizzard assigns a distinct talent_id per rank of a talent, so the same
+        # tree node can produce multiple SQL rows. Merge them into one row per
+        # (bracket, spec_id, node_id, name) by summing counts/pcts.
+        #
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+        def merge_ranked_rows(rows)
+          return rows if rows.empty?
+
+          talent_ids = rows.map { |r| r["talent_id"] }.uniq
+
+          node_ids_by_talent = Talent.where(id: talent_ids).pluck(:id, :node_id).to_h
+          names_by_talent    = Translation
+            .where(translatable_type: "Talent", translatable_id: talent_ids, key: "name", locale: "en_US")
+            .pluck(:translatable_id, :value)
+            .to_h
+
+          rows
+            .group_by do |r|
+              node_id = node_ids_by_talent[r["talent_id"]]
+              node_id ? [ r["bracket"], r["spec_id"], node_id, names_by_talent[r["talent_id"]] ]
+                      : r["talent_id"]
+            end
+            .flat_map do |_key, group|
+              next group if group.size == 1
+              next group if node_ids_by_talent[group.first["talent_id"]].nil?
+
+              primary = group.max_by { |r| r["usage_pct"].to_f }.dup
+              primary["usage_count"]    = group.sum { |r| r["usage_count"].to_i }
+              primary["usage_pct"]      = group.sum { |r| r["usage_pct"].to_f }
+              primary["default_points"] = group.map { |r| r["default_points"].to_i }.max
+              primary["in_top_build"]   = group.any? { |r| r["in_top_build"] }
+              non_zero                  = group.map { |r| r["top_build_rank"].to_i }.select { |r| r > 0 }
+              primary["top_build_rank"] = non_zero.min || 0
+              [ primary ]
+            end
+        end
+
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
         # ── Budget-aware tier assignment ─────────────────────────────────
         #
