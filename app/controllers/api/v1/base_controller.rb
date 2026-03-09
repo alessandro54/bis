@@ -1,7 +1,7 @@
 class Api::V1::BaseController < ApplicationController
   private
 
-    META_CACHE_TTL = 6.hours
+    META_CACHE_TTL = 30.minutes
     META_CACHE_VERSION_KEY = "pvp_meta/version"
 
     # Builds a versioned cache key so all meta caches can be busted at once

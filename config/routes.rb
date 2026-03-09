@@ -11,6 +11,7 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       resources :characters, only: [ :index ]
+      get "characters/:region/:realm/:name", to: "characters#show", as: :character_profile
 
       namespace :pvp do
         scope ":season/:region", as: "season_region_bracket" do
@@ -25,6 +26,7 @@ Rails.application.routes.draw do
           resources :talents, only: [ :index ]
           get :class_distribution, to: "class_distributions#show"
           get :top_players, to: "top_players#index"
+          get :stat_priority, to: "stat_priority#show"
         end
       end
     end

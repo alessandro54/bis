@@ -47,7 +47,7 @@ module WowBis
     config.middleware.use ActionDispatch::Flash
     config.middleware.use Rack::MethodOverride
 
-    config.hosts << "intervals-gently-underground-amber.trycloudflare.com"
+    config.hosts << "assignment-preparing-handles-mtv.trycloudflare.com"
 
     # Lograge: single-line request logs
     config.lograge.enabled = true

@@ -11,6 +11,10 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         .where(spec_id: spec_id_param)
         .order(usage_pct: :desc)
 
+      # Blizzard assigns a distinct talent_id per rank, so the same tree node
+      # can produce multiple records. Merge them into one per node+name.
+      records = merge_ranked_records(records.to_a)
+
       zero_talents = load_zero_fill_talents(records)
       all_talents  = records.map(&:talent) + zero_talents
 
@@ -42,9 +46,35 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
 
   private
 
-    # rubocop:disable Metrics/AbcSize
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+    def merge_ranked_records(records)
+      records
+        .group_by { |r| [ r.talent.node_id, r.talent.t("name", locale: "en_US") ] }
+        .flat_map do |(node_id, _name), group|
+          next group if node_id.nil? || group.size == 1
+
+          # Same node + same name = different Blizzard rank IDs for the same talent.
+          # Merge into the highest-usage record, summing counts and pcts.
+          primary = group.max_by { |r| r.usage_pct.to_f }
+          primary.usage_count    = group.sum(&:usage_count)
+          primary.usage_pct      = group.sum { |r| r.usage_pct.to_f }
+          primary.in_top_build   = group.any?(&:in_top_build)
+          non_zero_ranks         = group.map(&:top_build_rank).select { |r| r > 0 }
+          primary.top_build_rank = non_zero_ranks.min || 0
+          [ primary ]
+        end
+        .sort_by { |r| -r.usage_pct.to_f }
+    end
+
     def load_zero_fill_talents(records)
       existing_ids = records.map(&:talent_id)
+
+      # Track (node_id, name) pairs already covered by a record so we can
+      # exclude stale rank variants from the zero-fill list.
+      covered_nodes = records.each_with_object(Set.new) do |r, set|
+        node_id = r.talent.node_id
+        set.add([ node_id, r.talent.t("name", locale: "en_US") ]) if node_id
+      end
 
       # Class/spec/hero talents from tree assignments
       tree_talents = Talent
@@ -53,18 +83,26 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         .where(talent_spec_assignments: { spec_id: spec_id_param })
       tree_talents = tree_talents.where.not(id: existing_ids) if existing_ids.any?
 
+      # Drop old rank variants whose node is already covered, then deduplicate
+      # remaining by (node_id, name), keeping the entry with the most data.
+      tree_talents = tree_talents
+        .to_a
+        .reject { |t| t.node_id && covered_nodes.include?([ t.node_id, t.t("name", locale: "en_US") ]) }
+        .group_by { |t| [ t.node_id, t.t("name", locale: "en_US") ] }
+        .flat_map { |_, group| group.size == 1 ? group : [ group.max_by { |t| t.icon_url ? 1 : 0 } ] }
+
       # PvP talents known for this spec (from character loadouts)
       pvp_talent_ids = CharacterTalent
         .where(spec_id: spec_id_param, talent_type: "pvp")
         .distinct.pluck(:talent_id)
       pvp_talent_ids -= existing_ids if existing_ids.any?
-      pvp_talent_ids -= tree_talents.pluck(:id)
+      pvp_talent_ids -= tree_talents.map(&:id)
 
       pvp_talents = pvp_talent_ids.any? ? Talent.includes(:translations).where(id: pvp_talent_ids).to_a : []
 
-      tree_talents.to_a + pvp_talents
+      tree_talents + pvp_talents
     end
-    # rubocop:enable Metrics/AbcSize
+    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
     def count_raw_players
       PvpLeaderboardEntry
