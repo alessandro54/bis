@@ -10,6 +10,7 @@ class Avo::Resources::PvpLeaderboardEntry < Avo::BaseResource
 
   def actions
     action Avo::Actions::SyncLeaderboardsAction
+    action Avo::Actions::DeleteSelectedAction
   end
 
   def filters
