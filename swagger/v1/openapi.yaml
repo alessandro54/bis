@@ -1,0 +1,796 @@
+openapi: 3.0.3
+info:
+  title: WoW BIS API
+  description: |
+    World of Warcraft PvP meta statistics API. Tracks leaderboard data for US/EU regions
+    and exposes item, enchant, gem, talent, and spec popularity aggregations.
+  version: "1"
+  contact:
+    name: WoW BIS
+
+servers:
+  - url: /api/v1
+    description: Current version
+
+tags:
+  - name: Characters
+    description: Character profiles and rankings
+  - name: Leaderboards
+    description: PvP ladder data per bracket and region
+  - name: Meta – Items
+    description: Item popularity aggregations
+  - name: Meta – Enchants
+    description: Enchant popularity aggregations
+  - name: Meta – Gems
+    description: Gem popularity aggregations
+  - name: Meta – Specs
+    description: Spec distribution and talent builds
+  - name: Meta – Talents
+    description: Individual talent popularity
+  - name: Meta – Classes
+    description: Class distribution
+  - name: Meta – Players
+    description: Top players and stat priorities
+
+# ─── Reusable components ────────────────────────────────────────────────────
+
+components:
+  parameters:
+    BracketQuery:
+      name: bracket
+      in: query
+      required: true
+      description: PvP bracket (`2v2`, `3v3`, `shuffle`, `rbg`)
+      schema:
+        type: string
+        enum: [2v2, 3v3, shuffle, rbg]
+
+    SpecIdQuery:
+      name: spec_id
+      in: query
+      required: true
+      description: Blizzard specialization ID
+      schema:
+        type: integer
+        example: 253
+
+    SlotQuery:
+      name: slot
+      in: query
+      required: false
+      description: Equipment slot filter (e.g. `head`, `trinket_1`)
+      schema:
+        type: string
+
+    LocaleQuery:
+      name: locale
+      in: query
+      required: false
+      description: Locale for translated strings (default `en_US`)
+      schema:
+        type: string
+        example: en_US
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    UsageStats:
+      type: object
+      properties:
+        usage_count:
+          type: integer
+        usage_pct:
+          type: number
+          format: float
+        snapshot_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+        blizzard_id:
+          type: integer
+        name:
+          type: string
+        icon_url:
+          type: string
+          format: uri
+          nullable: true
+        quality:
+          type: string
+          nullable: true
+
+    MetaItem:
+      allOf:
+        - $ref: "#/components/schemas/UsageStats"
+        - type: object
+          properties:
+            id:
+              type: integer
+            item:
+              $ref: "#/components/schemas/Item"
+            slot:
+              type: string
+            crafted:
+              type: boolean
+            top_crafting_stats:
+              type: array
+              items:
+                type: string
+
+    Enchantment:
+      type: object
+      properties:
+        id:
+          type: integer
+        blizzard_id:
+          type: integer
+        name:
+          type: string
+
+    MetaEnchant:
+      allOf:
+        - $ref: "#/components/schemas/UsageStats"
+        - type: object
+          properties:
+            id:
+              type: integer
+            enchantment:
+              $ref: "#/components/schemas/Enchantment"
+            slot:
+              type: string
+
+    MetaGem:
+      allOf:
+        - $ref: "#/components/schemas/UsageStats"
+        - type: object
+          properties:
+            id:
+              type: integer
+            item:
+              $ref: "#/components/schemas/Item"
+            slot:
+              type: string
+            socket_type:
+              type: string
+              nullable: true
+
+    SpecSummary:
+      type: object
+      properties:
+        spec_id:
+          type: integer
+        spec_slug:
+          type: string
+        count:
+          type: integer
+        usage_pct:
+          type: number
+          format: float
+
+    TalentBuild:
+      type: object
+      properties:
+        loadout_code:
+          type: string
+        count:
+          type: integer
+        usage_pct:
+          type: number
+          format: float
+
+    HeroTalent:
+      type: object
+      properties:
+        hero_talent_tree_id:
+          type: integer
+        hero_talent_tree_name:
+          type: string
+        count:
+          type: integer
+        usage_pct:
+          type: number
+          format: float
+
+    TierSet:
+      type: object
+      properties:
+        tier_set_id:
+          type: integer
+        tier_set_name:
+          type: string
+        tier_set_pieces:
+          type: integer
+        tier_4p_active:
+          type: boolean
+        count:
+          type: integer
+        usage_pct:
+          type: number
+          format: float
+
+    SpecDetail:
+      type: object
+      properties:
+        spec_id:
+          type: integer
+        bracket:
+          type: string
+        total_players:
+          type: integer
+        talent_builds:
+          type: array
+          items:
+            $ref: "#/components/schemas/TalentBuild"
+        hero_talents:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeroTalent"
+        tier_sets:
+          type: array
+          items:
+            $ref: "#/components/schemas/TierSet"
+        snapshot_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    TalentFields:
+      type: object
+      properties:
+        id:
+          type: integer
+        blizzard_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        talent_type:
+          type: string
+        spell_id:
+          type: integer
+          nullable: true
+        node_id:
+          type: integer
+          nullable: true
+        display_row:
+          type: integer
+          nullable: true
+        display_col:
+          type: integer
+          nullable: true
+        max_rank:
+          type: integer
+          nullable: true
+        icon_url:
+          type: string
+          format: uri
+          nullable: true
+        default_points:
+          type: integer
+        prerequisite_node_ids:
+          type: array
+          items:
+            type: integer
+
+    MetaTalent:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        talent:
+          $ref: "#/components/schemas/TalentFields"
+        usage_count:
+          type: integer
+        usage_pct:
+          type: number
+          format: float
+        in_top_build:
+          type: boolean
+        top_build_rank:
+          type: integer
+        tier:
+          type: string
+        snapshot_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    TopPlayer:
+      type: object
+      properties:
+        name:
+          type: string
+        realm:
+          type: string
+        region:
+          type: string
+        rating:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        rank:
+          type: integer
+        score:
+          type: number
+          format: float
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        class_slug:
+          type: string
+
+    StatPriority:
+      type: object
+      properties:
+        stat:
+          type: string
+        count:
+          type: integer
+        pct:
+          type: number
+          format: float
+
+    PvpEntry:
+      type: object
+      properties:
+        bracket:
+          type: string
+        region:
+          type: string
+        rating:
+          type: integer
+        wins:
+          type: integer
+        losses:
+          type: integer
+        rank:
+          type: integer
+        spec_id:
+          type: integer
+
+    CharacterDetail:
+      type: object
+      properties:
+        name:
+          type: string
+        realm:
+          type: string
+        region:
+          type: string
+        class_slug:
+          type: string
+        race:
+          type: string
+          nullable: true
+        faction:
+          type: string
+          nullable: true
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        inset_url:
+          type: string
+          format: uri
+          nullable: true
+        pvp_entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PvpEntry"
+
+# ─── Paths ──────────────────────────────────────────────────────────────────
+
+paths:
+
+  # ── Characters ─────────────────────────────────────────────────────────────
+
+  /characters:
+    get:
+      operationId: listCharacters
+      summary: List characters
+      tags: [Characters]
+      responses:
+        "200":
+          description: Array of characters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  /characters/{region}/{realm}/{name}:
+    get:
+      operationId: showCharacter
+      summary: Get a character profile
+      tags: [Characters]
+      parameters:
+        - name: region
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [us, eu]
+          example: us
+        - name: realm
+          in: path
+          required: true
+          schema:
+            type: string
+          example: stormrage
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+          example: arthas
+      responses:
+        "200":
+          description: Character profile with current-season PvP entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CharacterDetail"
+        "404":
+          description: Character not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ── Leaderboards ────────────────────────────────────────────────────────────
+
+  /pvp/{season}/{region}/leaderboards/{bracket}:
+    get:
+      operationId: showLeaderboard
+      summary: Get top-N leaderboard entries
+      tags: [Leaderboards]
+      parameters:
+        - name: season
+          in: path
+          required: true
+          description: Blizzard season ID (e.g. `37`)
+          schema:
+            type: integer
+          example: 37
+        - name: region
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [us, eu]
+          example: us
+        - name: bracket
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [2v2, 3v3, shuffle, rbg]
+        - name: spec_id
+          in: query
+          required: false
+          description: Required for mixed brackets (`2v2`, `3v3`, `rbg`)
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Top-N leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+  # ── Meta – Items ────────────────────────────────────────────────────────────
+
+  /pvp/meta/items:
+    get:
+      operationId: listMetaItems
+      summary: Item popularity for a spec in a bracket
+      tags: [Meta – Items]
+      parameters:
+        - $ref: "#/components/parameters/BracketQuery"
+        - $ref: "#/components/parameters/SpecIdQuery"
+        - $ref: "#/components/parameters/SlotQuery"
+        - $ref: "#/components/parameters/LocaleQuery"
+      responses:
+        "200":
+          description: Items sorted by usage percentage
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetaItem"
+
+  # ── Meta – Enchants ─────────────────────────────────────────────────────────
+
+  /pvp/meta/enchants:
+    get:
+      operationId: listMetaEnchants
+      summary: Enchant popularity for a spec in a bracket
+      tags: [Meta – Enchants]
+      parameters:
+        - $ref: "#/components/parameters/BracketQuery"
+        - $ref: "#/components/parameters/SpecIdQuery"
+        - $ref: "#/components/parameters/SlotQuery"
+        - $ref: "#/components/parameters/LocaleQuery"
+      responses:
+        "200":
+          description: Enchants sorted by usage percentage
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetaEnchant"
+
+  # ── Meta – Gems ─────────────────────────────────────────────────────────────
+
+  /pvp/meta/gems:
+    get:
+      operationId: listMetaGems
+      summary: Gem popularity for a spec in a bracket
+      tags: [Meta – Gems]
+      parameters:
+        - $ref: "#/components/parameters/BracketQuery"
+        - $ref: "#/components/parameters/SpecIdQuery"
+        - $ref: "#/components/parameters/SlotQuery"
+        - name: socket_type
+          in: query
+          required: false
+          description: Filter by socket type (e.g. `prismatic`)
+          schema:
+            type: string
+        - $ref: "#/components/parameters/LocaleQuery"
+      responses:
+        "200":
+          description: Gems sorted by usage percentage
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MetaGem"
+
+  # ── Meta – Specs ────────────────────────────────────────────────────────────
+
+  /pvp/meta/specs:
+    get:
+      operationId: listMetaSpecs
+      summary: Spec distribution for a bracket
+      tags: [Meta – Specs]
+      parameters:
+        - $ref: "#/components/parameters/BracketQuery"
+      responses:
+        "200":
+          description: Spec distribution across the bracket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bracket:
+                    type: string
+                  specs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/SpecSummary"
+                  snapshot_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+  /pvp/meta/specs/{spec_id}:
+    get:
+      operationId: showMetaSpec
+      summary: Detailed meta for a specific spec
+      description: Returns talent builds, hero talent trees, and tier set usage.
+      tags: [Meta – Specs]
+      parameters:
+        - name: spec_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 253
+        - $ref: "#/components/parameters/BracketQuery"
+        - name: limit
+          in: query
+          required: false
+          description: Max number of talent builds to return (default 20, max 100)
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        "200":
+          description: Spec detail with talent builds and hero talents
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpecDetail"
+
+  # ── Meta – Talents ──────────────────────────────────────────────────────────
+
+  /pvp/meta/talents:
+    get:
+      operationId: listMetaTalents
+      summary: Talent node popularity for a spec in a bracket
+      description: |
+        Returns every talent node for the spec (including zero-usage nodes)
+        with usage counts, tier classification, and prerequisite graph data.
+      tags: [Meta – Talents]
+      parameters:
+        - $ref: "#/components/parameters/BracketQuery"
+        - $ref: "#/components/parameters/SpecIdQuery"
+        - $ref: "#/components/parameters/LocaleQuery"
+      responses:
+        "200":
+          description: Talent list with meta context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    type: object
+                    properties:
+                      bracket:
+                        type: string
+                      spec_id:
+                        type: integer
+                      total_players:
+                        type: integer
+                      total_weighted:
+                        type: integer
+                      snapshot_at:
+                        type: string
+                        format: date-time
+                        nullable: true
+                  talents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MetaTalent"
+
+  # ── Meta – Classes ──────────────────────────────────────────────────────────
+
+  /pvp/meta/class_distribution:
+    get:
+      operationId: showClassDistribution
+      summary: Class distribution for a bracket
+      tags: [Meta – Classes]
+      parameters:
+        - name: season_id
+          in: query
+          required: true
+          description: Blizzard season ID
+          schema:
+            type: integer
+          example: 37
+        - $ref: "#/components/parameters/BracketQuery"
+        - name: region
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [us, eu]
+            default: us
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [dps, healer, tank]
+            default: dps
+      responses:
+        "200":
+          description: Class distribution breakdown
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  season_id:
+                    type: integer
+                  bracket:
+                    type: string
+                  region:
+                    type: string
+                  total_entries:
+                    type: integer
+                  classes:
+                    type: array
+                    items:
+                      type: object
+
+  # ── Meta – Top Players ──────────────────────────────────────────────────────
+
+  /pvp/meta/top_players:
+    get:
+      operationId: listTopPlayers
+      summary: Top 10 players for a spec in a bracket
+      description: |
+        Ranks players by a composite score: `rating + winrate_bonus - grinder_penalty`.
+        Returns merged US+EU results unless `region` is specified.
+      tags: [Meta – Players]
+      parameters:
+        - $ref: "#/components/parameters/BracketQuery"
+        - $ref: "#/components/parameters/SpecIdQuery"
+        - name: region
+          in: query
+          required: false
+          description: Filter to a single region (omit for merged US+EU)
+          schema:
+            type: string
+            enum: [us, eu]
+      responses:
+        "200":
+          description: Top players with composite ranking score
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bracket:
+                    type: string
+                  spec_id:
+                    type: integer
+                  regions:
+                    type: array
+                    items:
+                      type: string
+                  players:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TopPlayer"
+                  snapshot_at:
+                    type: string
+                    format: date-time
+                    nullable: true
+
+  # ── Meta – Stat Priority ────────────────────────────────────────────────────
+
+  /pvp/meta/stat_priority:
+    get:
+      operationId: showStatPriority
+      summary: Secondary stat priority inferred from crafting choices
+      description: |
+        Tallies which secondary stats top players chose on crafted items
+        to derive a stat priority ranking for the spec.
+      tags: [Meta – Players]
+      parameters:
+        - $ref: "#/components/parameters/BracketQuery"
+        - $ref: "#/components/parameters/SpecIdQuery"
+      responses:
+        "200":
+          description: Stat priority list sorted by popularity
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  bracket:
+                    type: string
+                  spec_id:
+                    type: integer
+                  stats:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/StatPriority"
