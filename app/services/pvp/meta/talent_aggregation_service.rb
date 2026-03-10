@@ -33,6 +33,7 @@ module Pvp
         @top_n  = top_n
       end
 
+      # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       def call
         rows    = execute_query
         rows    = merge_ranked_rows(rows)
@@ -51,16 +52,22 @@ module Pvp
           # rubocop:enable Rails/SkipsModelValidations
 
           # Remove stale rank-variant rows that were merged into a primary record.
-          PvpMetaTalentPopularity
-            .where(pvp_season_id: season.id)
-            .where.not(talent_id: kept_ids)
-            .delete_all
+          # Scoped per (bracket, spec_id) so we only prune within aggregated groups,
+          # not across specs/brackets that had no data in this run.
+          bracket_spec_pairs = records.map { |r| [ r[:bracket], r[:spec_id] ] }.uniq
+          bracket_spec_pairs.each do |bracket, spec_id|
+            PvpMetaTalentPopularity
+              .where(pvp_season_id: season.id, bracket: bracket, spec_id: spec_id)
+              .where.not(talent_id: kept_ids)
+              .delete_all
+          end
         end
 
         success(records.size, context: { count: records.size })
       rescue => e
         failure(e)
       end
+      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
       private
 
