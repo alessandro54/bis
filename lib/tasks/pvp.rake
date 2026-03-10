@@ -83,6 +83,53 @@ namespace :pvp do
     puts "Done. #{enqueued} characters queued across #{(enqueued.to_f / batch_size).ceil} jobs."
   end
 
+  desc "Find characters with missing talent data, clear their loadout codes, and re-sync"
+  task sanitize_talents: :environment do
+    batch_size = ENV.fetch("PVP_SYNC_BATCH_SIZE", 50).to_i
+    season     = PvpSeason.current
+
+    # Characters present in the current season leaderboard (with specialization processed)
+    # but with no character_talents at all — their data was silently wiped.
+    affected_char_ids = PvpLeaderboardEntry
+      .joins(:pvp_leaderboard)
+      .where(pvp_leaderboards: { pvp_season: season })
+      .where.not(specialization_processed_at: nil)
+      .where.not(character_id: CharacterTalent.select(:character_id).distinct)
+      .distinct
+      .pluck(:character_id)
+
+    if affected_char_ids.empty?
+      puts "No characters with missing talent data found. All good."
+      next
+    end
+
+    puts "Found #{affected_char_ids.size} characters with missing talents."
+
+    # rubocop:disable Rails/SkipsModelValidations
+    # Clear stored loadout codes so next sync forces a full rebuild
+    Character.where(id: affected_char_ids).update_all(spec_talent_loadout_codes: nil)
+
+    # Reset specialization_processed_at so the aggregation excludes them until rebuilt
+    updated = PvpLeaderboardEntry
+      .joins(:pvp_leaderboard)
+      .where(pvp_leaderboards: { pvp_season: season })
+      .where(character_id: affected_char_ids)
+      .update_all(specialization_processed_at: nil)
+    # rubocop:enable Rails/SkipsModelValidations
+
+    puts "Reset specialization_processed_at for #{updated} leaderboard entries."
+    puts "Enqueueing re-sync jobs..."
+
+    enqueued = 0
+    affected_char_ids.each_slice(batch_size) do |batch|
+      Pvp::SyncCharacterBatchJob.perform_later(character_ids: batch)
+      enqueued += batch.size
+    end
+
+    puts "Done. #{enqueued} characters queued across #{(enqueued.to_f / batch_size).ceil} jobs."
+    puts "Run `rails pvp:reaggregate_talents` after jobs complete."
+  end
+
   desc "Re-run talent aggregation for the current season and bust the meta cache"
   task reaggregate_talents: :environment do
     season = PvpSeason.current

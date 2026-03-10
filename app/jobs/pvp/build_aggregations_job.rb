@@ -8,7 +8,7 @@ module Pvp
       [ :items,    Pvp::Meta::ItemAggregationService,    PvpMetaItemPopularity,    1.hour    ],
       [ :enchants, Pvp::Meta::EnchantAggregationService, PvpMetaEnchantPopularity, 1.hour    ],
       [ :gems,     Pvp::Meta::GemAggregationService,     PvpMetaGemPopularity,     1.hour    ],
-      [ :talents,  Pvp::Meta::TalentAggregationService,  PvpMetaTalentPopularity,  12.hours  ]
+      [ :talents,  Pvp::Meta::TalentAggregationService,  PvpMetaTalentPopularity,  6.hours   ]
     ].freeze
 
     def perform(pvp_season_id:, sync_cycle_id: nil, cycle_started_at: nil)

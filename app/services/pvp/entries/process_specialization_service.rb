@@ -75,6 +75,9 @@ module Pvp
         # Process talents for ALL specs returned by the API, not just the active one.
         # Each spec's talents are stored independently, keyed by spec_id.
         # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+        TREE_TALENT_TYPES = %w[class spec hero].freeze
+        private_constant :TREE_TALENT_TYPES
+
         def process_all_specs_talents(spec_service, char_attrs)
           current_codes = character.spec_talent_loadout_codes || {}
           new_codes = current_codes.dup
@@ -97,6 +100,10 @@ module Pvp
               raw_specialization: talent_hash,
               locale:             locale
             )
+
+            # Skip if Blizzard returned no tree talents (e.g. empty loadout after a patch).
+            # Do NOT store the new code — keeps the mismatch so the next sync retries.
+            next if TREE_TALENT_TYPES.all? { |t| talent_upsert[t].empty? }
 
             rebuild_character_talents(talent_upsert, sid)
             upsert_spec_default_points(talent_upsert, sid)
