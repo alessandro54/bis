@@ -34,7 +34,7 @@ namespace :fix do
   desc "Rebuild all PvP meta aggregations for the current season"
   task aggregations: :environment do
     puts "Enqueuing BuildAggregationsJob..."
-    BuildAggregationsJob.perform_later
+    Pvp::BuildAggregationsJob.perform_later
     puts "Done."
   end
 
