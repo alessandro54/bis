@@ -106,6 +106,7 @@ module Pvp
               bonus_list:                 item_data["bonus_list"] || [],
               sockets:                    item_data["sockets"] || [],
               crafting_stats:             item_data["crafting_stats"] || [],
+              stats:                      item_data["stats"] || {},
               created_at:                 now,
               updated_at:                 now
             }

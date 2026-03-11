@@ -1,6 +1,6 @@
 class Api::V1::Pvp::Meta::StatPriorityController < Api::V1::BaseController
   # GET /api/v1/pvp/meta/stat_priority
-  # Returns secondary stat priority inferred from crafting stat choices of
+  # Returns secondary stat priority as median in-game percentages across
   # top players in the given bracket + spec.
   def show
     cache_key = meta_cache_key("stat_priority", bracket_param, spec_id_param)
@@ -16,29 +16,38 @@ class Api::V1::Pvp::Meta::StatPriorityController < Api::V1::BaseController
   private
 
     def build_stats
-      rows = crafting_stat_rows
-      stat_counts = count_stats(rows)
-      total = stat_counts.values.sum.to_f
+      rows = stat_pct_rows
+      return [] if rows.empty?
 
-      stat_counts.sort_by { |_, count| -count }.map do |stat, count|
-        { stat: stat, count: count, pct: total > 0 ? (count / total * 100).round(1) : 0.0 }
-      end
+      compute_medians(rows)
+        .sort_by { |_, median| -median }
+        .map { |stat, median| { stat: stat, median: median.round(1) } }
     end
 
-    def crafting_stat_rows
-      CharacterItem
-        .joins(character: { pvp_leaderboard_entries: :pvp_leaderboard })
+    def stat_pct_rows
+      Character
+        .joins(pvp_leaderboard_entries: :pvp_leaderboard)
         .where(pvp_leaderboards: { bracket: bracket_param, pvp_season: current_season })
         .where(pvp_leaderboard_entries: { spec_id: spec_id_param })
-        .where("crafting_stats <> '{}'")
-        .pluck(:crafting_stats)
+        .where("stat_pcts <> '{}'")
+        .pluck(:stat_pcts)
     end
 
-    def count_stats(rows)
-      rows.each_with_object(Hash.new(0)) do |stats, counts|
-        stats.each { |s| counts[s] += 1 }
+    # Returns { "VERSATILITY" => 347, ... } — median rating per stat across all characters.
+    # rubocop:disable Metrics/AbcSize
+    def compute_medians(rows)
+      stat_values = Hash.new { |h, k| h[k] = [] }
+      rows.each do |pcts|
+        pcts.each { |stat, rating| stat_values[stat] << rating.to_i }
+      end
+
+      stat_values.transform_values do |values|
+        sorted = values.sort
+        mid    = sorted.size / 2
+        sorted.size.odd? ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0
       end
     end
+    # rubocop:enable Metrics/AbcSize
 
     def bracket_param
       params.require(:bracket)

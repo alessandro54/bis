@@ -125,6 +125,15 @@ module Pvp
             entry_attrs.merge!(equipment_entry_attrs_from_latest)
           end
 
+          # Compute stat totals from character_items whenever gear changed or not yet computed.
+          if eq_fetch.changed? || character.stat_pcts.blank?
+            spec_id = active_spec_id || entry_attrs[:spec_id]
+            if spec_id
+              totals_result = ComputeStatTotalsService.call(character: character, spec_id: spec_id)
+              char_attrs[:stat_pcts] = totals_result.payload if totals_result.success? && totals_result.payload.present?
+            end
+          end
+
           # --- Spec-aware entry updates ---
           update_entries_with_spec_awareness(entries, entry_attrs, active_spec_id, per_spec_hero_trees)
 
