@@ -201,6 +201,13 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
         allow(Blizzard::Data::CharacterEquipmentSpecializationsService)
           .to receive(:new).with(raw_specialization).and_return(disc_service_double)
         character.update_columns(spec_talent_loadout_codes: { "256" => "old_code" })
+
+        # Pre-create canonical TalentSpecAssignment rows (normally done by SyncTalentTreesJob).
+        # upsert_spec_default_points only updates existing rows, never creates new ones.
+        { 82_717 => "class", 82_713 => "class", 82_700 => "class", 83_001 => "spec" }.each do |blz_id, type|
+          talent = create(:talent, blizzard_id: blz_id, talent_type: type)
+          TalentSpecAssignment.create!(talent_id: talent.id, spec_id: 256, default_points: 0)
+        end
       end
 
       it "writes default_points to talent_spec_assignments for talents with dp > 0" do

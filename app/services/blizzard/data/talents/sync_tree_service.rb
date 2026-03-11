@@ -192,7 +192,7 @@ module Blizzard
             # rubocop:enable Rails/SkipsModelValidations
           end
 
-          # rubocop:disable Metrics/MethodLength
+          # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
           def apply_spec_assignments(spec_assignments)
             return if spec_assignments.empty?
 
@@ -202,23 +202,23 @@ module Blizzard
               .pluck(:blizzard_id, :id)
               .to_h
 
-            now  = Time.current
-            rows = spec_assignments.flat_map do |spec_id, blizzard_ids|
-              blizzard_ids.filter_map do |blizzard_id|
-                talent_id = id_map[blizzard_id]
-                next unless talent_id
-
-                { talent_id: talent_id, spec_id: spec_id, created_at: now, updated_at: now }
-              end
-            end
-
-            return if rows.empty?
+            now = Time.current
 
             # rubocop:disable Rails/SkipsModelValidations
-            TalentSpecAssignment.insert_all(rows, unique_by: %i[talent_id spec_id])
+            spec_assignments.each do |spec_id, blizzard_ids|
+              talent_ids = blizzard_ids.filter_map { |blz_id| id_map[blz_id] }
+              next if talent_ids.empty?
+
+              # Remove stale assignments no longer present in the API tree.
+              # Preserves default_points on rows that remain.
+              TalentSpecAssignment.where(spec_id: spec_id).where.not(talent_id: talent_ids).delete_all
+
+              rows = talent_ids.map { |tid| { talent_id: tid, spec_id: spec_id, created_at: now, updated_at: now } }
+              TalentSpecAssignment.insert_all(rows, unique_by: %i[talent_id spec_id])
+            end
             # rubocop:enable Rails/SkipsModelValidations
           end
-          # rubocop:enable Metrics/MethodLength
+          # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
           # Fetches /data/wow/talent/{id} for talents missing an icon or description,
           # storing spell_id, icon_url, and the max-rank description translation in one pass.

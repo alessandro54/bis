@@ -114,34 +114,38 @@ module Pvp
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
+        # rubocop:disable Metrics/AbcSize
         def upsert_spec_default_points(talent_upsert, spec_id)
-          now     = Time.current
-          records = []
-
-          talent_upsert.each do |_type, talents|
-            Array(talents).each do |td|
+          candidates = talent_upsert.flat_map do |_type, talents|
+            Array(talents).filter_map do |td|
               next unless td[:talent_id]
 
-              records << {
-                talent_id:      td[:talent_id],
-                spec_id:        spec_id,
-                default_points: td[:default_points].to_i,
-                created_at:     now,
-                updated_at:     now
-              }
+              { talent_id: td[:talent_id], spec_id: spec_id, default_points: td[:default_points].to_i }
             end
-          end
+          end.uniq { |r| r[:talent_id] }
 
+          return if candidates.empty?
+
+          # Only update default_points on EXISTING canonical assignments.
+          # Never create new rows here — canonical spec assignments are owned
+          # by SyncTalentTreesJob. Creating rows from character loadouts would
+          # pollute the zero-fill with talents from other specs.
+          existing_ids = TalentSpecAssignment
+            .where(spec_id: spec_id, talent_id: candidates.map { |r| r[:talent_id] })
+            .pluck(:talent_id).to_set
+
+          records = candidates.select { |r| existing_ids.include?(r[:talent_id]) }
           return if records.empty?
 
           # rubocop:disable Rails/SkipsModelValidations
           TalentSpecAssignment.upsert_all(
-            records.uniq { |r| [ r[:talent_id], r[:spec_id] ] },
+            records,
             unique_by:   %i[talent_id spec_id],
             update_only: %i[default_points]
           )
           # rubocop:enable Rails/SkipsModelValidations
         end
+        # rubocop:enable Metrics/AbcSize
 
         def rebuild_character_talents(talent_upsert, spec_id)
           character.character_talents.where(spec_id: spec_id).delete_all
