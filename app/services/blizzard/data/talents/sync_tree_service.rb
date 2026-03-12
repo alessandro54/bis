@@ -10,10 +10,10 @@ module Blizzard
       #   SyncTalentTreesJob.perform_later
       # rubocop:disable Metrics/ClassLength
       class SyncTreeService < BaseService
-        def initialize(region: "us", force: false)
+        def initialize(region: "us", locale: "en_US", force: false)
           @region = region
           @force  = force
-          @client = Blizzard::Client.new(region: region, locale: "en_US")
+          @client = Blizzard::Client.new(region: region, locale: locale)
         end
 
         # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -240,6 +240,7 @@ module Blizzard
             talent_data = fetch_talent_data(talent.blizzard_id)
             spell_id    = talent.spell_id || talent_data[:spell_id]
 
+            save_name(talent, talent_data[:name])
             save_description(talent, talent_data[:description])
             sync_icon(talent, spell_id) if spell_id && talent.icon_url.nil?
           rescue Blizzard::Client::NotFoundError
@@ -255,6 +256,7 @@ module Blizzard
             talent_data = fetch_pvp_talent_data(talent.blizzard_id)
             spell_id    = talent.spell_id || talent_data[:spell_id]
 
+            save_name(talent, talent_data[:name])
             save_description(talent, talent_data[:description])
             sync_icon(talent, spell_id) if spell_id && talent.icon_url.nil?
           rescue Blizzard::Client::NotFoundError
@@ -276,14 +278,14 @@ module Blizzard
             Rails.logger.warn("[SyncTreeService] Icon fetch failed for spell #{spell_id}: #{e.message}")
           end
 
-          # Fetches /data/wow/talent/{id} and returns { spell_id:, description: }.
+          # Fetches /data/wow/talent/{id} and returns { spell_id:, description:, name: }.
           # description is the max-rank description (highest rank players invest in).
           def fetch_talent_data(blizzard_id)
             data  = client.get("/data/wow/talent/#{blizzard_id}", namespace: client.static_namespace)
             ranks = Array(data["rank_descriptions"])
             desc  = ranks.max_by { |r| r["rank"].to_i }&.dig("description")
 
-            { spell_id: data.dig("spell", "id"), description: desc }
+            { spell_id: data.dig("spell", "id"), description: desc, name: data["name"] }
           end
 
           # Fetches /data/wow/pvp-talent/{id} — PvP talents use a separate endpoint.
@@ -292,7 +294,13 @@ module Blizzard
             desc     = data["description"]
             spell_id = data.dig("spell", "id")
 
-            { spell_id: spell_id, description: desc }
+            { spell_id: spell_id, description: desc, name: data["name"] }
+          end
+
+          def save_name(talent, name)
+            return unless name.present?
+
+            talent.set_translation("name", client.locale, name, meta: { source: "blizzard" })
           end
 
           def save_description(talent, description)

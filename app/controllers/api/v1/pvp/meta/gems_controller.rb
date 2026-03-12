@@ -57,8 +57,4 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
     def socket_type_param
       params[:socket_type]
     end
-
-    def locale_param
-      params[:locale] || "en_US"
-    end
 end

@@ -83,10 +83,6 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
       params[:slot]
     end
 
-    def locale_param
-      params[:locale] || "en_US"
-    end
-
     def enqueue_unsynced_items
       items = PvpMetaItemPopularity
         .includes(:item)

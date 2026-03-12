@@ -120,6 +120,7 @@ module Pvp
               entry_attrs.merge!(eq_result.context[:entry_attrs]) if eq_result.context[:entry_attrs]
             end
             char_attrs[:equipment_last_modified] = eq_fetch.last_modified if eq_fetch.last_modified.present?
+            sync_extra_locale_translations
           else
             # 304: equipment unchanged — propagate attrs from latest processed entry
             entry_attrs.merge!(equipment_entry_attrs_from_latest)
@@ -280,6 +281,29 @@ module Pvp
           return nil if value.blank?
 
           Time.parse(value).utc
+        end
+
+        # Fetch equipment in each extra locale configured for this region and
+        # upsert translations. Called only when primary equipment changed (200),
+        # so 304 cycles never trigger unnecessary API calls.
+        def sync_extra_locale_translations
+          extra = Pvp::RegionConfig::REGION_EXTRA_LOCALES[character.region] || []
+          return if extra.empty?
+
+          threads = extra.map do |extra_locale|
+            Thread.new do
+              json = Blizzard::Api::Profile::CharacterEquipmentSummary.fetch(
+                region: character.region,
+                realm:  character.realm,
+                name:   character.name,
+                locale: extra_locale
+              )
+              Blizzard::Data::Items::UpsertFromRawEquipmentService.call(raw_equipment: json, locale: extra_locale)
+            rescue StandardError => e
+              logger.warn("[SyncCharacterService] Extra locale #{extra_locale} fetch failed: #{e.message}")
+            end
+          end
+          threads.each(&:join)
         end
 
         # Character profile endpoints don't carry translation-sensitive text —

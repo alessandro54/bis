@@ -27,4 +27,9 @@ class Api::V1::BaseController < ApplicationController
     def current_season
       @current_season ||= PvpSeason.current
     end
+
+    def locale_param
+      loc = params[:locale]
+      Wow::Locales::SUPPORTED_LOCALES.include?(loc) ? loc : "en_US"
+    end
 end

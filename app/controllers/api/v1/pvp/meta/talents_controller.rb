@@ -50,7 +50,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
       # exclude stale rank variants from the zero-fill list.
       covered_nodes = records.each_with_object(Set.new) do |r, set|
         node_id = r.talent.node_id
-        set.add([ node_id, r.talent.t("name", locale: "en_US") ]) if node_id
+        set.add([ node_id, r.talent.t("name", locale: locale_param) ]) if node_id
       end
 
       # Class/spec/hero talents from tree assignments
@@ -64,8 +64,8 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
       # remaining by (node_id, name), keeping the entry with the most data.
       tree_talents = tree_talents
         .to_a
-        .reject { |t| t.node_id && covered_nodes.include?([ t.node_id, t.t("name", locale: "en_US") ]) }
-        .group_by { |t| [ t.node_id, t.t("name", locale: "en_US") ] }
+        .reject { |t| t.node_id && covered_nodes.include?([ t.node_id, t.t("name", locale: locale_param) ]) }
+        .group_by { |t| [ t.node_id, t.t("name", locale: locale_param) ] }
         .flat_map { |_, group| group.size == 1 ? group : [ group.max_by { |t| t.icon_url ? 1 : 0 } ] }
 
       # PvP talents known for this spec (from character loadouts)
@@ -162,9 +162,5 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
 
     def spec_id_param
       params.require(:spec_id).to_i
-    end
-
-    def locale_param
-      params[:locale] || "en_US"
     end
 end

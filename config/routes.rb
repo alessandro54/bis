@@ -39,7 +39,12 @@ Rails.application.routes.draw do
   delete "/admin/logout", to: "admin/sessions#destroy", as: :admin_logout
 
   mount MissionControl::Jobs::Engine, at: "/jobs"
-  mount_avo
+  mount_avo do
+    scope :tools do
+      get  :translation_health, to: "translation_health#show", as: :translation_health
+      post :translation_health_backfill, to: "translation_health#backfill", as: :translation_health_backfill
+    end
+  end
 
   match "*unmatched", to: "errors#not_found", via: :all, constraints: ->(req) { req.path.start_with?("/api/") }
 end

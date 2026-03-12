@@ -47,8 +47,4 @@ class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
   def slot_param
     params[:slot]
   end
-
-  def locale_param
-    params[:locale] || "en_US"
-  end
 end
