@@ -22,6 +22,7 @@ AllCops:
     - "vendor/**/*"
     - "tmp/**/*"
     - "log/**/*"
+    - "lib/tasks/**/*.rake"
 
 Bundler/OrderedGems:
   Enabled: true

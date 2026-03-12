@@ -228,6 +228,123 @@ namespace :pvp do
     puts "Done."
   end
 
+  # == Health ==
+
+  # Prints per-bracket processing coverage, character availability, and data
+  # freshness for the current season's leaderboard entries. Modelled after
+  # translations:health — quick visual check that the sync pipeline is healthy.
+  #
+  # Usage:
+  #   bundle exec rails pvp:health
+  desc "Print entry processing health for the current season"
+  task health: :environment do # rubocop:disable Metrics/BlockLength
+    season = PvpSeason.current
+    abort "No active season found." unless season
+
+    bar = ->(label, count, total, good: true) {
+      pct    = total > 0 ? (count.to_f / total * 100).round(1) : 100.0
+      filled = ("█" * (pct / 5).round).ljust(20)
+      ok     = good ? count == total : count.zero?
+      marker = ok ? "✓" : "✗"
+      puts "  #{marker} #{label.ljust(18)} #{filled} #{pct.to_s.rjust(5)}%  (#{count})"
+    }
+
+    # --- Header ---
+    last_cycle = PvpSyncCycle.where(pvp_season: season).order(created_at: :desc).first
+
+    puts "\nEntry Health — #{season.display_name}"
+    if last_cycle
+      ts  = last_cycle.completed_at || last_cycle.updated_at
+      ago = distance_of_time(Time.current - ts)
+      puts "Last sync: #{last_cycle.status} — #{ago} ago " \
+           "(#{last_cycle.completed_character_batches}/#{last_cycle.expected_character_batches} batches)"
+    end
+    puts
+
+    # --- Per-bracket processing ---
+    leaderboards = PvpLeaderboard.where(pvp_season: season).order(:bracket, :region)
+
+    overall_total     = 0
+    overall_processed = 0
+
+    leaderboards.group_by(&:bracket).each do |bracket, lbs|
+      lb_ids = lbs.map(&:id)
+
+      total, fully, eq_only, spec_only, none = PvpLeaderboardEntry
+        .where(pvp_leaderboard_id: lb_ids)
+        .pick(
+          Arel.sql("COUNT(*)"),
+          Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at IS NOT NULL AND specialization_processed_at IS NOT NULL)"),
+          Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at IS NOT NULL AND specialization_processed_at IS NULL)"),
+          Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at IS NULL AND specialization_processed_at IS NOT NULL)"),
+          Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at IS NULL AND specialization_processed_at IS NULL)")
+        )
+      next if total.zero?
+
+      overall_total     += total
+      overall_processed += fully
+
+      regions = lbs.map { |lb| lb.region.upcase }.sort.join(" + ")
+      puts "#{bracket} (#{regions}) — #{total} entries"
+      bar.call("Fully processed", fully, total)
+      bar.call("Equipment only",  eq_only, total, good: false)
+      bar.call("Talents only",    spec_only, total, good: false)
+      bar.call("Unprocessed",     none, total, good: false)
+      puts
+    end
+
+    # --- Character health ---
+    char_ids = PvpLeaderboardEntry
+      .joins(:pvp_leaderboard)
+      .where(pvp_leaderboards: { pvp_season: season })
+      .distinct
+      .pluck(:character_id)
+
+    if char_ids.any?
+      total_c, private_c, unavailable_c = Character.where(id: char_ids).pick(
+        Arel.sql("COUNT(*)"),
+        Arel.sql("COUNT(*) FILTER (WHERE is_private = true)"),
+        Arel.sql("COUNT(*) FILTER (WHERE unavailable_until IS NOT NULL AND unavailable_until > NOW())")
+      )
+      available_c = total_c - private_c - unavailable_c
+
+      puts "Characters — #{total_c} unique"
+      bar.call("Available",       available_c, total_c)
+      bar.call("Not found (404)", unavailable_c, total_c, good: false)
+      bar.call("Private",         private_c, total_c, good: false)
+      puts
+    end
+
+    # --- Freshness ---
+    processed_scope = PvpLeaderboardEntry
+      .joins(:pvp_leaderboard)
+      .where(pvp_leaderboards: { pvp_season: season })
+      .where.not(equipment_processed_at: nil)
+
+    total_p, h1, h6, h24, older = processed_scope.pick(
+      Arel.sql("COUNT(*)"),
+      Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at > NOW() - INTERVAL '1 hour')"),
+      Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '1 hour')"),
+      Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW() - INTERVAL '6 hours')"),
+      Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at <= NOW() - INTERVAL '24 hours')")
+    )
+
+    if total_p&.positive?
+      puts "Freshness (equipment) — #{total_p} processed entries"
+      bar.call("< 1h ago",  h1, total_p)
+      bar.call("1–6h ago",  h6, total_p, good: false)
+      bar.call("6–24h ago", h24, total_p, good: false)
+      bar.call("> 24h ago", older, total_p, good: false)
+      puts
+    end
+
+    # --- Summary ---
+    if overall_total > 0
+      pct = (overall_processed.to_f / overall_total * 100).round(1)
+      puts "Overall: #{pct}% fully processed (#{overall_processed}/#{overall_total})"
+    end
+  end
+
   # == Queue ==
 
   # Deletes all SolidQueue jobs that have a finished_at timestamp. Safe to run
@@ -237,5 +354,14 @@ namespace :pvp do
     count = SolidQueue::Job.where.not(finished_at: nil).count
     SolidQueue::Job.where.not(finished_at: nil).delete_all
     puts "Deleted #{count} finished jobs."
+  end
+end
+
+def distance_of_time(seconds)
+  seconds = seconds.to_i
+  if seconds < 60 then "#{seconds}s"
+  elsif seconds < 3_600 then "#{seconds / 60}m"
+  elsif seconds < 86_400 then "#{seconds / 3_600}h"
+  else "#{seconds / 86_400}d"
   end
 end
