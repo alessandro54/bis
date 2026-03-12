@@ -20,6 +20,7 @@ module Blizzard
         def call
           spec_entries     = Array(fetch_index["spec_talent_trees"])
           talent_attrs     = {}
+          name_map         = {} # blizzard_id => name (from tree response, locale-aware)
           edges            = Set.new
           spec_assignments = Hash.new { |h, k| h[k] = Set.new } # spec_id => Set<blizzard_id>
 
@@ -28,7 +29,7 @@ module Blizzard
             next unless tree_id && spec_id
 
             tree = fetch_tree(tree_id, spec_id)
-            process_tree(tree, talent_attrs, edges, spec_assignments[spec_id])
+            process_tree(tree, talent_attrs, edges, spec_assignments[spec_id], name_map)
           rescue Blizzard::Client::Error => e
             Rails.logger.warn(
               "[SyncTreeService] Skipping tree #{tree_id}/#{spec_id}: #{e.message}"
@@ -44,6 +45,7 @@ module Blizzard
           end
 
           apply_spec_assignments(spec_assignments)
+          save_names_from_tree(name_map)
           fetch_missing_media
 
           success(nil, context: { talents: talent_attrs.size, edges: edges.size })
@@ -78,23 +80,23 @@ module Blizzard
             [ m[1].to_i, m[2].to_i ]
           end
 
-          def process_tree(tree, talent_attrs, edges, spec_blizzard_ids)
-            process_nodes(Array(tree["class_talent_nodes"]), talent_attrs, edges, spec_blizzard_ids)
-            process_nodes(Array(tree["spec_talent_nodes"]),  talent_attrs, edges, spec_blizzard_ids)
+          def process_tree(tree, talent_attrs, edges, spec_blizzard_ids, name_map)
+            process_nodes(Array(tree["class_talent_nodes"]), talent_attrs, edges, spec_blizzard_ids, name_map)
+            process_nodes(Array(tree["spec_talent_nodes"]),  talent_attrs, edges, spec_blizzard_ids, name_map)
             Array(tree["hero_talent_trees"]).each do |hero|
-              process_nodes(Array(hero["nodes"]), talent_attrs, edges, spec_blizzard_ids)
+              process_nodes(Array(hero["nodes"]), talent_attrs, edges, spec_blizzard_ids, name_map)
             end
           end
 
           # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-          def process_nodes(nodes, talent_attrs, edges, spec_blizzard_ids)
+          def process_nodes(nodes, talent_attrs, edges, spec_blizzard_ids, name_map)
             nodes.each do |node|
               node_id     = node["id"]
               display_row = node["display_row"]
               display_col = node["display_col"]
               max_rank    = [ Array(node["ranks"]).size, 1 ].max
 
-              talents_from_node(node).each do |blizzard_id, spell_id|
+              talents_from_node(node).each do |blizzard_id, spell_id, name|
                 talent_attrs[blizzard_id] = {
                   node_id:     node_id,
                   display_row: display_row,
@@ -102,6 +104,7 @@ module Blizzard
                   max_rank:    max_rank,
                   spell_id:    spell_id
                 }
+                name_map[blizzard_id] = name if name.present?
                 spec_blizzard_ids.add(blizzard_id)
               end
 
@@ -113,6 +116,7 @@ module Blizzard
           end
           # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           # Returns [[blizzard_id, spell_id], ...] for all talents in the node.
           # Handles regular nodes (ranks[].tooltip) and choice nodes (ranks[].choice_of_tooltips).
           def talents_from_node(node)
@@ -120,18 +124,19 @@ module Blizzard
               if rank["tooltip"]
                 talent   = rank.dig("tooltip", "talent")
                 spell_id = rank.dig("tooltip", "spell_tooltip", "spell", "id")
-                talent ? [ [ talent["id"], spell_id ] ] : []
+                talent ? [ [ talent["id"], spell_id, talent["name"] ] ] : []
               elsif rank["choice_of_tooltips"]
                 rank["choice_of_tooltips"].filter_map do |c|
                   talent   = c["talent"]
                   spell_id = c.dig("spell_tooltip", "spell", "id")
-                  [ talent["id"], spell_id ] if talent
+                  [ talent["id"], spell_id, talent["name"] ] if talent
                 end
               else
                 []
               end
             end.uniq { |blizzard_id, _| blizzard_id }.compact
           end
+          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
           def apply_positions_for_incomplete(talent_attrs)
             return if talent_attrs.empty?
@@ -295,6 +300,15 @@ module Blizzard
             spell_id = data.dig("spell", "id")
 
             { spell_id: spell_id, description: desc, name: data["name"] }
+          end
+
+          def save_names_from_tree(name_map)
+            return if name_map.empty?
+
+            Talent.where(blizzard_id: name_map.keys).find_each do |talent|
+              name = name_map[talent.blizzard_id]
+              talent.set_translation("name", client.locale, name, meta: { source: "blizzard" }) if name.present?
+            end
           end
 
           def save_name(talent, name)

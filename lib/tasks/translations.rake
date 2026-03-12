@@ -1,23 +1,69 @@
 namespace :translations do
+  # Runs the full translation pipeline inline (no queue):
+  #   1. SyncTalentTreesJob with the target locale — extracts names directly
+  #      from the talent tree API response where the individual talent endpoint
+  #      doesn't return localized names (e.g. es_MX).
+  #   2. EnsureMetaTranslationsJob — fetches item/gem/enchant names via the
+  #      Blizzard Item API for all locales missing a "name" translation.
+  # Prints a health report when done.
+  #
+  # Usage:
+  #   bundle exec rails translations:sync_all              # es_MX, skip existing
+  #   bundle exec rails translations:sync_all FORCE=1      # re-fetch everything
+  #   bundle exec rails translations:sync_all LOCALE=fr_FR # different locale
+  desc "Run all translation syncs inline: talent trees + item/enchant/gem backfill (FORCE=1 to re-fetch all)"
+  task sync_all: :environment do
+    force  = ENV["FORCE"] == "1"
+    locale = ENV.fetch("LOCALE", "es_MX")
+
+    puts "==> Syncing talent trees (locale: #{locale})..."
+    SyncTalentTreesJob.perform_now(locale: locale)
+    puts "    Done."
+
+    puts "==> Running translation backfill (force: #{force})..."
+    EnsureMetaTranslationsJob.perform_now(force: force)
+    puts "    Done."
+
+    Rake::Task["translations:health"].invoke
+  end
+
+  # Enqueues EnsureMetaTranslationsJob to fill missing "name" translations for
+  # all items, gems, enchantments, and talents referenced in the current season
+  # meta. Skips records that already have translations for all supported locales.
+  # Jobs run asynchronously via SolidQueue — use sync_all for inline execution.
   desc "Enqueue translation backfill for all meta items, enchantments, and talents (skips already complete)"
   task backfill: :environment do
     EnsureMetaTranslationsJob.perform_later
     puts "Enqueued EnsureMetaTranslationsJob."
   end
 
-  desc "Force re-fetch translations for all meta records in every supported locale (LOCALE=es_MX to target one)"
+  # Like backfill but passes force: true, which re-fetches translations from
+  # Blizzard even for records that already have all locales. Use after Blizzard
+  # updates names (e.g. item renames, patch localization fixes).
+  # Optional: LOCALE=es_MX targets a single locale (not yet implemented in job).
+  desc "Force re-fetch translations for all meta records in every supported locale"
   task force: :environment do
     EnsureMetaTranslationsJob.perform_later(force: true)
     puts "Enqueued EnsureMetaTranslationsJob (force mode)."
   end
 
-  desc "Backfill talent names/descriptions for a given locale via SyncTalentTreesJob (LOCALE=es_MX)"
+  # Enqueues SyncTalentTreesJob for the given locale. Talent names are embedded
+  # in the talent tree API response — this is the only reliable source for
+  # locales like es_MX where the individual /talent/{id} endpoint returns no name.
+  #
+  # Usage:
+  #   bundle exec rails translations:sync_talent_trees              # defaults to es_MX
+  #   bundle exec rails translations:sync_talent_trees LOCALE=fr_FR
+  desc "Backfill talent names for a given locale via SyncTalentTreesJob (LOCALE=es_MX)"
   task sync_talent_trees: :environment do
     locale = ENV.fetch("LOCALE", "es_MX")
     SyncTalentTreesJob.perform_later(locale: locale)
     puts "Enqueued SyncTalentTreesJob(locale: #{locale})."
   end
 
+  # Queries the translations table against the current season's meta records
+  # and prints per-model, per-locale coverage as a progress bar.
+  # Models checked: Items & Gems, Enchantments, Talents (key: "name" only).
   desc "Print translation coverage for the current meta season"
   task health: :environment do
     season = PvpSeason.current
