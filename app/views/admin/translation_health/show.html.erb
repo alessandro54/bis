@@ -5,9 +5,9 @@
     </div>
 
     <div class="flex gap-2">
-      <%= button_to "Run Backfill", avo.translation_health_backfill_path, method: :post,
+      <%= button_to "Run Backfill", admin_translation_health_backfill_path, method: :post,
             class: "px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700" %>
-      <%= button_to "Force Re-fetch All", avo.translation_health_backfill_path(force: true), method: :post,
+      <%= button_to "Force Re-fetch All", admin_translation_health_backfill_path(force: true), method: :post,
             class: "px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700" %>
     </div>
   </div>
