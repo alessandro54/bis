@@ -67,11 +67,11 @@ FactoryBot.define do
     tier_4p_active        { false }
 
     trait :with_gear do
-      index = (1..3).to_a.sample
+      character_name = %w[egirlbooster jw motívate].sample
       raw_equipment do
         JSON.parse(
           File.read(
-            Rails.root.join("spec/fixtures/pvp_leaderboard_entries/gear_raw_#{index}.json")
+            Rails.root.join("spec/fixtures/equipment/#{character_name}.json")
           )
         )
       end
@@ -79,7 +79,7 @@ FactoryBot.define do
       raw_specialization do
         JSON.parse(
           File.read(
-            Rails.root.join("spec/fixtures/pvp_leaderboard_entries/talents_raw_#{index}.json")
+            Rails.root.join("spec/fixtures/specialization/#{character_name}.json")
           )
         )
       end

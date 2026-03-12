@@ -1,0 +1,57 @@
+<div class="flex flex-col gap-6 p-6">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900">Translation Health</h1>
+    </div>
+
+    <div class="flex gap-2">
+      <%= button_to "Run Backfill", admin_translation_health_backfill_path, method: :post,
+            class: "px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700" %>
+      <%= button_to "Force Re-fetch All", admin_translation_health_backfill_path(force: true), method: :post,
+            class: "px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700" %>
+    </div>
+  </div>
+
+  <% if @sections.any? %>
+    <% @sections.each do |section| %>
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-3 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
+          <h2 class="font-semibold text-gray-800"><%= section[:label] %></h2>
+          <span class="text-sm text-gray-500"><%= section[:total] %> records</span>
+        </div>
+
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
+              <th class="px-5 py-3">Locale</th>
+              <th class="px-5 py-3 text-right">Translated</th>
+              <th class="px-5 py-3 text-right">Missing</th>
+              <th class="px-5 py-3 text-right">Coverage</th>
+              <th class="px-5 py-3">Progress</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% section[:locales].each do |stat| %>
+              <tr class="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                <td class="px-5 py-3 font-mono font-medium text-gray-700"><%= stat[:locale] %></td>
+                <td class="px-5 py-3 text-right text-green-700"><%= stat[:present] %></td>
+                <td class="px-5 py-3 text-right <%= stat[:missing] > 0 ? 'text-red-600 font-medium' : 'text-gray-400' %>">
+                  <%= stat[:missing] > 0 ? stat[:missing] : "—" %>
+                </td>
+                <td class="px-5 py-3 text-right font-semibold <%= stat[:pct] == 100.0 ? 'text-green-600' : stat[:pct] >= 80 ? 'text-yellow-600' : 'text-red-600' %>">
+                  <%= stat[:pct] %>%
+                </td>
+                <td class="px-5 py-3 w-48">
+                  <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="h-2 rounded-full <%= stat[:pct] == 100.0 ? 'bg-green-500' : stat[:pct] >= 80 ? 'bg-yellow-400' : 'bg-red-500' %>"
+                         style="width: <%= stat[:pct] %>%"></div>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  <% end %>
+</div>

@@ -15,13 +15,14 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
     described_class.call(character: character, raw_specialization: raw_specialization, locale: locale)
   end
 
-  # talents_raw_1.json is the normalized talent payload produced by
+  # fixture_talents is the normalized talent payload produced by
   # CharacterEquipmentSpecializationsService#talents — it contains
   # class_talents, spec_talents, hero_talents, pvp_talents, and
   # talent_loadout_code. This is what UpsertFromRawSpecializationService
   # consumes directly.
   let(:fixture_talents) do
-    JSON.parse(File.read(Rails.root.join("spec/fixtures/pvp_leaderboard_entries/talents_raw_1.json")))
+    raw = JSON.parse(File.read(Rails.root.join("spec/fixtures/specialization/egirlbooster.json")))
+    Blizzard::Data::CharacterEquipmentSpecializationsService.new(raw).talents
   end
 
   let(:spec_service_double) do
@@ -146,6 +147,92 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
         it "does not include spec_talent_loadout_codes in char_attrs" do
           expect(result.context[:char_attrs]).not_to have_key(:spec_talent_loadout_codes)
         end
+      end
+    end
+
+    # Uses synthetic talent data with default_points to test per-spec storage.
+    context "default_points on talent_spec_assignments" do
+      let(:disc_talents) do
+        {
+          "class_talents" => [
+            { "id" => 82_717, "name" => "Improved Flash Heal", "rank" => 1, "default_points" => 1 },
+            { "id" => 82_713, "name" => "Mind Blast", "rank" => 1, "default_points" => 1 },
+            { "id" => 82_700, "name" => "Shadow Word: Death", "rank" => 1, "default_points" => 0 }
+          ],
+          "spec_talents" => [
+            { "id" => 83_001, "name" => "Atonement", "rank" => 1, "default_points" => 0 }
+          ],
+          "hero_talents" => [],
+          "pvp_talents" => [
+            {
+              "selected" => {
+                "talent" => { "id" => 5001, "name" => "Trinity" },
+                "spell_tooltip" => { "spell" => { "id" => 9001 } }
+              },
+              "slot_number" => 2
+            }
+          ],
+          "talent_loadout_code" => "disc_test_code"
+        }
+      end
+
+      let(:disc_service_double) do
+        instance_double(
+          Blizzard::Data::CharacterEquipmentSpecializationsService,
+          has_data?:             true,
+          active_specialization: { "id" => 256 },
+          active_hero_tree:      nil,
+          talents:               disc_talents,
+          class_slug:            "priest",
+          all_specializations:   [
+            {
+              spec_id:             256,
+              hero_tree:           nil,
+              talent_loadout_code: "disc_test_code",
+              talents:             disc_talents.slice("class_talents", "spec_talents", "hero_talents"),
+              pvp_talents:         disc_talents["pvp_talents"],
+              class_slug:          "priest"
+            }
+          ]
+        )
+      end
+
+      before do
+        allow(Blizzard::Data::CharacterEquipmentSpecializationsService)
+          .to receive(:new).with(raw_specialization).and_return(disc_service_double)
+        character.update_columns(spec_talent_loadout_codes: { "256" => "old_code" })
+
+        # Pre-create canonical TalentSpecAssignment rows (normally done by SyncTalentTreesJob).
+        # upsert_spec_default_points only updates existing rows, never creates new ones.
+        { 82_717 => "class", 82_713 => "class", 82_700 => "class", 83_001 => "spec" }.each do |blz_id, type|
+          talent = create(:talent, blizzard_id: blz_id, talent_type: type)
+          TalentSpecAssignment.create!(talent_id: talent.id, spec_id: 256, default_points: 0)
+        end
+      end
+
+      it "writes default_points to talent_spec_assignments for talents with dp > 0" do
+        result
+
+        assignments = TalentSpecAssignment.where(spec_id: 256).where("default_points > 0")
+        expect(assignments.count).to eq(2)
+      end
+
+      it "stores the correct default_points value per talent" do
+        result
+
+        talent = Talent.find_by(blizzard_id: 82_717)
+        assignment = TalentSpecAssignment.find_by(talent_id: talent.id, spec_id: 256)
+        expect(assignment.default_points).to eq(1)
+      end
+
+      it "does not create default_points entries for pvp talents" do
+        result
+
+        pvp_talent_ids = Talent.where(talent_type: "pvp").pluck(:id)
+        pvp_with_dp = TalentSpecAssignment
+          .where(talent_id: pvp_talent_ids, spec_id: 256)
+          .where("default_points > 0")
+        expect(pvp_with_dp).not_to exist
       end
     end
 

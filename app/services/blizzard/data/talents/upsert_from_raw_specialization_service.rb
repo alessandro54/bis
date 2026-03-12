@@ -36,8 +36,9 @@ module Blizzard
                 spell_id:    nil
               }
 
-              rank = talent[:rank] || talent["rank"] || 1
-              type_records << { blizzard_id: blizzard_id, rank: rank }
+              rank           = talent[:rank] || talent["rank"] || 1
+              default_points = (talent[:default_points] || talent["default_points"]).to_i
+              type_records << { blizzard_id: blizzard_id, rank: rank, default_points: default_points }
             end
 
             junction_data[type] = type_records
@@ -96,10 +97,11 @@ module Blizzard
               next unless talent_id
 
               {
-                talent_id:   talent_id,
-                talent_type: type,
-                rank:        rec[:rank],
-                slot_number: rec[:slot_number]
+                talent_id:      talent_id,
+                talent_type:    type,
+                rank:           rec[:rank],
+                slot_number:    rec[:slot_number],
+                default_points: rec[:default_points] || 0
               }
             end
           end

@@ -4,6 +4,7 @@ module Blizzard
       # rubocop:disable Metrics/ClassLength
       class UpsertFromRawEquipmentService
         EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
+        SECONDARY_STATS = %w[HASTE_RATING CRIT_RATING MASTERY_RATING VERSATILITY].freeze
         CACHE_TTL = 1.hour
 
         def self.call(raw_equipment:, locale: "en_US")
@@ -90,7 +91,8 @@ module Blizzard
               "enchantment_source_item_id" => enc_src_blz_id ? items_by_blizzard_id[enc_src_blz_id] : nil,
               "embellishment_spell_id" => extract_embellishment_spell_id(raw_item),
               "sockets" => extract_sockets_with_ids(raw_item, items_by_blizzard_id),
-              "crafting_stats" => extract_crafting_stats(raw_item)
+              "crafting_stats" => extract_crafting_stats(raw_item),
+              "stats" => extract_secondary_stats(raw_item)
             }
           end
 
@@ -248,6 +250,15 @@ module Blizzard
 
           def extract_crafting_stats(raw_item)
             Array(raw_item["modified_crafting_stat"]).map { |s| s["type"] }
+          end
+
+          def extract_secondary_stats(raw_item)
+            Array(raw_item["stats"])
+              .reject { |s| s["is_negated"] }
+              .each_with_object({}) do |s, h|
+                type = s.dig("type", "type")
+                h[type] = s["value"].to_i if SECONDARY_STATS.include?(type)
+              end
           end
 
           # Collect translations for equipped items, socket gems, and enchantments

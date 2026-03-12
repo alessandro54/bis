@@ -12,7 +12,7 @@ module Api
 
             cache_key = meta_cache_key("class_distribution", season.blizzard_id, bracket, region, role)
 
-            json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+            json = meta_cache_fetch(cache_key) do
               distribution = ::Pvp::Meta::ClassDistributionService.new(
                 role:    role,
                 season:  season,

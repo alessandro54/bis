@@ -58,3 +58,5 @@ rspec_failures.txt
 # OS
 .DS_Store
 Thumbs.db
+
+.claude/

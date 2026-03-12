@@ -1,9 +1,9 @@
 class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
-  # rubocop:disable Metrics/AbcSize
+  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def index
     cache_key = meta_cache_key("talents", bracket_param, spec_id_param, locale_param)
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       records = PvpMetaTalentPopularity
         .includes(talent: :translations)
         .where(pvp_season: current_season)
@@ -11,32 +11,83 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         .where(spec_id: spec_id_param)
         .order(usage_pct: :desc)
 
-      zero_talents = load_zero_fill_talents(records)
+      zero_talents = load_zero_fill_talents(records.to_a)
       all_talents  = records.map(&:talent) + zero_talents
 
-      prereqs = load_prerequisites(all_talents)
+      prereqs        = load_prerequisites(all_talents)
+      default_points = load_default_points(all_talents)
 
-      records.map { |r| serialize(r, prereqs) } +
-        zero_talents.map { |t| serialize_zero(t, prereqs) }
+      talents = records.map { |r| serialize(r, prereqs, default_points) } +
+        zero_talents.map { |t| serialize_zero(t, prereqs, default_points) }
+
+      total_weighted = records.sum(&:usage_count).to_i
+      total_players  = count_raw_players
+
+      {
+        meta:    {
+          bracket:        bracket_param,
+          spec_id:        spec_id_param,
+          total_players:  total_players,
+          total_weighted: total_weighted,
+          snapshot_at:    records.first&.snapshot_at
+        },
+        talents: talents
+      }
     end
 
     render json: json
     set_cache_headers
   end
-  # rubocop:enable Metrics/AbcSize
+  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
   private
 
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def load_zero_fill_talents(records)
       existing_ids = records.map(&:talent_id)
 
-      base = Talent
+      # Track (node_id, name) pairs already covered by a record so we can
+      # exclude stale rank variants from the zero-fill list.
+      covered_nodes = records.each_with_object(Set.new) do |r, set|
+        node_id = r.talent.node_id
+        set.add([ node_id, r.talent.t("name", locale: locale_param) ]) if node_id
+      end
+
+      # Class/spec/hero talents from tree assignments
+      tree_talents = Talent
         .includes(:translations)
         .joins(:talent_spec_assignments)
         .where(talent_spec_assignments: { spec_id: spec_id_param })
+      tree_talents = tree_talents.where.not(id: existing_ids) if existing_ids.any?
 
-      base = base.where.not(id: existing_ids) if existing_ids.any?
-      base.to_a
+      # Drop old rank variants whose node is already covered, then deduplicate
+      # remaining by (node_id, name), keeping the entry with the most data.
+      tree_talents = tree_talents
+        .to_a
+        .reject { |t| t.node_id && covered_nodes.include?([ t.node_id, t.t("name", locale: locale_param) ]) }
+        .group_by { |t| [ t.node_id, t.t("name", locale: locale_param) ] }
+        .flat_map { |_, group| group.size == 1 ? group : [ group.max_by { |t| t.icon_url ? 1 : 0 } ] }
+
+      # PvP talents known for this spec (from character loadouts)
+      pvp_talent_ids = CharacterTalent
+        .where(spec_id: spec_id_param, talent_type: "pvp")
+        .distinct.pluck(:talent_id)
+      pvp_talent_ids -= existing_ids if existing_ids.any?
+      pvp_talent_ids -= tree_talents.map(&:id)
+
+      pvp_talents = pvp_talent_ids.any? ? Talent.includes(:translations).where(id: pvp_talent_ids).to_a : []
+
+      tree_talents + pvp_talents
+    end
+    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+    def count_raw_players
+      PvpLeaderboardEntry
+        .joins(:pvp_leaderboard)
+        .where(pvp_leaderboards: { pvp_season_id: current_season.id, bracket: bracket_param })
+        .where(spec_id: spec_id_param)
+        .where.not(specialization_processed_at: nil)
+        .select(:character_id).distinct.count
     end
 
     def load_prerequisites(talents)
@@ -49,32 +100,45 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         .transform_values { |ps| ps.map(&:prerequisite_node_id) }
     end
 
-    def serialize(record, prereqs)
+    def load_default_points(talents)
+      talent_ids = talents.map(&:id).uniq
+      return {} if talent_ids.empty?
+
+      TalentSpecAssignment
+        .where(talent_id: talent_ids, spec_id: spec_id_param)
+        .pluck(:talent_id, :default_points)
+        .to_h
+    end
+
+    def serialize(record, prereqs, default_points)
       t = record.talent
       {
         id:             record.id,
-        talent:         serialize_talent_fields(t, record.talent_type, prereqs),
+        talent:         serialize_talent_fields(t, record.talent_type, prereqs, default_points),
         usage_count:    record.usage_count,
         usage_pct:      record.usage_pct.to_f,
         in_top_build:   record.in_top_build,
         top_build_rank: record.top_build_rank,
+        tier:           record.tier,
         snapshot_at:    record.snapshot_at
       }
     end
 
-    def serialize_zero(talent, prereqs)
+    def serialize_zero(talent, prereqs, default_points)
+      dp = default_points[talent.id] || 0
       {
         id:             nil,
-        talent:         serialize_talent_fields(talent, talent.talent_type, prereqs),
+        talent:         serialize_talent_fields(talent, talent.talent_type, prereqs, default_points),
         usage_count:    0,
         usage_pct:      0.0,
         in_top_build:   false,
         top_build_rank: 0,
+        tier:           dp > 0 ? "bis" : "common",
         snapshot_at:    nil
       }
     end
 
-    def serialize_talent_fields(t, talent_type, prereqs)
+    def serialize_talent_fields(t, talent_type, prereqs, default_points)
       {
         id:                    t.id,
         blizzard_id:           t.blizzard_id,
@@ -87,6 +151,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         display_col:           t.display_col,
         max_rank:              t.max_rank,
         icon_url:              t.icon_url,
+        default_points:        default_points[t.id] || 0,
         prerequisite_node_ids: prereqs[t.node_id] || []
       }
     end
@@ -97,9 +162,5 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
 
     def spec_id_param
       params.require(:spec_id).to_i
-    end
-
-    def locale_param
-      params[:locale] || "en_US"
     end
 end

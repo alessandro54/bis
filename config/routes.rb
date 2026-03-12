@@ -4,6 +4,8 @@ Rails.application.routes.draw do
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
+  get "api-docs" => "api_docs#index"
+  get "api-docs/openapi.yaml" => "api_docs#spec"
 
   # Defines the root path route ("/")
   # root "posts#index"
@@ -11,6 +13,7 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :v1 do
       resources :characters, only: [ :index ]
+      get "characters/:region/:realm/:name", to: "characters#show", as: :character_profile
 
       namespace :pvp do
         scope ":season/:region", as: "season_region_bracket" do
@@ -25,6 +28,7 @@ Rails.application.routes.draw do
           resources :talents, only: [ :index ]
           get :class_distribution, to: "class_distributions#show"
           get :top_players, to: "top_players#index"
+          get :stat_priority, to: "stat_priority#show"
         end
       end
     end
@@ -35,5 +39,14 @@ Rails.application.routes.draw do
   delete "/admin/logout", to: "admin/sessions#destroy", as: :admin_logout
 
   mount MissionControl::Jobs::Engine, at: "/jobs"
+
+  namespace :admin do
+    get  :dashboard, to: "dashboard#show"
+    get  :translation_health, to: "translation_health#show"
+    post :translation_health_backfill, to: "translation_health#backfill"
+  end
+
   mount_avo
+
+  match "*unmatched", to: "errors#not_found", via: :all, constraints: ->(req) { req.path.start_with?("/api/") }
 end

@@ -3,7 +3,7 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
   def index
     cache_key = meta_cache_key("items", bracket_param, spec_id_param, slot_param, locale_param)
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       items = PvpMetaItemPopularity
         .includes(item: :translations)
         .where(pvp_season: current_season)
@@ -81,10 +81,6 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
 
     def slot_param
       params[:slot]
-    end
-
-    def locale_param
-      params[:locale] || "en_US"
     end
 
     def enqueue_unsynced_items

@@ -10,6 +10,7 @@
 #  item_level                 :integer
 #  slot                       :string           not null
 #  sockets                    :jsonb
+#  stats                      :jsonb
 #  created_at                 :datetime         not null
 #  updated_at                 :datetime         not null
 #  character_id               :bigint           not null

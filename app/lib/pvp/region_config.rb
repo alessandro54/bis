@@ -14,5 +14,11 @@ module Pvp
       "us" => "en_US",
       "eu" => "en_GB"
     }.freeze
+
+    # Additional locales to fetch per region for translation purposes.
+    # Each locale triggers a separate Blizzard API call when equipment changes.
+    REGION_EXTRA_LOCALES = {
+      "us" => %w[es_MX]
+    }.freeze
   end
 end

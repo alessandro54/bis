@@ -1,8 +1,10 @@
 #!/bin/bash -e
 
-# If running the rails server then create or migrate existing database
+# Run pending migrations before starting the server.
+# db:migrate is used instead of db:prepare — the database always exists in
+# production (managed by Dokku), so there is no need to create or schema:load.
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
-  ./bin/rails db:prepare
+  ./bin/rails db:migrate
 fi
 
 exec "${@}"

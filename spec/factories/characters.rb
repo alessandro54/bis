@@ -19,6 +19,7 @@
 #  region                      :string
 #  spec_equipment_fingerprints :jsonb
 #  spec_talent_loadout_codes   :jsonb
+#  stat_pcts                   :jsonb
 #  talents_last_modified       :datetime
 #  unavailable_until           :datetime
 #  created_at                  :datetime         not null

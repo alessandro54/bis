@@ -1,16 +1,38 @@
 class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
   DEFAULT_REGIONS  = %w[us eu].freeze
   LIMIT            = 10
-  MIN_GAMES        = 50
-  # Composite score: rating + CLAMP((winrate% - 50) * 4, 0, 100)
-  # Adds up to +100 pts for exceptional winrate (≥75%), 0 for ≤50%.
-  # Players below MIN_GAMES are included only when the scored pool < LIMIT.
+  MIN_GAMES              = 50
+  GRINDER_GAME_THRESHOLD = 200
+
+  # Composite score:
+  #   rating
+  #   + winrate_bonus    (up to +120 for ≥80% winrate, 0 at 60%)
+  #   - grinder_penalty  (up to -300 for sub-60% winrate with many games)
+  #
+  # Winrate bonus: rewards players ABOVE 60% winrate.
+  #   60% = neutral, 70% = +60, 80% = +120.
+  #
+  # Grinder penalty: scales with (a) how far below 60% winrate, and
+  #   (b) how many games beyond GRINDER_GAME_THRESHOLD. Factor caps at 1.5×
+  #   so deep grinders (400+ games) get up to 50% extra penalty.
+  #   57% with 532 games → penalty ≈ -36 pts.
+  #   52% with 400 games → penalty ≈ -64 pts.
+  #   A 150-game player below threshold gets no penalty.
   SCORE_SQL = Arel.sql(<<~SQL.squish)
     pvp_leaderboard_entries.rating
-    + LEAST(100, GREATEST(0,
+    + LEAST(120, GREATEST(0,
         (pvp_leaderboard_entries.wins * 100.0
           / NULLIF(pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses, 0)
-        - 50) * 4
+        - 60) * 6.0
+      ))
+    - LEAST(300, GREATEST(0,
+        (60 - pvp_leaderboard_entries.wins * 100.0
+          / NULLIF(pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses, 0)
+        ) * 8.0
+        * LEAST(1.5, GREATEST(0,
+            (pvp_leaderboard_entries.wins + pvp_leaderboard_entries.losses - #{GRINDER_GAME_THRESHOLD})::float
+            / #{GRINDER_GAME_THRESHOLD}
+          ))
       ))
   SQL
 
@@ -24,7 +46,7 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
     regions   = region_params
     cache_key = meta_cache_key("top_players", bracket_param, spec_id_param, regions.join("+"))
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       rows = query_top_players(regions)
 
       {
@@ -75,7 +97,6 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
           "pvp_leaderboard_entries.wins",
           "pvp_leaderboard_entries.losses",
           "pvp_leaderboard_entries.rank",
-          "pvp_leaderboard_entries.hero_talent_tree_name",
           "pvp_leaderboard_entries.snapshot_at",
           "ROUND((#{SCORE_SQL})::numeric, 1) AS score",
           "characters.name",
@@ -94,18 +115,25 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
     def serialize_players(rows)
       rows.map do |row|
         {
-          name:                  row.name,
-          realm:                 row.realm,
-          region:                row.region,
-          rating:                row.rating,
-          wins:                  row.wins,
-          losses:                row.losses,
-          rank:                  row.rank,
-          score:                 row.score.to_f,
-          avatar_url:            row.avatar_url,
-          class_slug:            row.class_slug,
-          hero_talent_tree_name: row.hero_talent_tree_name
+          name:       row.name,
+          realm:      format_realm(row.realm),
+          region:     format_region(row.region),
+          rating:     row.rating,
+          wins:       row.wins,
+          losses:     row.losses,
+          rank:       row.rank,
+          score:      row.score.to_f,
+          avatar_url: row.avatar_url,
+          class_slug: row.class_slug
         }
       end
+    end
+
+    def format_realm(realm)
+      realm.to_s.tr("-", " ").titleize
+    end
+
+    def format_region(region)
+      region.to_s.upcase
     end
 end

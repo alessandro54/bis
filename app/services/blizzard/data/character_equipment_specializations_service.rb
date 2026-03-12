@@ -88,9 +88,10 @@ module Blizzard
             next unless info
 
             {
-              id:   info["id"],
-              name: info["name"],
-              rank: talent["rank"]
+              id:             info["id"],
+              name:           info["name"],
+              rank:           talent["rank"],
+              default_points: talent["default_points"].to_i
             }
           end
         end

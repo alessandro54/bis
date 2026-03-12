@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — Wow Meta Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; color: #111827; line-height: 1.5; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
+    .nav h1 { font-size: 1.5rem; font-weight: 700; }
+    .nav a { font-size: .85rem; color: #2563eb; text-decoration: none; }
+    .nav a:hover { text-decoration: underline; }
+
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: .75rem; overflow: hidden; margin-bottom: 1.5rem; }
+    .card-header { padding: .75rem 1.25rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+    .card-header h2 { font-size: .95rem; font-weight: 600; color: #1f2937; }
+    .card-header .badge { font-size: .8rem; color: #6b7280; }
+
+    .sync-banner { padding: 1rem 1.25rem; font-size: .85rem; color: #374151; display: flex; gap: .5rem; flex-wrap: wrap; }
+    .sync-banner .tag { display: inline-block; padding: .15rem .5rem; border-radius: .25rem; font-size: .75rem; font-weight: 600; }
+    .tag-green  { background: #dcfce7; color: #166534; }
+    .tag-yellow { background: #fef9c3; color: #854d0e; }
+    .tag-red    { background: #fee2e2; color: #991b1b; }
+    .tag-blue   { background: #dbeafe; color: #1e40af; }
+
+    table { width: 100%; font-size: .85rem; border-collapse: collapse; }
+    thead tr { border-bottom: 1px solid #f3f4f6; }
+    th { padding: .6rem 1.25rem; text-align: left; font-size: .7rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .04em; }
+    th.r { text-align: right; }
+    td { padding: .55rem 1.25rem; border-bottom: 1px solid #f9fafb; }
+    td.r { text-align: right; }
+    td.mono { font-family: ui-monospace, monospace; font-size: .8rem; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: #f9fafb; }
+
+    .bar-track { width: 100%; height: .5rem; background: #e5e7eb; border-radius: .25rem; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: .25rem; transition: width .3s; }
+    .bar-green  { background: #22c55e; }
+    .bar-yellow { background: #eab308; }
+    .bar-red    { background: #ef4444; }
+    .bar-blue   { background: #3b82f6; }
+
+    .pct { font-weight: 600; font-size: .8rem; }
+    .pct-green  { color: #16a34a; }
+    .pct-yellow { color: #ca8a04; }
+    .pct-red    { color: #dc2626; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    .section-title { font-size: .8rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .06em; margin: 2rem 0 .75rem; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="nav">
+      <h1>Dashboard</h1>
+      <a href="/avo">Back to Avo</a>
+    </div>
+
+    <% if @season.nil? %>
+      <div class="card"><div class="sync-banner">No active season found.</div></div>
+    <% else %>
+
+      <%# ── Sync status ── %>
+      <div class="card">
+        <div class="card-header">
+          <h2><%= @season.display_name %></h2>
+          <% if @last_cycle %>
+            <span class="tag <%= cycle_tag_class(@last_cycle.status) %>"><%= @last_cycle.status.titleize %></span>
+          <% end %>
+        </div>
+        <% if @last_cycle %>
+          <div class="sync-banner">
+            Last sync: <%= time_ago_in_words(@last_cycle.completed_at || @last_cycle.updated_at) %> ago
+            &mdash;
+            <%= @last_cycle.completed_character_batches %>/<%= @last_cycle.expected_character_batches %> batches
+          </div>
+        <% end %>
+      </div>
+
+      <%# ── Entry Processing ── %>
+      <div class="section-title">Entry Processing</div>
+
+      <div class="grid-2">
+        <% @brackets.each do |b| %>
+          <div class="card">
+            <div class="card-header">
+              <h2><%= b[:label] %></h2>
+              <span class="badge"><%= b[:regions] %> &mdash; <%= number_with_delimiter(b[:total]) %></span>
+            </div>
+            <table>
+              <thead><tr><th>Status</th><th class="r">Count</th><th class="r">%</th><th style="width:35%">Progress</th></tr></thead>
+              <tbody>
+                <% b[:rows].each_with_index do |row, i| %>
+                  <tr>
+                    <td><%= row[:label] %></td>
+                    <td class="r mono"><%= number_with_delimiter(row[:count]) %></td>
+                    <td class="r pct <%= pct_class(row[:pct], good: i == 0) %>"><%= row[:pct] %>%</td>
+                    <td><div class="bar-track"><div class="bar-fill <%= bar_class(row[:pct], good: i == 0) %>" style="width:<%= row[:pct] %>%"></div></div></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      </div>
+
+      <%# ── Characters + Freshness ── %>
+      <div class="grid-2">
+        <% if @characters %>
+          <div class="card">
+            <div class="card-header">
+              <h2>Characters</h2>
+              <span class="badge"><%= number_with_delimiter(@characters[:total]) %> unique</span>
+            </div>
+            <table>
+              <thead><tr><th>Status</th><th class="r">Count</th><th class="r">%</th><th style="width:35%">Progress</th></tr></thead>
+              <tbody>
+                <% @characters[:rows].each_with_index do |row, i| %>
+                  <tr>
+                    <td><%= row[:label] %></td>
+                    <td class="r mono"><%= number_with_delimiter(row[:count]) %></td>
+                    <td class="r pct <%= pct_class(row[:pct], good: i == 0) %>"><%= row[:pct] %>%</td>
+                    <td><div class="bar-track"><div class="bar-fill <%= bar_class(row[:pct], good: i == 0) %>" style="width:<%= row[:pct] %>%"></div></div></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+
+        <% if @freshness %>
+          <div class="card">
+            <div class="card-header">
+              <h2>Freshness</h2>
+              <span class="badge"><%= number_with_delimiter(@freshness[:total]) %> processed</span>
+            </div>
+            <table>
+              <thead><tr><th>Age</th><th class="r">Count</th><th class="r">%</th><th style="width:35%">Progress</th></tr></thead>
+              <tbody>
+                <% @freshness[:rows].each_with_index do |row, i| %>
+                  <tr>
+                    <td><%= row[:label] %></td>
+                    <td class="r mono"><%= number_with_delimiter(row[:count]) %></td>
+                    <td class="r pct <%= pct_class(row[:pct], good: i == 0) %>"><%= row[:pct] %>%</td>
+                    <td><div class="bar-track"><div class="bar-fill <%= bar_class(row[:pct], good: i == 0) %>" style="width:<%= row[:pct] %>%"></div></div></td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+        <% end %>
+      </div>
+
+      <%# ── Translations ── %>
+      <div class="section-title">Translation Coverage</div>
+
+      <% @translations.each do |section| %>
+        <div class="card">
+          <div class="card-header">
+            <h2><%= section[:label] %></h2>
+            <span class="badge"><%= section[:total] %> records</span>
+          </div>
+          <table>
+            <thead><tr><th>Locale</th><th class="r">Translated</th><th class="r">Missing</th><th class="r">Coverage</th><th style="width:30%">Progress</th></tr></thead>
+            <tbody>
+              <% section[:locales].each do |stat| %>
+                <tr>
+                  <td class="mono"><%= stat[:locale] %></td>
+                  <td class="r" style="color:#16a34a"><%= stat[:present] %></td>
+                  <td class="r <%= 'pct-red' if stat[:missing] > 0 %>">
+                    <%= stat[:missing] > 0 ? stat[:missing] : "&mdash;".html_safe %>
+                  </td>
+                  <td class="r pct <%= pct_class(stat[:pct]) %>"><%= stat[:pct] %>%</td>
+                  <td><div class="bar-track"><div class="bar-fill <%= bar_class(stat[:pct]) %>" style="width:<%= stat[:pct] %>%"></div></div></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+
+    <% end %>
+  </div>
+</body>
+</html>

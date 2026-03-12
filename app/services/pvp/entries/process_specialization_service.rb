@@ -74,7 +74,10 @@ module Pvp
 
         # Process talents for ALL specs returned by the API, not just the active one.
         # Each spec's talents are stored independently, keyed by spec_id.
-        # rubocop:disable Metrics/AbcSize
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+        TREE_TALENT_TYPES = %w[class spec hero].freeze
+        private_constant :TREE_TALENT_TYPES
+
         def process_all_specs_talents(spec_service, char_attrs)
           current_codes = character.spec_talent_loadout_codes || {}
           new_codes = current_codes.dup
@@ -98,11 +101,49 @@ module Pvp
               locale:             locale
             )
 
+            # Skip if Blizzard returned no tree talents (e.g. empty loadout after a patch).
+            # Do NOT store the new code — keeps the mismatch so the next sync retries.
+            next if TREE_TALENT_TYPES.all? { |t| talent_upsert[t].empty? }
+
             rebuild_character_talents(talent_upsert, sid)
+            upsert_spec_default_points(talent_upsert, sid)
             new_codes[sid.to_s] = new_code
           end
 
           char_attrs[:spec_talent_loadout_codes] = new_codes if new_codes != current_codes
+        end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+        # rubocop:disable Metrics/AbcSize
+        def upsert_spec_default_points(talent_upsert, spec_id)
+          candidates = talent_upsert.flat_map do |_type, talents|
+            Array(talents).filter_map do |td|
+              next unless td[:talent_id]
+
+              { talent_id: td[:talent_id], spec_id: spec_id, default_points: td[:default_points].to_i }
+            end
+          end.uniq { |r| r[:talent_id] }
+
+          return if candidates.empty?
+
+          # Only update default_points on EXISTING canonical assignments.
+          # Never create new rows here — canonical spec assignments are owned
+          # by SyncTalentTreesJob. Creating rows from character loadouts would
+          # pollute the zero-fill with talents from other specs.
+          existing_ids = TalentSpecAssignment
+            .where(spec_id: spec_id, talent_id: candidates.map { |r| r[:talent_id] })
+            .pluck(:talent_id).to_set
+
+          records = candidates.select { |r| existing_ids.include?(r[:talent_id]) }
+          return if records.empty?
+
+          # rubocop:disable Rails/SkipsModelValidations
+          TalentSpecAssignment.upsert_all(
+            records,
+            unique_by:   %i[talent_id spec_id],
+            update_only: %i[default_points]
+          )
+          # rubocop:enable Rails/SkipsModelValidations
         end
         # rubocop:enable Metrics/AbcSize
 

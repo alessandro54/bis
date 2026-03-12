@@ -10,15 +10,17 @@ module Blizzard
       #   SyncTalentTreesJob.perform_later
       # rubocop:disable Metrics/ClassLength
       class SyncTreeService < BaseService
-        def initialize(region: "us")
+        def initialize(region: "us", locale: "en_US", force: false)
           @region = region
-          @client = Blizzard::Client.new(region: region, locale: "en_US")
+          @force  = force
+          @client = Blizzard::Client.new(region: region, locale: locale)
         end
 
         # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def call
           spec_entries     = Array(fetch_index["spec_talent_trees"])
           talent_attrs     = {}
+          name_map         = {} # blizzard_id => name (from tree response, locale-aware)
           edges            = Set.new
           spec_assignments = Hash.new { |h, k| h[k] = Set.new } # spec_id => Set<blizzard_id>
 
@@ -27,16 +29,23 @@ module Blizzard
             next unless tree_id && spec_id
 
             tree = fetch_tree(tree_id, spec_id)
-            process_tree(tree, talent_attrs, edges, spec_assignments[spec_id])
+            process_tree(tree, talent_attrs, edges, spec_assignments[spec_id], name_map)
           rescue Blizzard::Client::Error => e
             Rails.logger.warn(
               "[SyncTreeService] Skipping tree #{tree_id}/#{spec_id}: #{e.message}"
             )
           end
 
-          apply_positions(talent_attrs)
-          apply_prerequisites(edges)
+          if force?
+            apply_positions(talent_attrs)
+            apply_prerequisites(edges)
+          else
+            apply_positions_for_incomplete(talent_attrs)
+            apply_prerequisites(edges) if TalentPrerequisite.none?
+          end
+
           apply_spec_assignments(spec_assignments)
+          save_names_from_tree(name_map)
           fetch_missing_media
 
           success(nil, context: { talents: talent_attrs.size, edges: edges.size })
@@ -48,6 +57,8 @@ module Blizzard
         private
 
           attr_reader :region, :client
+
+          def force? = @force
 
           def fetch_index
             client.get("/data/wow/talent-tree/index", namespace: client.static_namespace)
@@ -69,23 +80,23 @@ module Blizzard
             [ m[1].to_i, m[2].to_i ]
           end
 
-          def process_tree(tree, talent_attrs, edges, spec_blizzard_ids)
-            process_nodes(Array(tree["class_talent_nodes"]), talent_attrs, edges, spec_blizzard_ids)
-            process_nodes(Array(tree["spec_talent_nodes"]),  talent_attrs, edges, spec_blizzard_ids)
+          def process_tree(tree, talent_attrs, edges, spec_blizzard_ids, name_map)
+            process_nodes(Array(tree["class_talent_nodes"]), talent_attrs, edges, spec_blizzard_ids, name_map)
+            process_nodes(Array(tree["spec_talent_nodes"]),  talent_attrs, edges, spec_blizzard_ids, name_map)
             Array(tree["hero_talent_trees"]).each do |hero|
-              process_nodes(Array(hero["nodes"]), talent_attrs, edges, spec_blizzard_ids)
+              process_nodes(Array(hero["nodes"]), talent_attrs, edges, spec_blizzard_ids, name_map)
             end
           end
 
           # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-          def process_nodes(nodes, talent_attrs, edges, spec_blizzard_ids)
+          def process_nodes(nodes, talent_attrs, edges, spec_blizzard_ids, name_map)
             nodes.each do |node|
               node_id     = node["id"]
               display_row = node["display_row"]
               display_col = node["display_col"]
               max_rank    = [ Array(node["ranks"]).size, 1 ].max
 
-              talents_from_node(node).each do |blizzard_id, spell_id|
+              talents_from_node(node).each do |blizzard_id, spell_id, name|
                 talent_attrs[blizzard_id] = {
                   node_id:     node_id,
                   display_row: display_row,
@@ -93,6 +104,7 @@ module Blizzard
                   max_rank:    max_rank,
                   spell_id:    spell_id
                 }
+                name_map[blizzard_id] = name if name.present?
                 spec_blizzard_ids.add(blizzard_id)
               end
 
@@ -104,6 +116,7 @@ module Blizzard
           end
           # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
           # Returns [[blizzard_id, spell_id], ...] for all talents in the node.
           # Handles regular nodes (ranks[].tooltip) and choice nodes (ranks[].choice_of_tooltips).
           def talents_from_node(node)
@@ -111,17 +124,31 @@ module Blizzard
               if rank["tooltip"]
                 talent   = rank.dig("tooltip", "talent")
                 spell_id = rank.dig("tooltip", "spell_tooltip", "spell", "id")
-                talent ? [ [ talent["id"], spell_id ] ] : []
+                talent ? [ [ talent["id"], spell_id, talent["name"] ] ] : []
               elsif rank["choice_of_tooltips"]
                 rank["choice_of_tooltips"].filter_map do |c|
                   talent   = c["talent"]
                   spell_id = c.dig("spell_tooltip", "spell", "id")
-                  [ talent["id"], spell_id ] if talent
+                  [ talent["id"], spell_id, talent["name"] ] if talent
                 end
               else
                 []
               end
             end.uniq { |blizzard_id, _| blizzard_id }.compact
+          end
+          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+          def apply_positions_for_incomplete(talent_attrs)
+            return if talent_attrs.empty?
+
+            incomplete_ids = Talent
+              .where(blizzard_id: talent_attrs.keys)
+              .where("node_id IS NULL OR spell_id IS NULL")
+              .pluck(:blizzard_id)
+
+            return if incomplete_ids.empty?
+
+            apply_positions(talent_attrs.slice(*incomplete_ids))
           end
 
           # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
@@ -170,7 +197,7 @@ module Blizzard
             # rubocop:enable Rails/SkipsModelValidations
           end
 
-          # rubocop:disable Metrics/MethodLength
+          # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
           def apply_spec_assignments(spec_assignments)
             return if spec_assignments.empty?
 
@@ -180,23 +207,23 @@ module Blizzard
               .pluck(:blizzard_id, :id)
               .to_h
 
-            now  = Time.current
-            rows = spec_assignments.flat_map do |spec_id, blizzard_ids|
-              blizzard_ids.filter_map do |blizzard_id|
-                talent_id = id_map[blizzard_id]
-                next unless talent_id
-
-                { talent_id: talent_id, spec_id: spec_id, created_at: now, updated_at: now }
-              end
-            end
-
-            return if rows.empty?
+            now = Time.current
 
             # rubocop:disable Rails/SkipsModelValidations
-            TalentSpecAssignment.insert_all(rows, unique_by: %i[talent_id spec_id])
+            spec_assignments.each do |spec_id, blizzard_ids|
+              talent_ids = blizzard_ids.filter_map { |blz_id| id_map[blz_id] }
+              next if talent_ids.empty?
+
+              # Remove stale assignments no longer present in the API tree.
+              # Preserves default_points on rows that remain.
+              TalentSpecAssignment.where(spec_id: spec_id).where.not(talent_id: talent_ids).delete_all
+
+              rows = talent_ids.map { |tid| { talent_id: tid, spec_id: spec_id, created_at: now, updated_at: now } }
+              TalentSpecAssignment.insert_all(rows, unique_by: %i[talent_id spec_id])
+            end
             # rubocop:enable Rails/SkipsModelValidations
           end
-          # rubocop:enable Metrics/MethodLength
+          # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
           # Fetches /data/wow/talent/{id} for talents missing an icon or description,
           # storing spell_id, icon_url, and the max-rank description translation in one pass.
@@ -217,37 +244,125 @@ module Blizzard
           def sync_talent_media(talent)
             talent_data = fetch_talent_data(talent.blizzard_id)
             spell_id    = talent.spell_id || talent_data[:spell_id]
-            return unless spell_id
 
+            save_name(talent, talent_data[:name])
             save_description(talent, talent_data[:description])
-            sync_icon(talent, spell_id) if talent.icon_url.nil?
+            sync_icon(talent, spell_id) if spell_id && talent.icon_url.nil?
           rescue Blizzard::Client::NotFoundError
-            # no entry in Blizzard's API — skip silently
+            sync_pvp_talent_media(talent)
           rescue Blizzard::Client::Error => e
             Rails.logger.warn("[SyncTreeService] Media fetch failed for talent #{talent.blizzard_id}: #{e.message}")
           end
+
+          # PvP talents live at /data/wow/pvp-talent/{id} instead of /data/wow/talent/{id}.
+          # Falls back to the already-stored spell_id when the PvP endpoint also fails.
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+          def sync_pvp_talent_media(talent)
+            talent_data = fetch_pvp_talent_data(talent.blizzard_id)
+            spell_id    = talent.spell_id || talent_data[:spell_id]
+
+            save_name(talent, talent_data[:name])
+            save_description(talent, talent_data[:description])
+            sync_icon(talent, spell_id) if spell_id && talent.icon_url.nil?
+          rescue Blizzard::Client::NotFoundError
+            # Neither Blizzard endpoint has this talent — try stored spell_id, then WoWHead
+            sync_icon(talent, talent.spell_id) if talent.spell_id && talent.icon_url.nil?
+            sync_icon_from_wowhead(talent) if talent.reload.icon_url.nil? && talent.spell_id
+          rescue Blizzard::Client::Error => e
+            message = "[SyncTreeService] PvP talent media fetch failed for talent #{talent.blizzard_id}: #{e.message}"
+            Rails.logger.warn(message)
+          end
+          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
           def sync_icon(talent, spell_id)
             url = fetch_spell_icon_url(spell_id)
             # rubocop:disable Rails/SkipsModelValidations
             Talent.where(id: talent.id).update_all(icon_url: url, spell_id: spell_id) if url
             # rubocop:enable Rails/SkipsModelValidations
+          rescue Blizzard::Client::Error => e
+            Rails.logger.warn("[SyncTreeService] Icon fetch failed for spell #{spell_id}: #{e.message}")
           end
 
-          # Fetches /data/wow/talent/{id} and returns { spell_id:, description: }.
+          # Fetches /data/wow/talent/{id} and returns { spell_id:, description:, name: }.
           # description is the max-rank description (highest rank players invest in).
           def fetch_talent_data(blizzard_id)
             data  = client.get("/data/wow/talent/#{blizzard_id}", namespace: client.static_namespace)
             ranks = Array(data["rank_descriptions"])
             desc  = ranks.max_by { |r| r["rank"].to_i }&.dig("description")
 
-            { spell_id: data.dig("spell", "id"), description: desc }
+            { spell_id: data.dig("spell", "id"), description: desc, name: data["name"] }
+          end
+
+          # Fetches /data/wow/pvp-talent/{id} — PvP talents use a separate endpoint.
+          def fetch_pvp_talent_data(blizzard_id)
+            data     = client.get("/data/wow/pvp-talent/#{blizzard_id}", namespace: client.static_namespace)
+            desc     = data["description"]
+            spell_id = data.dig("spell", "id")
+
+            { spell_id: spell_id, description: desc, name: data["name"] }
+          end
+
+          def save_names_from_tree(name_map)
+            return if name_map.empty?
+
+            Talent.where(blizzard_id: name_map.keys).find_each do |talent|
+              name = name_map[talent.blizzard_id]
+              talent.set_translation("name", client.locale, name, meta: { source: "blizzard" }) if name.present?
+            end
+          end
+
+          def save_name(talent, name)
+            return unless name.present?
+
+            talent.set_translation("name", client.locale, name, meta: { source: "blizzard" })
           end
 
           def save_description(talent, description)
             return unless description.present?
 
             talent.set_translation("description", client.locale, description, meta: { source: "blizzard" })
+          end
+
+          # Last-resort fallback: fetch icon name from WoWHead tooltip API
+          # and build a Blizzard CDN URL from it.
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+          def sync_icon_from_wowhead(talent)
+            data = fetch_wowhead_tooltip(talent.spell_id)
+            return unless data
+
+            if data[:icon_url] && talent.icon_url.nil?
+              # rubocop:disable Rails/SkipsModelValidations
+              Talent.where(id: talent.id).update_all(icon_url: data[:icon_url])
+              # rubocop:enable Rails/SkipsModelValidations
+              message = "[SyncTreeService] WoWHead fallback icon for talent #{talent.blizzard_id}: #{data[:icon_url]}"
+              Rails.logger.info(message)
+            end
+
+            save_description(talent, data[:description]) if data[:description].present?
+          rescue => e
+            message = "[SyncTreeService] WoWHead fallback failed for spell #{talent.spell_id}: #{e.message}"
+            Rails.logger.warn(message)
+          end
+          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+          def fetch_wowhead_tooltip(spell_id)
+            uri  = URI("https://nether.wowhead.com/tooltip/spell/#{spell_id}")
+            resp = Net::HTTP.get_response(uri)
+            return nil unless resp.is_a?(Net::HTTPSuccess)
+
+            body = JSON.parse(resp.body)
+            icon = body["icon"]
+            # WoWHead returns HTML tooltip — convert to readable plain text
+            desc = body["tooltip"]
+              &.gsub(/<br\s*\/?>|<\/(?:div|p|td|tr|li)>/i, "\n")
+              &.gsub(/<[^>]+>/, "")
+              &.gsub(/\n{3,}/, "\n\n")
+              &.strip&.presence
+
+            {
+              icon_url:    icon.present? ? "https://render.worldofwarcraft.com/us/icons/56/#{icon}.jpg" : nil,
+              description: desc
+            }
           end
 
           def fetch_spell_icon_url(spell_id)

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_04_060000) do
+ActiveRecord::Schema[8.1].define(version: 2026_03_11_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -28,6 +28,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_04_060000) do
     t.string "slot", null: false
     t.jsonb "sockets", default: []
     t.integer "spec_id", null: false
+    t.jsonb "stats", default: {}
     t.datetime "updated_at", null: false
     t.index ["character_id", "slot", "spec_id"], name: "idx_character_items_on_char_slot_spec", unique: true
     t.index ["character_id", "spec_id"], name: "idx_character_items_on_char_spec"
@@ -70,6 +71,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_04_060000) do
     t.string "region"
     t.jsonb "spec_equipment_fingerprints", default: {}
     t.jsonb "spec_talent_loadout_codes", default: {}
+    t.jsonb "stat_pcts", default: {}
     t.datetime "talents_last_modified", precision: nil
     t.datetime "unavailable_until"
     t.datetime "updated_at", null: false
@@ -217,6 +219,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_04_060000) do
     t.integer "spec_id", null: false
     t.bigint "talent_id", null: false
     t.string "talent_type", null: false
+    t.string "tier", default: "common", null: false
     t.integer "top_build_rank", default: 0, null: false
     t.datetime "updated_at", null: false
     t.integer "usage_count", default: 0, null: false
@@ -265,6 +268,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_04_060000) do
 
   create_table "talent_spec_assignments", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.integer "default_points", default: 0, null: false
     t.integer "spec_id", null: false
     t.bigint "talent_id", null: false
     t.datetime "updated_at", null: false

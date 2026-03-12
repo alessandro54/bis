@@ -1,5 +1,7 @@
 require "active_support/core_ext/integer/time"
 
+# ignore rubocop
+# rubocop:disable Metrics/BlockLength
 Rails.application.configure do
   # Settings specified here will take precedence over those in config/application.rb.
 
@@ -12,7 +14,8 @@ Rails.application.configure do
   # Full error reports are disabled.
   config.consider_all_requests_local = false
 
-  # Cache assets for far-future expiry since they are all digest stamped.
+  # Serve static files and cache assets for far-future expiry since they are all digest stamped.
+  config.public_file_server.enabled = true
   config.public_file_server.headers = { "cache-control" => "public, max-age=#{1.year.to_i}" }
 
   # Enable serving of images, stylesheets, and JavaScripts from an asset server.
@@ -20,9 +23,10 @@ Rails.application.configure do
 
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
+  config.active_storage.variant_processor = :disabled
 
   # Assume all access to the app is happening through a SSL-terminating reverse proxy.
-  # config.assume_ssl = true
+  config.assume_ssl = true
 
   # Force all access to the app over SSL, use Strict-Transport-Security, and use secure cookies.
   # config.force_ssl = true
@@ -83,5 +87,26 @@ Rails.application.configure do
   # ]
   #
   # Skip DNS rebinding protection for the default health check endpoint.
-  # config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
+  config.hosts << "api.wowinsights.xyz"
+
+  # Trust Cloudflare proxy IPs for correct remote_ip resolution
+  config.action_dispatch.trusted_proxies = ActionDispatch::RemoteIp::TRUSTED_PROXIES + %w[
+    173.245.48.0/20
+    103.21.244.0/22
+    103.22.200.0/22
+    103.31.4.0/22
+    141.101.64.0/18
+    108.162.192.0/18
+    190.93.240.0/20
+    188.114.96.0/20
+    197.234.240.0/22
+    198.41.128.0/17
+    162.158.0.0/15
+    104.16.0.0/13
+    104.24.0.0/14
+    172.64.0.0/13
+    131.0.72.0/22
+  ].map { |proxy| IPAddr.new(proxy) }
 end
+# rubocop:enable Metrics/BlockLength,

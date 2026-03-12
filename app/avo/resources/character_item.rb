@@ -5,6 +5,10 @@ class Avo::Resources::CharacterItem < Avo::BaseResource
   #   query: -> { query.ransack(id_eq: q, m: "or").result(distinct: false) }
   # }
 
+  def actions
+    action Avo::Actions::DeleteSelectedAction
+  end
+
   def fields
     field :id, as: :id
     field :bonus_list, as: :number

@@ -3,7 +3,7 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
   def index
     cache_key = meta_cache_key("gems", bracket_param, spec_id_param, slot_param, socket_type_param, locale_param)
 
-    json = Rails.cache.fetch(cache_key, expires_in: META_CACHE_TTL) do
+    json = meta_cache_fetch(cache_key) do
       gems = PvpMetaGemPopularity
         .includes(item: :translations)
         .where(pvp_season: current_season)
@@ -56,9 +56,5 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
 
     def socket_type_param
       params[:socket_type]
-    end
-
-    def locale_param
-      params[:locale] || "en_US"
     end
 end
