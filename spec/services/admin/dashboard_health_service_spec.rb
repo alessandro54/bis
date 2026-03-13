@@ -86,18 +86,17 @@ RSpec.describe Admin::DashboardHealthService, type: :service do
       end
 
       describe "freshness" do
-        it "buckets processed entries by age" do
+        it "buckets all entries by updated_at" do
           freshness = result.context[:freshness]
 
-          expect(freshness[:total]).to eq(2)
+          expect(freshness[:total]).to eq(4)
 
           labels = freshness[:rows].map { |r| r[:label] }
           expect(labels).to eq([ "< 1h ago", "1-6h ago", "6-24h ago", "> 24h ago" ])
 
-          h1  = freshness[:rows].find { |r| r[:label] == "< 1h ago" }
-          h6  = freshness[:rows].find { |r| r[:label] == "1-6h ago" }
-          expect(h1[:count]).to eq(1)
-          expect(h6[:count]).to eq(1)
+          # All 4 entries were just created, so updated_at is within < 1h
+          h1 = freshness[:rows].find { |r| r[:label] == "< 1h ago" }
+          expect(h1[:count]).to eq(4)
         end
       end
     end

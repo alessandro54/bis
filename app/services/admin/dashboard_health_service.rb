@@ -100,16 +100,15 @@ module Admin
       # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Layout/LineLength
       def freshness
         scope = PvpLeaderboardEntry
-        .joins(:pvp_leaderboard)
-        .where(pvp_leaderboards: { pvp_season: season })
-          .where.not(equipment_processed_at: nil)
+          .joins(:pvp_leaderboard)
+          .where(pvp_leaderboards: { pvp_season: season })
 
         total, h1, h6, h24, older = scope.pick(
           Arel.sql("COUNT(*)"),
-          Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at > NOW() - INTERVAL '1 hour')"),
-          Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '1 hour')"),
-          Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW() - INTERVAL '6 hours')"),
-          Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at <= NOW() - INTERVAL '24 hours')")
+          Arel.sql("COUNT(*) FILTER (WHERE pvp_leaderboard_entries.updated_at > NOW() - INTERVAL '1 hour')"),
+          Arel.sql("COUNT(*) FILTER (WHERE pvp_leaderboard_entries.updated_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '1 hour')"),
+          Arel.sql("COUNT(*) FILTER (WHERE pvp_leaderboard_entries.updated_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW() - INTERVAL '6 hours')"),
+          Arel.sql("COUNT(*) FILTER (WHERE pvp_leaderboard_entries.updated_at <= NOW() - INTERVAL '24 hours')")
         )
         return unless total&.positive?
 

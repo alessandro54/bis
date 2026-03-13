@@ -41,9 +41,7 @@ Rails.application.routes.draw do
   mount MissionControl::Jobs::Engine, at: "/jobs"
 
   namespace :admin do
-    get  :dashboard, to: "dashboard#show"
-    get  :translation_health, to: "translation_health#show"
-    post :translation_health_backfill, to: "translation_health#backfill"
+    get :dashboard, to: "dashboard#show"
   end
 
   mount_avo
