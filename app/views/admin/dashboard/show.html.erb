@@ -7,7 +7,7 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: system-ui, -apple-system, sans-serif; background: #f3f4f6; color: #111827; line-height: 1.5; }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 2rem 1.5rem; }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
     .nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; }
     .nav h1 { font-size: 1.5rem; font-weight: 700; }
     .nav a { font-size: .85rem; color: #2563eb; text-decoration: none; }
@@ -48,9 +48,32 @@
     .pct-red    { color: #dc2626; }
 
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-    @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    @media (max-width: 900px) { .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
 
     .section-title { font-size: .8rem; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: .06em; margin: 2rem 0 .75rem; }
+
+    /* Leaderboard distribution */
+    .dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 50%; flex-shrink: 0; }
+    .role-tag { display: inline-block; padding: .1rem .3rem; border-radius: .2rem; font-size: .6rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-left: .3rem; vertical-align: middle; }
+    .role-dps    { background: #fee2e2; color: #991b1b; }
+    .role-healer { background: #dcfce7; color: #166534; }
+    .role-tank   { background: #dbeafe; color: #1e40af; }
+    .spec-row { display: flex; align-items: center; gap: .5rem; padding: .45rem .75rem; border-bottom: 1px solid #f3f4f6; }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-row:hover { background: #f9fafb; }
+    .spec-name { font-size: .8rem; font-weight: 500; min-width: 7rem; }
+    .spec-class { font-size: .72rem; color: #9ca3af; min-width: 6rem; }
+    .spec-bar-wrap { flex: 1; height: .4rem; background: #e5e7eb; border-radius: .2rem; overflow: hidden; min-width: 3rem; }
+    .spec-bar-fill { height: 100%; border-radius: .2rem; transition: width .3s; }
+    .spec-counts { font-family: ui-monospace, monospace; font-size: .72rem; color: #6b7280; white-space: nowrap; min-width: 6rem; text-align: right; }
+    .spec-pct { font-family: ui-monospace, monospace; font-size: .75rem; font-weight: 600; min-width: 3rem; text-align: right; color: #374151; }
+    .class-header { display: flex; align-items: center; gap: .5rem; padding: .6rem .75rem; border-bottom: 1px solid #e5e7eb; }
+    .class-header-name { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .class-header-count { margin-left: auto; font-size: .75rem; color: #6b7280; font-family: ui-monospace, monospace; }
+    .shuffle-spec-bar { flex: 1; height: .35rem; background: #e5e7eb; border-radius: .2rem; overflow: hidden; }
   </style>
 </head>
 <body>
@@ -181,6 +204,71 @@
             </tbody>
           </table>
         </div>
+      <% end %>
+
+      <%# ── Leaderboard Distribution ── %>
+      <% if @leaderboard %>
+
+        <%# Standard brackets: 2v2, 3v3, rbg %>
+        <% if @leaderboard[:regular].any? %>
+          <div class="section-title">Spec Distribution — Standard Brackets</div>
+
+          <% @leaderboard[:regular].each do |bracket| %>
+            <div class="card" style="margin-bottom:1rem">
+              <div class="card-header">
+                <h2 style="text-transform:uppercase;letter-spacing:.05em"><%= bracket[:bracket] %></h2>
+                <span class="badge"><%= bracket[:regions] %> &mdash; <%= number_with_delimiter(bracket[:total]) %> entries</span>
+              </div>
+              <% bracket[:specs].each do |spec| %>
+                <div class="spec-row">
+                  <span class="dot" style="background:<%= spec[:color] %>"></span>
+                  <span class="spec-name">
+                    <%= spec[:spec_slug].titleize %>
+                    <span class="role-tag role-<%= spec[:role] %>"><%= spec[:role] %></span>
+                  </span>
+                  <span class="spec-class"><%= spec[:class_slug].titleize %></span>
+                  <div class="spec-bar-wrap">
+                    <div class="spec-bar-fill" style="width:<%= spec[:pct] %>%;background:<%= spec[:color] %>99"></div>
+                  </div>
+                  <span class="spec-counts">US <%= number_with_delimiter(spec[:us]) %> / EU <%= number_with_delimiter(spec[:eu]) %></span>
+                  <span class="spec-pct"><%= spec[:pct] %>%</span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        <% end %>
+
+        <%# Solo Shuffle: grouped by class, 4 cards per row %>
+        <% if @leaderboard[:shuffle].any? %>
+          <div class="section-title">Spec Distribution — Solo Shuffle</div>
+
+          <div class="grid-4" style="margin-bottom:1.5rem">
+            <% @leaderboard[:shuffle].each do |class_slug, specs| %>
+              <% class_color = specs.first&.dig(:color) || "#9ca3af" %>
+              <% class_total = specs.sum { |s| s[:total] } %>
+              <div class="card">
+                <div class="class-header" style="border-left:3px solid <%= class_color %>">
+                  <span class="dot" style="background:<%= class_color %>"></span>
+                  <span class="class-header-name" style="color:<%= class_color %>"><%= class_slug.titleize %></span>
+                  <span class="class-header-count"><%= number_with_delimiter(class_total) %></span>
+                </div>
+                <% specs.each do |spec| %>
+                  <div class="spec-row">
+                    <span class="spec-name" style="min-width:0;flex:1">
+                      <%= spec[:spec_slug].titleize %>
+                      <span class="role-tag role-<%= spec[:role] %>"><%= spec[:role] %></span>
+                    </span>
+                    <div class="shuffle-spec-bar">
+                      <div class="spec-bar-fill" style="width:<%= class_total > 0 ? (spec[:total].to_f / class_total * 100).round(1) : 0 %>%;background:<%= spec[:color] %>99"></div>
+                    </div>
+                    <span class="spec-pct" style="min-width:2.5rem"><%= number_with_delimiter(spec[:total]) %></span>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+
       <% end %>
 
     <% end %>

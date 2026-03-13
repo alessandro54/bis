@@ -12,6 +12,7 @@ module Admin
       @characters   = result.context[:characters]
       @freshness    = result.context[:freshness]
       @translations = result.context[:translations]
+      @leaderboard  = result.context[:leaderboard]
     end
 
     private

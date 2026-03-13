@@ -1,10 +1,27 @@
 module Admin
+  # rubocop:disable Metrics/ClassLength
   class DashboardHealthService < BaseService
     TRANSLATION_SECTIONS = [
       { label: "Items & Gems", type: "Item" },
       { label: "Enchantments", type: "Enchantment" },
       { label: "Talents",      type: "Talent" }
     ].freeze
+
+    CLASS_COLORS = {
+      "warrior" => "#C79C6E",
+      "paladin" => "#F58CBA",
+      "hunter" => "#ABD473",
+      "rogue" => "#FFF569",
+      "priest" => "#D2D2D2",
+      "death_knight" => "#C41F3B",
+      "shaman" => "#0070DE",
+      "mage" => "#69CCF0",
+      "warlock" => "#9482C9",
+      "monk" => "#00FF96",
+      "druid" => "#FF7D0A",
+      "demon_hunter" => "#A330C9",
+      "evoker" => "#33937F"
+    }.freeze
 
     def initialize(season:)
       @season = season
@@ -16,7 +33,8 @@ module Admin
         brackets:     brackets,
         characters:   characters,
         freshness:    freshness,
-        translations: translations
+        translations: translations,
+        leaderboard:  leaderboard_distribution
       })
     end
 
@@ -157,8 +175,101 @@ module Admin
         { locale: locale, present: present, missing: missing, pct: pct(present, ids.size) }
       end
 
+      # -- Leaderboard spec distribution --
+
+      # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+      def leaderboard_distribution
+        raw = PvpLeaderboardEntry
+          .joins(:pvp_leaderboard)
+          .where(pvp_leaderboards: { pvp_season: season })
+          .where.not(pvp_leaderboard_entries: { spec_id: nil })
+          .group("pvp_leaderboards.bracket", "pvp_leaderboards.region", "pvp_leaderboard_entries.spec_id")
+          .pluck(
+            "pvp_leaderboards.bracket",
+            "pvp_leaderboards.region",
+            "pvp_leaderboard_entries.spec_id",
+            Arel.sql("COUNT(*)")
+          )
+
+        nested = raw.each_with_object({}) do |(bracket, region, spec_id, count), acc|
+          (acc[bracket] ||= {})[region] ||= {}
+          acc[bracket][region][spec_id] = count
+        end
+
+        shuffle_brackets = nested.select { |b, _| b =~ /\Ashuffle-[^o]/ }
+        regular_brackets = nested.reject { |b, _| b.start_with?("shuffle-") }
+
+        { regular: build_regular_cards(regular_brackets), shuffle: build_shuffle_by_class(shuffle_brackets) }
+      end
+
+      # rubocop:disable Metrics/PerceivedComplexity
+      def build_regular_cards(brackets)
+        order = { "2v2" => 0, "3v3" => 1, "rbg" => 2, "blitz-overall" => 3 }
+
+        brackets.map do |bracket, regions|
+          spec_counts = {}
+          regions.each do |region, specs|
+            specs.each { |sid, count| (spec_counts[sid] ||= { us: 0, eu: 0 })[region.to_sym] += count }
+          end
+
+          total       = spec_counts.values.sum { |v| v[:us] + v[:eu] }
+          all_regions = regions.keys.map(&:upcase).sort.join(" + ")
+
+          specs = spec_counts.map do |spec_id, counts|
+            info  = Wow::Catalog::SPECS[spec_id] || {}
+            combo = counts[:us] + counts[:eu]
+            {
+              spec_slug:  info[:spec_slug]  || "unknown",
+              class_slug: info[:class_slug] || "unknown",
+              role:       info[:role]       || :dps,
+              color:      CLASS_COLORS.fetch(info[:class_slug].to_s, "#9ca3af"),
+              us:         counts[:us],
+              eu:         counts[:eu],
+              total:      combo,
+              pct:        total > 0 ? (combo.to_f / total * 100).round(1) : 0.0
+            }
+          end.sort_by { |s| -s[:total] }
+
+          { bracket: bracket, regions: all_regions, total: total, specs: specs, sort: order.fetch(bracket, 10) }
+        end.sort_by { |c| c[:sort] }
+      end
+      # rubocop:enable Metrics/PerceivedComplexity
+
+      # rubocop:disable Metrics/PerceivedComplexity
+      def build_shuffle_by_class(shuffle_brackets)
+        class_data = {}
+
+        shuffle_brackets.each do |bracket, regions|
+          spec_id = Wow::Catalog.spec_id_from_bracket(bracket)
+          next unless spec_id
+
+          info = Wow::Catalog::SPECS[spec_id]
+          next unless info
+
+          us = regions.dig("us", spec_id).to_i
+          eu = regions.dig("eu", spec_id).to_i
+
+          (class_data[info[:class_slug]] ||= []) << {
+            spec_id:   spec_id,
+            spec_slug: info[:spec_slug],
+            role:      info[:role] || :dps,
+            color:     CLASS_COLORS.fetch(info[:class_slug], "#9ca3af"),
+            us:        us,
+            eu:        eu,
+            total:     us + eu
+          }
+        end
+
+        class_data
+          .transform_values { |specs| specs.sort_by { |s| s[:spec_id] } }
+          .sort_by { |cs, _| cs }
+          .to_h
+      end
+      # rubocop:enable Metrics/PerceivedComplexity
+
       def pct(count, total)
         total > 0 ? (count.to_f / total * 100).round(1) : 100.0
       end
   end
 end
+# rubocop:enable Metrics/ClassLength
