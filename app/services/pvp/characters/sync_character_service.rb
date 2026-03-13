@@ -45,6 +45,9 @@ module Pvp
             # rubocop:disable Rails/SkipsModelValidations
             character.update_columns(unavailable_until: UNAVAILABILITY_COOLDOWN.from_now)
             # rubocop:enable Rails/SkipsModelValidations
+            # Purge stale data so deleted/transferred characters don't pollute meta aggregations
+            character.character_talents.delete_all
+            character.character_items.delete_all
           end
         end
 

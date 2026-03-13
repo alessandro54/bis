@@ -139,7 +139,7 @@ class Api::V1::CharactersController < Api::V1::BaseController
           usage_count:    ct ? (ct[:rank] || 1) : 0,
           usage_pct:      ct ? 1.0 : 0.0,
           in_top_build:   ct.present?,
-          top_build_rank: 0,
+          top_build_rank: ct ? (ct[:rank] || 0) : 0,
           tier:           ct ? "bis" : "common",
           snapshot_at:    nil
         }
