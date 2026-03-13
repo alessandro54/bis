@@ -37,12 +37,12 @@ module Pvp
       def call
         rows    = execute_query
         rows    = merge_ranked_rows(rows)
+        rows    = merge_stale_variants(rows)
+        rows    = drop_unresolvable_stale(rows)
         rows    = apply_budget_tiers(rows)
         records = build_records(rows)
 
         if records.any?
-          kept_ids = records.map { |r| r[:talent_id] }
-
           # rubocop:disable Rails/SkipsModelValidations
           PvpMetaTalentPopularity.upsert_all(
             records,
@@ -52,13 +52,15 @@ module Pvp
           # rubocop:enable Rails/SkipsModelValidations
 
           # Remove stale rank-variant rows that were merged into a primary record.
-          # Scoped per (bracket, spec_id) so we only prune within aggregated groups,
-          # not across specs/brackets that had no data in this run.
-          bracket_spec_pairs = records.map { |r| [ r[:bracket], r[:spec_id] ] }.uniq
-          bracket_spec_pairs.each do |bracket, spec_id|
+          # Use per-(bracket, spec_id) kept_ids so a stale talent that survives in
+          # one spec's data cannot prevent its deletion from another spec's records.
+          kept_ids_by_pair = records.each_with_object(Hash.new { |h, k| h[k] = [] }) do |r, h|
+            h[[ r[:bracket], r[:spec_id] ]] << r[:talent_id]
+          end
+          kept_ids_by_pair.each do |(bracket, spec_id), ids|
             PvpMetaTalentPopularity
               .where(pvp_season_id: season.id, bracket: bracket, spec_id: spec_id)
-              .where.not(talent_id: kept_ids)
+              .where.not(talent_id: ids)
               .delete_all
           end
         end
@@ -282,6 +284,77 @@ module Pvp
             end
         end
 
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+        # ── Cross-node stale-variant deduplication ───────────────────────
+        #
+        # Handles the case where a talent was reworked (blizzard_id changed) and
+        # the old talent record survives in CharacterTalent data. The old record
+        # has the same name as the new one but a different node_id and no
+        # TalentSpecAssignment for the current spec. Merge its usage into the
+        # canonical (TSA-assigned) entry and discard the stale one.
+        #
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+        def merge_stale_variants(rows)
+          return rows if rows.empty?
+
+          talent_ids    = rows.map { |r| r["talent_id"] }.uniq
+          names         = Translation
+            .where(translatable_type: "Talent", translatable_id: talent_ids, key: "name", locale: "en_US")
+            .pluck(:translatable_id, :value).to_h
+          spec_ids      = rows.map { |r| r["spec_id"] }.uniq
+          assigned_ids  = TalentSpecAssignment
+            .where(talent_id: talent_ids, spec_id: spec_ids)
+            .pluck(:talent_id, :spec_id)
+            .to_set
+
+          rows
+            .group_by { |r| [ r["bracket"], r["spec_id"], names[r["talent_id"]] ] }
+            .flat_map do |(_bracket, spec_id, _name), group|
+              next group if group.size == 1
+
+              canonical = group.select { |r| assigned_ids.include?([ r["talent_id"], spec_id ]) }
+              stale     = group.reject { |r| assigned_ids.include?([ r["talent_id"], spec_id ]) }
+
+              # Only merge when exactly one canonical entry exists; otherwise pass through unchanged.
+              next group unless canonical.size == 1
+
+              primary = canonical.first.dup
+              primary["usage_count"]    = group.sum { |r| r["usage_count"].to_i }
+              primary["usage_pct"]      = group.sum { |r| r["usage_pct"].to_f }
+              primary["in_top_build"]   = group.any? { |r| r["in_top_build"] }
+              non_zero                  = group.map { |r| r["top_build_rank"].to_i }.select { |v| v > 0 }
+              primary["top_build_rank"] = non_zero.min || 0
+              [ primary ]
+            end
+        end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+        # ── Drop unresolvable stale talents ─────────────────────────────
+        #
+        # Removes rows for talents that have no TalentSpecAssignment for the
+        # current spec AND no icon_url. These are definitively obsolete entries
+        # (old blizzard_ids from pre-rework data) with no canonical partner to
+        # merge into. Keeping them produces broken talent cards in the UI.
+        #
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+        def drop_unresolvable_stale(rows)
+          return rows if rows.empty?
+
+          talent_ids   = rows.map { |r| r["talent_id"] }.uniq
+          spec_ids     = rows.map { |r| r["spec_id"] }.uniq
+          assigned_ids = TalentSpecAssignment
+            .where(talent_id: talent_ids, spec_id: spec_ids)
+            .pluck(:talent_id, :spec_id)
+            .to_set
+          icon_ids     = Talent.where(id: talent_ids).where.not(icon_url: [ nil, "" ]).pluck(:id).to_set
+
+          rows.reject do |r|
+            tid      = r["talent_id"]
+            spec_id  = r["spec_id"]
+            !assigned_ids.include?([ tid, spec_id ]) && !icon_ids.include?(tid)
+          end
+        end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
         # ── Budget-aware tier assignment ─────────────────────────────────
