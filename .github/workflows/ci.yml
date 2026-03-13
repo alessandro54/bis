@@ -63,9 +63,7 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/wow_bis_test
         run: |
-          bundle exec rails db:create
-          bundle exec rails db:schema:load
-          bundle exec rails db:test:prepare
+          bundle exec rails db:create db:migrate
 
       - name: Run RSpec tests
         env:
