@@ -273,9 +273,10 @@ module Pvp
               next group if group.size == 1
               next group if node_ids_by_talent[group.first["talent_id"]].nil?
 
+              # Use the highest-usage rank variant as the primary; do not sum usage_pct/count
+              # because each character has a separate CharacterTalent record per rank variant,
+              # so summing would multiply-count the same players (e.g. 3× for max_rank=3).
               primary = group.max_by { |r| r["usage_pct"].to_f }.dup
-              primary["usage_count"]    = group.sum { |r| r["usage_count"].to_i }
-              primary["usage_pct"]      = group.sum { |r| r["usage_pct"].to_f }
               primary["default_points"] = group.map { |r| r["default_points"].to_i }.max
               primary["in_top_build"]   = group.any? { |r| r["in_top_build"] }
               non_zero                  = group.map { |r| r["top_build_rank"].to_i }.select { |r| r > 0 }
@@ -316,16 +317,13 @@ module Pvp
               canonical = group.select { |r| assigned_ids.include?([ r["talent_id"], spec_id ]) }
               stale     = group.reject { |r| assigned_ids.include?([ r["talent_id"], spec_id ]) }
 
-              # Only merge when exactly one canonical entry exists; otherwise pass through unchanged.
+              # Only discard stale when exactly one canonical entry exists; otherwise pass through unchanged.
               next group unless canonical.size == 1
 
-              primary = canonical.first.dup
-              primary["usage_count"]    = group.sum { |r| r["usage_count"].to_i }
-              primary["usage_pct"]      = group.sum { |r| r["usage_pct"].to_f }
-              primary["in_top_build"]   = group.any? { |r| r["in_top_build"] }
-              non_zero                  = group.map { |r| r["top_build_rank"].to_i }.select { |v| v > 0 }
-              primary["top_build_rank"] = non_zero.min || 0
-              [ primary ]
+              # Do not sum stale usage into canonical — re-processed characters contribute to both
+              # old and new CharacterTalent records, so summing would double-count and exceed 100%.
+              # Just keep the canonical entry and discard the stale ones.
+              canonical
             end
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
