@@ -25,9 +25,16 @@ namespace :db do
     system("ssh -i #{ssh_key} dokku@#{ssh_host} postgres:export #{db_name} > #{dump}") || abort("Export failed")
     puts "  Dump saved (#{(File.size(dump) / 1024.0 / 1024.0).round(1)} MB)"
 
+    queue_db = ActiveRecord::Base.configurations.configs_for(env_name: "development", name: "queue")&.database ||
+               "#{local}_queue"
+
     puts "→ Dropping and recreating '#{local}'..."
     system("dropdb --if-exists #{local}") || abort("dropdb failed")
     system("createdb #{local}") || abort("createdb failed")
+
+    # Ensure the queue database exists — Solid Queue connects on environment load
+    # and will error if the DB is missing.
+    system("createdb #{queue_db} 2>/dev/null")
 
     puts "→ Restoring into '#{local}'..."
     system("pg_restore --no-acl --no-owner -d #{local} #{dump}")
@@ -47,7 +54,7 @@ namespace :db do
     # Ensure the queue database schema is up to date (it's local-only, not pulled
     # from production, but may have been wiped by dropdb/createdb during PG upgrades).
     puts "→ Ensuring queue database schema..."
-    system("bundle exec rails db:prepare:queue")
+    system("bundle exec rails db:schema:load:queue")
 
     puts "✓ Done. Local database '#{local}' now mirrors production."
   end
