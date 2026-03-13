@@ -315,22 +315,21 @@ namespace :pvp do
       puts
     end
 
-    # --- Freshness ---
-    processed_scope = PvpLeaderboardEntry
+    # --- Freshness (last synced, not last changed) ---
+    freshness_scope = PvpLeaderboardEntry
       .joins(:pvp_leaderboard)
       .where(pvp_leaderboards: { pvp_season: season })
-      .where.not(equipment_processed_at: nil)
 
-    total_p, h1, h6, h24, older = processed_scope.pick(
+    total_p, h1, h6, h24, older = freshness_scope.pick(
       Arel.sql("COUNT(*)"),
-      Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at > NOW() - INTERVAL '1 hour')"),
-      Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '1 hour')"),
-      Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW() - INTERVAL '6 hours')"),
-      Arel.sql("COUNT(*) FILTER (WHERE equipment_processed_at <= NOW() - INTERVAL '24 hours')")
+      Arel.sql("COUNT(*) FILTER (WHERE pvp_leaderboard_entries.updated_at > NOW() - INTERVAL '1 hour')"),
+      Arel.sql("COUNT(*) FILTER (WHERE pvp_leaderboard_entries.updated_at BETWEEN NOW() - INTERVAL '6 hours' AND NOW() - INTERVAL '1 hour')"),
+      Arel.sql("COUNT(*) FILTER (WHERE pvp_leaderboard_entries.updated_at BETWEEN NOW() - INTERVAL '24 hours' AND NOW() - INTERVAL '6 hours')"),
+      Arel.sql("COUNT(*) FILTER (WHERE pvp_leaderboard_entries.updated_at <= NOW() - INTERVAL '24 hours')")
     )
 
     if total_p&.positive?
-      puts "Freshness (equipment) — #{total_p} processed entries"
+      puts "Freshness — #{total_p} entries"
       bar.call("< 1h ago",  h1, total_p)
       bar.call("1–6h ago",  h6, total_p, good: false)
       bar.call("6–24h ago", h24, total_p, good: false)
