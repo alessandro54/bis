@@ -91,7 +91,7 @@ GEM
       io-event (~> 1.11)
       metrics (~> 0.12)
       traces (~> 0.18)
-    avo (3.30.1)
+    avo (3.30.2)
       actionview (>= 6.1)
       active_link_to
       activerecord (>= 6.1)
