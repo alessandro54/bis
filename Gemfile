@@ -9,7 +9,7 @@ gem "rails", "~> 8.1.1"
 gem "bootsnap", "~> 1.19", require: false
 
 # Fiber-based cooperative concurrency (replaces thread pools)
-gem "async", "~> 2.21"
+gem "async", "~> 2.38"
 
 # HTTP client
 gem "httpx", "~> 1.6"
