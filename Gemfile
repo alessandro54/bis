@@ -3,7 +3,7 @@ source "https://rubygems.org"
 gem "avo"
 
 # Main Rails framework (API, ActiveRecord, ActionPack)
-gem "rails", "~> 8.1.1"
+gem "rails", "~> 8.1.3"
 
 # Boot-time caching for faster startup
 gem "bootsnap", "~> 1.19", require: false
