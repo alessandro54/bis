@@ -89,7 +89,7 @@ group :development, :test do
   # Factories for tests
   gem "factory_bot_rails", "~> 6.5"
 
-  # RSpec testing framework for Rails
+  # RSpec testing framework for Railshttps://www.youtube.com/watch?v=KzI9mwk3pIQ
   gem "rspec-rails", "~> 8.0"
 
   # RuboCop integrations
