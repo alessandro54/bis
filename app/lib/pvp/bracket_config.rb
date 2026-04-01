@@ -7,13 +7,15 @@ module Pvp
       two_v_two:     { top_n: 1000, job_queue: :pvp_sync_2v2 },
       three_v_three: { top_n: 1000, job_queue: :pvp_sync_3v3 },
       shuffle_like:  { top_n: 500,  job_queue: :pvp_sync_shuffle },
-      rbg_like:      { top_n: 500,  job_queue: :pvp_sync_rbg },
+      blitz_like:    { top_n: 500,  job_queue: :pvp_sync_blitz },
       default:       { top_n: 500,  job_queue: :default }
     }.freeze
 
-    # Brackets to skip entirely during discovery — redundant because their
-    # characters are fully covered by the per-spec brackets we already sync.
-    SKIP_BRACKETS = %w[shuffle-overall].freeze
+    # Brackets to skip entirely during discovery — redundant or dead.
+    # Classic RBG is dead (<5k entries, noisy data). Overalls are redundant
+    # because their characters are fully covered by the per-spec brackets.
+    # See discovery/pvp/rbg-brackets.ipynb.
+    SKIP_BRACKETS = %w[shuffle-overall blitz-overall rbg].freeze
 
     EXPLICIT = {}.freeze
 
@@ -30,8 +32,8 @@ module Pvp
           :three_v_three
         when "shuffle-overall", /\Ashuffle-/
           :shuffle_like
-        when "rbg", "blitz-overall", /\Ablitz-/
-          :rbg_like
+        when /\Ablitz-/
+          :blitz_like
         else
           :default
         end
