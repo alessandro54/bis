@@ -21,14 +21,10 @@ module Pvp
         entries = res.fetch("entries", [])
 
         bracket_config = Pvp::BracketConfig.for(bracket)
-        top_n      = bracket_config&.dig(:top_n)
-        rating_min = bracket_config&.dig(:rating_min)
+        top_n = bracket_config&.dig(:top_n)
 
-        # Primary limit: take top N entries (already sorted by rank from API)
+        # Take top N entries (already sorted by rank from API)
         entries = entries.first(top_n) if top_n
-
-        # Safety floor: filter by minimum rating
-        entries.select! { |entry| entry["rating"].to_i >= rating_min } if rating_min
 
         character_ids = []
 

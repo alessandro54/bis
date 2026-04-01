@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [staging, develop]
+    branches: [develop]
 
 env:
   RAILS_ENV: test

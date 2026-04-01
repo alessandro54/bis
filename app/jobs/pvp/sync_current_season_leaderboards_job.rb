@@ -8,6 +8,12 @@ module Pvp
 
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def perform(locale: "en_US")
+      begin
+        Blizzard::Data::PvpSeasons::SyncCurrentSeasonService.call
+      rescue => e # rubocop:disable Style/RescueStandardError
+        Rails.logger.warn("[SyncCurrentSeasonLeaderboardsJob] Season auto-detect failed: #{e.message}")
+      end
+
       season = PvpSeason.current
       return unless season
 
