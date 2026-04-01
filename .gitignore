@@ -60,3 +60,6 @@ rspec_failures.txt
 Thumbs.db
 
 .claude/
+
+# Discovery notebooks (exploratory analysis, not part of the app)
+/discovery/
