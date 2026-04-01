@@ -24,6 +24,11 @@ Sentry.init do |config|
   # Tag releases for tracking deploys
   config.release = ENV["GIT_SHA"] || `git rev-parse --short HEAD 2>/dev/null`.strip.presence
 
+  config.enabled_patches = [ :logger ]
+
+  # Enable sending logs to Sentry
+  config.enable_logs = true
+
   # Filter sensitive params
-  config.send_default_pii = false
+  config.send_default_pii = true
 end
