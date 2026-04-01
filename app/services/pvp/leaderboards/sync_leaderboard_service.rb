@@ -68,8 +68,7 @@ module Pvp
             region:        region
           )
 
-          bracket_spec_id  = Wow::Catalog.spec_id_from_bracket(bracket)
-          bracket_class_id = Wow::Catalog.class_id_for_spec(bracket_spec_id) if bracket_spec_id
+          bracket_spec_id = Wow::Catalog.spec_id_from_bracket(bracket)
 
           leaderboard.with_lock do
             now = Time.current
@@ -89,8 +88,7 @@ module Pvp
                 updated_at:         now
               }
 
-              record[:spec_id]  = bracket_spec_id  if bracket_spec_id
-              record[:class_id] = bracket_class_id if bracket_class_id
+              record[:spec_id] = bracket_spec_id if bracket_spec_id
               record
             end
 
@@ -103,7 +101,7 @@ module Pvp
 
             ActiveRecord::Base.transaction do
               update_cols = %i[rank rating wins losses snapshot_at]
-              update_cols.push(:spec_id, :class_id) if bracket_spec_id
+              update_cols.push(:spec_id) if bracket_spec_id
 
               # rubocop:disable Rails/SkipsModelValidations
               PvpLeaderboardEntry.upsert_all(
@@ -128,8 +126,6 @@ module Pvp
         )
 
         success(nil, context: { character_ids: character_ids, entry_count: entries.size })
-      rescue => e
-        failure(e)
       end
       # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 

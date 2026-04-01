@@ -103,6 +103,7 @@ module Pvp
           Rails.logger.error(
             "[SyncCurrentSeasonLeaderboardsJob] #{task[:region]}/#{task[:bracket]} failed: #{e.message}"
           )
+          Sentry.capture_exception(e, extra: { region: task[:region], bracket: task[:bracket] })
           nil
         end
 
