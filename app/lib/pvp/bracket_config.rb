@@ -1,43 +1,21 @@
 module Pvp
   module BracketConfig
+    # top_n is the sole limiter — no rating_min. This naturally adapts to season
+    # maturity: early season syncs fewer players (all available top), late season
+    # caps at the configured maximum. See discovery/pvp/all-brackets.ipynb.
     FAMILY_DEFAULTS = {
-      two_v_two:     {
-        top_n:      2500,
-        rating_min: 2200,
-        job_queue:  :pvp_sync_2v2
-      },
-      three_v_three: {
-        top_n:      2500,
-        rating_min: 2500,
-        job_queue:  :pvp_sync_3v3
-      },
-      shuffle_like:  {
-        top_n:      1000,
-        rating_min: 2000,
-        job_queue:  :pvp_sync_shuffle
-      },
-      rbg_like:      {
-        top_n:      1500,
-        rating_min: 2000,
-        job_queue:  :pvp_sync_rbg
-      },
-      default:       {
-        top_n:      500,
-        rating_min: 1800,
-        job_queue:  :default
-      }
+      two_v_two:     { top_n: 1000, job_queue: :pvp_sync_2v2 },
+      three_v_three: { top_n: 1000, job_queue: :pvp_sync_3v3 },
+      shuffle_like:  { top_n: 500,  job_queue: :pvp_sync_shuffle },
+      rbg_like:      { top_n: 500,  job_queue: :pvp_sync_rbg },
+      default:       { top_n: 500,  job_queue: :default }
     }.freeze
 
     # Brackets to skip entirely during discovery — redundant because their
     # characters are fully covered by the per-spec brackets we already sync.
     SKIP_BRACKETS = %w[shuffle-overall].freeze
 
-    EXPLICIT = {
-      # "2v2"                    => { top_n: 500, rating_min: 2050, job_queue: :pvp_sync_2v2_fast },
-      # "shuffle-overall"        => { top_n: 500, rating_min: 2450, job_queue: :pvp_sync_shuffle },
-      # "blitz-overall"          => { top_n: 500, rating_min: 2300, job_queue: :pvp_sync_rbg_fast },
-      # "shuffle-druid-balance"  => { top_n: 500, rating_min: 2500, job_queue: :pvp_sync_shuffle },
-    }.freeze
+    EXPLICIT = {}.freeze
 
     module_function
 

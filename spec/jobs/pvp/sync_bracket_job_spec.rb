@@ -225,11 +225,10 @@ RSpec.describe Pvp::SyncBracketJob, type: :job do
       end
     end
 
-    context "with rating filter" do
+    context "with top_n limit" do
       let(:bracket) { "3v3" }
 
       before do
-        # 3v3 has a rating_min of 2500
         api_response["entries"] << {
           "character" => {
             "id" => 11_111,
@@ -238,17 +237,17 @@ RSpec.describe Pvp::SyncBracketJob, type: :job do
           },
           "faction" => { "type" => "HORDE" },
           "rank" => 100,
-          "rating" => 1500, # Below 2500 threshold
+          "rating" => 1500,
           "season_match_statistics" => { "won" => 50, "lost" => 50 }
         }
       end
 
-      it "filters out entries below the rating threshold" do
+      it "includes all entries within top_n (no rating floor)" do
         perform_job
 
-        # Should only have 2 entries (the ones with 2400 and 2350 rating)
-        expect(PvpLeaderboardEntry.count).to eq(2)
-        expect(Character.find_by(blizzard_id: 11_111)).to be_nil
+        # All 3 entries should be synced — top_n=1000 is well above 3
+        expect(PvpLeaderboardEntry.count).to eq(3)
+        expect(Character.find_by(blizzard_id: 11_111)).to be_present
       end
     end
 
