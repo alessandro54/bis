@@ -1,12 +1,15 @@
 class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
+  before_action :validate_params!
+
   # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def index
     cache_key = meta_cache_key("talents", bracket_param, spec_id_param, locale_param)
 
     json = meta_cache_fetch(cache_key) do
+      season = meta_season_for(PvpMetaTalentPopularity)
       records = PvpMetaTalentPopularity
         .includes(talent: :translations)
-        .where(pvp_season: current_season)
+        .where(pvp_season: season)
         .where(bracket: bracket_param)
         .where(spec_id: spec_id_param)
         .order(usage_pct: :desc)
@@ -84,7 +87,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
     def count_raw_players
       PvpLeaderboardEntry
         .joins(:pvp_leaderboard)
-        .where(pvp_leaderboards: { pvp_season_id: current_season.id, bracket: bracket_param })
+        .where(pvp_leaderboards: { pvp_season_id: meta_season_for(PvpMetaTalentPopularity).id, bracket: bracket_param })
         .where(spec_id: spec_id_param)
         .where.not(specialization_processed_at: nil)
         .select(:character_id).distinct.count
@@ -156,11 +159,16 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
       }
     end
 
+    def validate_params!
+      validate_bracket!(params.require(:bracket)) or return
+      validate_spec_id!(params.require(:spec_id)) or return
+    end
+
     def bracket_param
-      params.require(:bracket)
+      @bracket_param ||= params.require(:bracket)
     end
 
     def spec_id_param
-      params.require(:spec_id).to_i
+      @spec_id_param ||= params.require(:spec_id).to_i
     end
 end

@@ -282,6 +282,107 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
   end
 
   # ═══════════════════════════════════════════════════════════════════════════
+  # Cross-bracket deduplication
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  describe "cross-bracket character deduplication" do
+    # Jw (Subtlety Rogue, spec_id=261) appears on both shuffle and blitz
+    # leaderboards. The sync should only call the Blizzard equipment/talent
+    # APIs once per character, then propagate data to all entries.
+
+    before do
+      clear_enqueued_jobs
+
+      # Discover: US returns shuffle + blitz brackets with the same character
+      allow(Blizzard::Api::GameData::PvpSeason::LeaderboardsIndex)
+        .to receive(:fetch)
+        .with(hash_including(region: "us"))
+        .and_return({
+          "leaderboards" => [
+            { "name" => "shuffle-rogue-subtlety" },
+            { "name" => "blitz-rogue-subtlety" }
+          ]
+        })
+
+      allow(Blizzard::Api::GameData::PvpSeason::LeaderboardsIndex)
+        .to receive(:fetch)
+        .with(hash_including(region: "eu"))
+        .and_return({ "leaderboards" => [] })
+
+      # Same character (Jw) appears on both leaderboards
+      jw_entry = {
+        "character" => { "id" => 177_763_085, "name" => "Jw", "realm" => { "slug" => "malorne" } },
+        "faction" => { "type" => "ALLIANCE" },
+        "rank" => 1,
+        "rating" => 2800,
+        "season_match_statistics" => { "won" => 200, "lost" => 50 }
+      }
+
+      allow(Blizzard::Api::GameData::PvpSeason::Leaderboard)
+        .to receive(:fetch)
+        .with(hash_including(bracket: "shuffle-rogue-subtlety"))
+        .and_return({ "entries" => [ jw_entry ] })
+
+      allow(Blizzard::Api::GameData::PvpSeason::Leaderboard)
+        .to receive(:fetch)
+        .with(hash_including(bracket: "blitz-rogue-subtlety"))
+        .and_return({ "entries" => [ jw_entry.merge("rating" => 2600, "rank" => 5) ] })
+
+      # Equipment + talent stubs
+      allow(Blizzard::Api::Profile::CharacterEquipmentSummary)
+        .to receive(:fetch_with_last_modified)
+        .with(hash_including(realm: "malorne"))
+        .and_return([ jw_equipment, "Wed, 01 Jan 2026 12:00:00 GMT", true ])
+
+      allow(Blizzard::Api::Profile::CharacterSpecializationSummary)
+        .to receive(:fetch_with_last_modified)
+        .with(hash_including(realm: "malorne"))
+        .and_return([ jw_specialization, "Wed, 01 Jan 2026 12:00:00 GMT", true ])
+
+      allow(::Characters::SyncCharacterMetaBatchJob).to receive(:perform_later)
+      allow(Pvp::BuildAggregationsJob).to receive(:perform_later)
+    end
+
+    it "creates one character with entries on both leaderboards but fetches equipment only once" do
+      # Phase 1
+      Pvp::SyncCurrentSeasonLeaderboardsJob.perform_now
+
+      expect(Character.count).to eq(1)
+      expect(PvpLeaderboard.count).to eq(2)
+      expect(PvpLeaderboardEntry.count).to eq(2)
+
+      jw = Character.find_by!(name: "Jw")
+      shuffle_entry = PvpLeaderboardEntry.joins(:pvp_leaderboard)
+                        .find_by(pvp_leaderboards: { bracket: "shuffle-rogue-subtlety" })
+      blitz_entry = PvpLeaderboardEntry.joins(:pvp_leaderboard)
+                      .find_by(pvp_leaderboards: { bracket: "blitz-rogue-subtlety" })
+
+      expect(shuffle_entry.rating).to eq(2800)
+      expect(blitz_entry.rating).to eq(2600)
+
+      # Phase 2 — verify equipment is fetched exactly once for both brackets
+      Pvp::SyncCharacterBatchJob.perform_now(
+        character_ids: [ jw.id ],
+        locale:        "en_US",
+        sync_cycle_id: PvpSyncCycle.last.id
+      )
+
+      # Both entries should be fully processed from a single API call
+      [ shuffle_entry, blitz_entry ].each do |entry|
+        entry.reload
+        expect(entry.equipment_processed_at).to be_present,
+          "#{entry.pvp_leaderboard.bracket} entry missing equipment_processed_at"
+        expect(entry.specialization_processed_at).to be_present,
+          "#{entry.pvp_leaderboard.bracket} entry missing specialization_processed_at"
+        expect(entry.spec_id).to eq(261),
+          "#{entry.pvp_leaderboard.bracket} entry should have spec_id=261 (Subtlety)"
+        expect(entry.item_level).to be_present,
+          "#{entry.pvp_leaderboard.bracket} entry missing item_level"
+      end
+    end
+  end
+
+  # ═══════════════════════════════════════════════════════════════════════════
   # Full end-to-end: both phases in sequence
   # ═══════════════════════════════════════════════════════════════════════════
 

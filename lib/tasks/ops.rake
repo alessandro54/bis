@@ -25,6 +25,12 @@ namespace :ops do
     puts "✓ App restarted."
   end
 
+  desc "Open a Rails console on production"
+  task :console do
+    ssh_host = ENV.fetch("DOKKU_SSH_HOST") { abort "Set DOKKU_SSH_HOST in .env" }
+    exec "ssh -t alessandro@#{ssh_host} 'dokku enter #{dokku_app} web.1 bin/rails console'"
+  end
+
   namespace :cache do
     desc "Clear the SolidCache store on the remote production app"
     task clear: :environment do

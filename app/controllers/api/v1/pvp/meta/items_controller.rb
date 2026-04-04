@@ -1,12 +1,15 @@
 class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
+  before_action :validate_params!
+
   # rubocop:disable Metrics/AbcSize
   def index
     cache_key = meta_cache_key("items", bracket_param, spec_id_param, slot_param, locale_param)
 
     json = meta_cache_fetch(cache_key) do
+      season = meta_season_for(PvpMetaItemPopularity)
       items = PvpMetaItemPopularity
         .includes(item: :translations)
-        .where(pvp_season: current_season)
+        .where(pvp_season: season)
         .where(bracket: bracket_param)
         .where(spec_id: spec_id_param)
         .order(usage_pct: :desc)
@@ -56,7 +59,7 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
 
       rows = CharacterItem
         .joins(character: { pvp_leaderboard_entries: :pvp_leaderboard })
-        .where(pvp_leaderboards: { bracket: bracket_param, pvp_season: current_season })
+        .where(pvp_leaderboards: { bracket: bracket_param, pvp_season: season })
         .where(pvp_leaderboard_entries: { spec_id: spec_id_param })
         .where(item_id: item_ids)
         .where("crafting_stats <> '{}'")
@@ -71,22 +74,27 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
       result
     end
 
+    def validate_params!
+      validate_bracket!(params.require(:bracket)) or return
+      validate_spec_id!(params.require(:spec_id)) or return
+    end
+
     def bracket_param
-      params.require(:bracket)
+      @bracket_param ||= params.require(:bracket)
     end
 
     def spec_id_param
-      params.require(:spec_id).to_i
+      @spec_id_param ||= params.require(:spec_id).to_i
     end
 
     def slot_param
-      params[:slot]
+      @slot_param ||= validate_slot(params[:slot])
     end
 
     def enqueue_unsynced_items
       items = PvpMetaItemPopularity
         .includes(:item)
-        .where(pvp_season: current_season, bracket: bracket_param, spec_id: spec_id_param)
+        .where(pvp_season: meta_season_for(PvpMetaItemPopularity), bracket: bracket_param, spec_id: spec_id_param)
 
       unsynced_ids = items.map(&:item).reject(&:meta_synced?).map(&:id)
       Items::SyncItemMetaBatchJob.perform_later(item_ids: unsynced_ids) if unsynced_ids.any?

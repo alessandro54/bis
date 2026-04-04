@@ -23,6 +23,10 @@ default: &default
   #   per_thread = floor(DB_POOL / PVP_SYNC_THREADS) - 1
   #   e.g. 8 threads, pool=130 → per_thread=15 → 120 peak connections ✓
   pool: <%= ENV.fetch("DB_POOL") { 130 } %>
+  host: <%= ENV.fetch("DB_HOST", "localhost") %>
+  port: <%= ENV.fetch("DB_PORT", 5432) %>
+  username: <%= ENV.fetch("POSTGRES_USER", nil) %>
+  password: <%= ENV.fetch("POSTGRES_PASSWORD", nil) %>
 
 
 development:
