@@ -1,4 +1,6 @@
 class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
+  before_action :validate_params!
+
   # rubocop:disable Metrics/AbcSize
   def index
     cache_key = meta_cache_key("enchants", bracket_param, spec_id_param, slot_param, locale_param)
@@ -22,30 +24,37 @@ class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
   end
   # rubocop:enable Metrics/AbcSize
 
-  def serialize_enchant(record)
-    {
-      id:          record.id,
-      enchantment: {
-        id:          record.enchantment.id,
-        blizzard_id: record.enchantment.blizzard_id,
-        name:        record.enchantment.t("name", locale: locale_param)
-      },
-      slot:        record.slot,
-      usage_count: record.usage_count,
-      usage_pct:   record.usage_pct.to_f,
-      snapshot_at: record.snapshot_at
-    }
-  end
+  private
 
-  def bracket_param
-    params.require(:bracket)
-  end
+    def serialize_enchant(record)
+      {
+        id:          record.id,
+        enchantment: {
+          id:          record.enchantment.id,
+          blizzard_id: record.enchantment.blizzard_id,
+          name:        record.enchantment.t("name", locale: locale_param)
+        },
+        slot:        record.slot,
+        usage_count: record.usage_count,
+        usage_pct:   record.usage_pct.to_f,
+        snapshot_at: record.snapshot_at
+      }
+    end
 
-  def spec_id_param
-    params.require(:spec_id).to_i
-  end
+    def validate_params!
+      validate_bracket!(params.require(:bracket)) or return
+      validate_spec_id!(params.require(:spec_id)) or return
+    end
 
-  def slot_param
-    params[:slot]
-  end
+    def bracket_param
+      @bracket_param ||= params.require(:bracket)
+    end
+
+    def spec_id_param
+      @spec_id_param ||= params.require(:spec_id).to_i
+    end
+
+    def slot_param
+      @slot_param ||= validate_slot(params[:slot])
+    end
 end

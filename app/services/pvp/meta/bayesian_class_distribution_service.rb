@@ -16,15 +16,27 @@ module Pvp
       MIN_PLAYERS = 3
 
       # Role-dependent scoring weights: [rating, winrate, presence]
-      # Presence (log-transformed) is the most reliable signal on sparse ladders.
+      # Presence (log-transformed) is the most reliable signal on shared ladders (arena).
       # Winrate is least reliable — MMR forces everyone toward 50% over time.
-      # Healer: presence is heavily indicative of actual power (bottleneck effect)
-      ROLE_WEIGHTS = {
+      # Healer: presence is heavily indicative of actual power (bottleneck effect).
+      #
+      # Shuffle/Blitz have per-spec ladders so presence is meaningless (~equal for all).
+      # Use performance-only weights for those brackets.
+      ARENA_WEIGHTS = {
         dps:    { rating: 0.40, winrate: 0.15, presence: 0.45 },
         healer: { rating: 0.25, winrate: 0.15, presence: 0.60 },
         tank:   { rating: 0.25, winrate: 0.15, presence: 0.60 }
       }.freeze
-      DEFAULT_WEIGHTS = { rating: 0.40, winrate: 0.15, presence: 0.45 }.freeze
+
+      SOLO_WEIGHTS = {
+        dps:    { rating: 0.65, winrate: 0.35, presence: 0.0 },
+        healer: { rating: 0.55, winrate: 0.45, presence: 0.0 },
+        tank:   { rating: 0.55, winrate: 0.45, presence: 0.0 }
+      }.freeze
+
+      DEFAULT_WEIGHTS = ARENA_WEIGHTS[:dps].freeze
+
+      SOLO_BRACKETS = %w[shuffle-overall blitz-overall].freeze
 
       def initialize(season:, bracket:, region:, role: nil)
         @season  = season
@@ -64,7 +76,7 @@ module Pvp
         def load_entries
           scope = PvpLeaderboardEntry
             .joins(:pvp_leaderboard)
-            .where(pvp_leaderboards: { pvp_season_id: season.id, bracket: bracket })
+            .merge(PvpLeaderboard.where(pvp_season_id: season.id).for_bracket(bracket))
             .where.not(spec_id: nil, rating: nil)
 
           scope = scope.where(pvp_leaderboards: { region: region }) if region
@@ -209,7 +221,8 @@ module Pvp
             # Hybrid scoring: B_k penalizes inferred performance metrics (rating,
             # winrate) which are subject to high variance at low sample sizes.
             # Presence is an observed fact — no confidence penalty needed.
-            weights = ROLE_WEIGHTS.fetch(row[:role], DEFAULT_WEIGHTS)
+            weight_table = SOLO_BRACKETS.include?(bracket) ? SOLO_WEIGHTS : ARENA_WEIGHTS
+            weights = weight_table.fetch(row[:role], DEFAULT_WEIGHTS)
             performance = norm_r * weights[:rating] + norm_w * weights[:winrate]
             row[:score] = (performance * row[:b_k] + norm_p * weights[:presence]).round(4)
           end

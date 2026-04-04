@@ -102,6 +102,32 @@ RSpec.describe PvpLeaderboard, type: :model do
   end
 
 
+  describe '.for_bracket' do
+    let(:season) { create_test_season }
+
+    let!(:lb_2v2) { create_test_leaderboard(pvp_season: season, bracket: '2v2', region: 'us') }
+    let!(:lb_blitz_sub) { create_test_leaderboard(pvp_season: season, bracket: 'blitz-rogue-subtlety', region: 'us') }
+    let!(:lb_blitz_fire) { create_test_leaderboard(pvp_season: season, bracket: 'blitz-mage-fire', region: 'us') }
+    let!(:lb_shuffle_sub) {
+ create_test_leaderboard(pvp_season: season, bracket: 'shuffle-rogue-subtlety', region: 'us') }
+
+    it 'matches exact bracket for standard brackets' do
+      expect(PvpLeaderboard.for_bracket('2v2')).to contain_exactly(lb_2v2)
+    end
+
+    it 'matches all blitz brackets for blitz-overall' do
+      expect(PvpLeaderboard.for_bracket('blitz-overall')).to contain_exactly(lb_blitz_sub, lb_blitz_fire)
+    end
+
+    it 'matches all shuffle brackets for shuffle-overall' do
+      expect(PvpLeaderboard.for_bracket('shuffle-overall')).to contain_exactly(lb_shuffle_sub)
+    end
+
+    it 'does not mix blitz and shuffle' do
+      expect(PvpLeaderboard.for_bracket('blitz-overall')).not_to include(lb_shuffle_sub)
+    end
+  end
+
   describe 'last_synced_at functionality' do
     let(:leaderboard) { create(:pvp_leaderboard, last_synced_at: nil) }
 

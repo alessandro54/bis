@@ -1,4 +1,6 @@
 class Api::V1::Pvp::Meta::StatPriorityController < Api::V1::BaseController
+  before_action :validate_params!
+
   # GET /api/v1/pvp/meta/stat_priority
   # Returns secondary stat priority as median in-game percentages across
   # top players in the given bracket + spec.
@@ -49,11 +51,16 @@ class Api::V1::Pvp::Meta::StatPriorityController < Api::V1::BaseController
     end
     # rubocop:enable Metrics/AbcSize
 
+    def validate_params!
+      validate_bracket!(params.require(:bracket)) or return
+      validate_spec_id!(params.require(:spec_id)) or return
+    end
+
     def bracket_param
-      params.require(:bracket)
+      @bracket_param ||= params.require(:bracket)
     end
 
     def spec_id_param
-      params.require(:spec_id).to_i
+      @spec_id_param ||= params.require(:spec_id).to_i
     end
 end

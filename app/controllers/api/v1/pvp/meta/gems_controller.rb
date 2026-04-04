@@ -1,4 +1,6 @@
 class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
+  before_action :validate_params!
+
   # rubocop:disable Metrics/AbcSize
   def index
     cache_key = meta_cache_key("gems", bracket_param, spec_id_param, slot_param, socket_type_param, locale_param)
@@ -43,19 +45,24 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
       }
     end
 
+    def validate_params!
+      validate_bracket!(params.require(:bracket)) or return
+      validate_spec_id!(params.require(:spec_id)) or return
+    end
+
     def bracket_param
-      params.require(:bracket)
+      @bracket_param ||= params.require(:bracket)
     end
 
     def spec_id_param
-      params.require(:spec_id).to_i
+      @spec_id_param ||= params.require(:spec_id).to_i
     end
 
     def slot_param
-      params[:slot]
+      @slot_param ||= validate_slot(params[:slot])
     end
 
     def socket_type_param
-      params[:socket_type]
+      @socket_type_param ||= validate_slot(params[:socket_type])
     end
 end

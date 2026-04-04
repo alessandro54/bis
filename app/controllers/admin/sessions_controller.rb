@@ -4,7 +4,9 @@ module Admin
     def new; end
 
     def create
-      if ActiveSupport::SecurityUtils.secure_compare(params[:password], Rails.application.credentials.admin_password)
+      stored_password = Rails.application.credentials.admin_password
+      if stored_password.present? &&
+         ActiveSupport::SecurityUtils.secure_compare(params[:password].to_s, stored_password)
         session[:admin_authenticated] = true
         redirect_to session.delete(:return_to) || "/jobs"
       else

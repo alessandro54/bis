@@ -42,6 +42,8 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
   # Only includes players whose equipment was processed for this spec within
   # the current season window — once a player switches specs,
   # equipment_processed_at stops being refreshed for their old-spec entry.
+  before_action :validate_params!
+
   def index
     regions   = region_params
     cache_key = meta_cache_key("top_players", bracket_param, spec_id_param, regions.join("+"))
@@ -64,17 +66,22 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
 
   private
 
+    def validate_params!
+      validate_bracket!(params.require(:bracket)) or return
+      validate_spec_id!(params.require(:spec_id)) or return
+    end
+
     def bracket_param
-      params.require(:bracket)
+      @bracket_param ||= params.require(:bracket)
     end
 
     def spec_id_param
-      params.require(:spec_id).to_i
+      @spec_id_param ||= params.require(:spec_id).to_i
     end
 
     def region_params
-      if params[:region].present?
-        Array(params[:region])
+      @region_params ||= if params[:region].present?
+        Array(params[:region]).select { |r| validate_region(r) }
       else
         DEFAULT_REGIONS
       end

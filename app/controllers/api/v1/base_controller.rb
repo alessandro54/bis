@@ -4,6 +4,43 @@ class Api::V1::BaseController < ApplicationController
     META_CACHE_TTL = 30.minutes
     META_CACHE_VERSION_KEY = "pvp_meta/version"
 
+    VALID_BRACKET_PATTERN = /\A[a-z0-9\-]{1,60}\z/
+    VALID_REGIONS = (Pvp::RegionConfig::REGIONS + [ nil ]).freeze
+    VALID_ROLES   = %w[dps healer tank].freeze
+    VALID_SLOT_PATTERN = /\A[a-z_]{1,30}\z/
+    VALID_SPEC_IDS = Wow::Catalog::SPECS.keys.to_set.freeze
+
+    def validate_bracket!(value)
+      unless value.match?(VALID_BRACKET_PATTERN)
+        render json: { error: "invalid bracket" }, status: :bad_request
+        return nil
+      end
+      value
+    end
+
+    def validate_spec_id!(value)
+      id = value.to_i
+      unless VALID_SPEC_IDS.include?(id)
+        render json: { error: "invalid spec_id" }, status: :bad_request
+        return nil
+      end
+      id
+    end
+
+    def validate_region(value)
+      VALID_REGIONS.include?(value) ? value : nil
+    end
+
+    def validate_role(value)
+      VALID_ROLES.include?(value) ? value : nil
+    end
+
+    def validate_slot(value)
+      return nil if value.blank?
+
+      value.match?(VALID_SLOT_PATTERN) ? value : nil
+    end
+
     # Builds a versioned cache key so all meta caches can be busted at once
     # by incrementing the version.
     def meta_cache_key(*segments)
