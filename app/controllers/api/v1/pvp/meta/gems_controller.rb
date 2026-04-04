@@ -4,9 +4,10 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
     cache_key = meta_cache_key("gems", bracket_param, spec_id_param, slot_param, socket_type_param, locale_param)
 
     json = meta_cache_fetch(cache_key) do
+      season = meta_season_for(PvpMetaGemPopularity)
       gems = PvpMetaGemPopularity
         .includes(item: :translations)
-        .where(pvp_season: current_season)
+        .where(pvp_season: season)
         .where(bracket: bracket_param)
         .where(spec_id: spec_id_param)
         .order(usage_pct: :desc)

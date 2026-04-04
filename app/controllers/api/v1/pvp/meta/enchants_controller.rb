@@ -4,9 +4,10 @@ class Api::V1::Pvp::Meta::EnchantsController < Api::V1::BaseController
     cache_key = meta_cache_key("enchants", bracket_param, spec_id_param, slot_param, locale_param)
 
     json = meta_cache_fetch(cache_key) do
+      season = meta_season_for(PvpMetaEnchantPopularity)
       enchants = PvpMetaEnchantPopularity
         .includes(enchantment: :translations)
-        .where(pvp_season: current_season)
+        .where(pvp_season: season)
         .where(bracket: bracket_param)
         .where(spec_id: spec_id_param)
         .order(usage_pct: :desc)

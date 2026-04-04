@@ -4,8 +4,8 @@ module Pvp
     # maturity: early season syncs fewer players (all available top), late season
     # caps at the configured maximum. See discovery/pvp/all-brackets.ipynb.
     FAMILY_DEFAULTS = {
-      two_v_two:     { top_n: 1000, job_queue: :pvp_sync_2v2 },
-      three_v_three: { top_n: 1000, job_queue: :pvp_sync_3v3 },
+      two_v_two:     { top_n: 2500, job_queue: :pvp_sync_2v2 },
+      three_v_three: { top_n: 2500, job_queue: :pvp_sync_3v3 },
       shuffle_like:  { top_n: 500,  job_queue: :pvp_sync_shuffle },
       blitz_like:    { top_n: 500,  job_queue: :pvp_sync_blitz },
       default:       { top_n: 500,  job_queue: :default }

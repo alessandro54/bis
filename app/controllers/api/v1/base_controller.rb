@@ -28,6 +28,22 @@ class Api::V1::BaseController < ApplicationController
       @current_season ||= PvpSeason.current
     end
 
+    # Returns the current season if it has aggregation data, otherwise falls
+    # back to the most recent season that does. This prevents empty responses
+    # during the first sync cycle of a new season.
+    def meta_season_for(model_class)
+      @meta_seasons ||= {}
+      @meta_seasons[model_class] ||= begin
+        if model_class.exists?(pvp_season_id: current_season.id)
+          current_season
+        else
+          PvpSeason.where.not(id: current_season.id)
+                   .order(blizzard_id: :desc)
+                   .detect { |s| model_class.exists?(pvp_season_id: s.id) } || current_season
+        end
+      end
+    end
+
     def locale_param
       loc = params[:locale]
       Wow::Locales::SUPPORTED_LOCALES.include?(loc) ? loc : "en_US"

@@ -3,17 +3,23 @@ module Api
     module Pvp
       module Meta
         class ClassDistributionsController < BaseController
-          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+          # rubocop:disable Metrics/AbcSize, Metrics/MethodLength, Layout/LineLength
           def show
-            season  = PvpSeason.find_by!(blizzard_id: params.fetch(:season_id).to_i)
+            season  = params[:season_id].present? ? PvpSeason.find_by!(blizzard_id: params[:season_id].to_i) : current_season
             bracket = params.fetch(:bracket)
-            region  = params.fetch(:region, "us")
+            region  = params.fetch(:region, "all")
+            region  = nil if region == "all"
             role    = params[:role] || :dps
 
-            cache_key = meta_cache_key("class_distribution", season.blizzard_id, bracket, region, role)
+            model = params[:new_model] == "true" ? :bayesian : :legacy
+            cache_key = meta_cache_key("class_distribution", model, season.blizzard_id, bracket, region, role)
 
             json = meta_cache_fetch(cache_key) do
-              distribution = ::Pvp::Meta::ClassDistributionService.new(
+              service_class = model == :bayesian ?
+                ::Pvp::Meta::BayesianClassDistributionService :
+                ::Pvp::Meta::ClassDistributionService
+
+              distribution = service_class.new(
                 role:    role,
                 season:  season,
                 bracket: bracket,
@@ -23,7 +29,7 @@ module Api
               {
                 season_id:     season.blizzard_id,
                 bracket:       bracket,
-                region:        region,
+                region:        region || "all",
                 total_entries: distribution.sum { |row| row[:count] },
                 classes:       distribution
               }
@@ -32,7 +38,7 @@ module Api
             render json: json
             set_cache_headers
           end
-          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+          # rubocop:enable Metrics/AbcSize, Metrics/MethodLength, Layout/LineLength
         end
       end
     end
