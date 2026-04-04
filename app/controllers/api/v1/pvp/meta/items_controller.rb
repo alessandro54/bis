@@ -17,7 +17,7 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
       items = items.where(slot: slot_param) if slot_param.present?
 
       item_ids = items.map(&:item_id)
-      crafting_map = crafting_stats_for(item_ids)
+      crafting_map = crafting_stats_for(item_ids, season)
 
       items.map { |record| serialize_item(record, crafting_map) }
     end
@@ -54,7 +54,7 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
     # rubocop:enable Metrics/AbcSize
 
     # Returns a map of item_id => most popular crafting_stats array for crafted items only.
-    def crafting_stats_for(item_ids)
+    def crafting_stats_for(item_ids, season)
       return {} if item_ids.empty?
 
       rows = CharacterItem
