@@ -30,7 +30,7 @@ gem "openssl"
 gem "pg", "~> 1.6"
 
 # Production web server
-gem "puma", "~> 7.1"
+gem "puma", "~> 8.0"
 gem "thruster", require: false
 
 # Rack-level request throttling and blocking
