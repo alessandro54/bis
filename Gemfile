@@ -101,7 +101,7 @@ end
 
 group :test do
   gem "database_cleaner-active_record", "~> 2.2"
-  gem "faker", "~> 3.5"
+  gem "faker", "~> 3.7"
   gem "shoulda-matchers", "~> 7.0"
   gem "simplecov", "~> 0.22", require: false
 end
