@@ -12,7 +12,7 @@ gem "bootsnap", "~> 1.19", require: false
 gem "async", "~> 2.21"
 
 # HTTP client
-gem "httpx", "~> 1.6"
+gem "httpx", "~> 1.7"
 
 # Mission Control UI for jobs
 gem "mission_control-jobs", "~> 1.1"
