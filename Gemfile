@@ -9,10 +9,10 @@ gem "rails", "~> 8.1.1"
 gem "bootsnap", "~> 1.19", require: false
 
 # Fiber-based cooperative concurrency (replaces thread pools)
-gem "async", "~> 2.21"
+gem "async", "~> 2.39"
 
 # HTTP client
-gem "httpx", "~> 1.6"
+gem "httpx", "~> 1.7"
 
 # Mission Control UI for jobs
 gem "mission_control-jobs", "~> 1.1"
@@ -21,7 +21,7 @@ gem "mission_control-jobs", "~> 1.1"
 gem "lograge", "~> 0.14"
 
 # Fast, optimized JSON parser/serializer
-gem "oj", "~> 3.16"
+gem "oj", "~> 3.17"
 
 # Explicit OpenSSL dependency (fix macOS SSL issues)
 gem "openssl"
@@ -30,7 +30,7 @@ gem "openssl"
 gem "pg", "~> 1.6"
 
 # Production web server
-gem "puma", "~> 7.1"
+gem "puma", "~> 8.0"
 gem "thruster", require: false
 
 # Rack-level request throttling and blocking
@@ -101,7 +101,7 @@ end
 
 group :test do
   gem "database_cleaner-active_record", "~> 2.2"
-  gem "faker", "~> 3.5"
+  gem "faker", "~> 3.8"
   gem "shoulda-matchers", "~> 7.0"
   gem "simplecov", "~> 0.22", require: false
 end
