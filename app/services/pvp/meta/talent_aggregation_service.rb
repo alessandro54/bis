@@ -6,10 +6,11 @@ module Pvp
 
       TOP_N = ENV.fetch("PVP_META_TOP_N", 1000).to_i
 
-      # Tier thresholds (usage_pct) — raw classification before budget logic
-      BIS_THRESHOLD          = 75.0
-      SITUATIONAL_THRESHOLD  = 50.0
-      COMMON_THRESHOLD       = 35.0
+      # Fallback thresholds used when Jenks cannot find natural breaks
+      # (e.g. fewer than k+1 distinct usage values in the group).
+      BIS_THRESHOLD         = 75.0
+      SITUATIONAL_THRESHOLD = 50.0
+      COMMON_THRESHOLD      = 35.0
 
       # Budget per tree type (talent points available)
       TREE_BUDGETS = { "class" => 34, "spec" => 34, "hero" => 10 }.freeze
@@ -280,7 +281,7 @@ module Pvp
               primary["default_points"] = group.map { |r| r["default_points"].to_i }.max
               primary["in_top_build"]   = group.any? { |r| r["in_top_build"] }
               non_zero                  = group.map { |r| r["top_build_rank"].to_i }.select { |r| r > 0 }
-              primary["top_build_rank"] = non_zero.min || 0
+              primary["top_build_rank"] = non_zero.max || 0
               [ primary ]
             end
         end
@@ -355,14 +356,16 @@ module Pvp
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
-        # ── Budget-aware tier assignment ─────────────────────────────────
+        # ── Tier assignment ──────────────────────────────────────────────
         #
         # For each (bracket, spec, talent_type) group:
         #
         #   Hero trees  → selected sub-tree all BiS, off-tree situational/common
-        #   Class/Spec  → fill BiS by best efficiency (pct / cost), then situational
+        #   Class/Spec  → in_top_build nodes → BiS (budget always fully spent because
+        #                 the top-build fingerprint is a real player's complete 34-pt build,
+        #                 so all prerequisite nodes are included automatically);
+        #                 non-top-build nodes with pct ≥ SITUATIONAL_THRESHOLD → situational
         #
-        # Prereqs are OR: a node locked by [A, B, C] only needs ONE satisfied.
         # Choice nodes: primary talent gets node tier, alternatives demoted one level.
         #
         def apply_budget_tiers(rows)
@@ -375,7 +378,11 @@ module Pvp
 
           groups.each do |(_, _, talent_type), group_rows|
             budget = TREE_BUDGETS[talent_type]
-            next unless budget
+
+            unless budget
+              assign_pvp_tiers(group_rows)
+              next
+            end
 
             node_rows = build_node_rows(group_rows)
 
@@ -403,115 +410,170 @@ module Pvp
           node_rows
         end
 
-        # Per-node cost/usage metadata. Cost = max_rank - default_points (spec-specific).
-        def build_node_meta(node_rows)
-          node_meta = {}
-          node_rows.each do |node_id, node_group|
-            primary = primary_talent(node_group)
-            info = @talent_info[primary["talent_id"]]
-            next unless info
-
-            dp   = primary["default_points"].to_i
-            cost = [ info[:max_rank] - dp, 0 ].max
-            node_meta[node_id] = { cost: cost, pct: primary["usage_pct"].to_f, free: cost == 0 }
-          end
-          node_meta
-        end
-
         # The highest-usage talent on a node (the "pick" for choice nodes).
         def primary_talent(node_group)
           node_group.max_by { |r| r["usage_pct"].to_f }
         end
 
-        # ── Class/Spec tree budget fill ─────────────────────────────────
+        # ── Class/Spec tree tier assignment ─────────────────────────────
 
-        def assign_tree_tiers(node_rows, budget)
-          node_meta = build_node_meta(node_rows)
-
-          bis_node_ids = collect_free_nodes(node_meta)
-          bis_spent    = fill_by_efficiency(bis_node_ids, node_meta, budget, SITUATIONAL_THRESHOLD)
-
-          remaining    = budget - bis_spent
-          sit_node_ids = Set.new
-          fill_by_efficiency(sit_node_ids, node_meta, remaining, COMMON_THRESHOLD, already: bis_node_ids)
-
-          write_tiers(node_rows, bis_node_ids, sit_node_ids)
-        end
-
-        # Free nodes (default_points >= max_rank) cost nothing — always BiS.
-        def collect_free_nodes(node_meta)
-          free = Set.new
-          node_meta.each { |nid, m| free.add(nid) if m[:free] }
-          free
-        end
-
-        # Iteratively pick the candidate with best efficiency = pct / chain_cost.
-        # Recalculates each round because shared prereqs change costs.
-        # Returns total points spent.
-        def fill_by_efficiency(selected, node_meta, budget, threshold, already: Set.new)
-          spent = 0
-          combined = already | selected
-
-          loop do
-            pick = best_efficiency_pick(combined, node_meta, budget - spent, threshold)
-            break unless pick
-
-            select_node_with_prereqs(pick[:node_id], selected, node_meta, exclude: already)
-            combined = already | selected
-            spent += pick[:cost]
-          end
-
-          spent
-        end
-
-        # Find the unselected node with highest pct/cost ratio that fits in remaining budget.
         # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-        def best_efficiency_pick(selected, node_meta, remaining, threshold)
-          best = nil
+        # BiS = highest-usage in_top_build nodes that fit within the budget.
+        # Overflow in_top_build nodes (snapshot-merge inflation from patch changes)
+        # drop into the Jenks pool and get classified by usage like any non-top-build node.
+        def assign_tree_tiers(node_rows, budget)
+          top_build_nodes = node_rows
+            .select { |_, group| group.any? { |r| r["in_top_build"] } }
+            .sort_by { |_, group| -primary_talent(group)["usage_pct"].to_f }
 
-          node_meta.each do |nid, m|
-            next if selected.include?(nid) || m[:pct] < threshold
+          bis_nodes = Set.new
+          remaining = budget
 
-            cost = cheapest_path_cost(nid, selected, node_meta)
+          top_build_nodes.each do |node_id, group|
+            cost = @talent_info.dig(primary_talent(group)["talent_id"], :max_rank) || 1
             next if cost > remaining
 
-            eff = cost == 0 ? Float::INFINITY : m[:pct] / cost
-
-            if best.nil? || eff > best[:eff] || (eff == best[:eff] && m[:pct] > best[:pct])
-              best = { node_id: nid, cost: cost, eff: eff, pct: m[:pct] }
-            end
+            bis_nodes.add(node_id)
+            remaining -= cost
           end
 
-          best
+          non_bis_usages = node_rows
+            .reject { |node_id, _| bis_nodes.include?(node_id) }
+            .map    { |_, group| primary_talent(group)["usage_pct"].to_f }
+
+          # Situational = genuinely competes with BIS nodes.
+          # Threshold is half the weakest BIS node's usage: if lowest BIS is at 60%,
+          # non-BIS nodes at 42% are real alternatives (same ballpark → situational).
+          # If all BIS are at 90%+, anything below 45% is a fringe pick → common.
+          # Jenks is skipped here — it creates artificial gaps between near-equal values
+          # (e.g. 47% vs 42% get split even though both are genuine situational picks).
+          # When no BIS exists (budget=0), fall back to SITUATIONAL_THRESHOLD.
+          lowest_bis_pct = bis_nodes.filter_map { |nid|
+            node_rows[nid]&.then { |g| primary_talent(g)["usage_pct"].to_f }
+          }.min || 0.0
+          sit_threshold = bis_nodes.any? ? lowest_bis_pct * 0.5 : SITUATIONAL_THRESHOLD
+
+          sit_nodes = node_rows
+            .reject { |node_id, _| bis_nodes.include?(node_id) }
+            .select { |_, group| primary_talent(group)["usage_pct"].to_f >= sit_threshold }
+            .keys.to_set
+
+          write_tiers(node_rows, bis_nodes, sit_nodes)
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
-        # Write final tiers to rows. Choice node alternatives demoted one level.
-        def write_tiers(node_rows, bis_node_ids, sit_node_ids)
-          node_rows.each do |node_id, node_group|
-            tier = if bis_node_ids.include?(node_id)
-              "bis"
-            elsif sit_node_ids.include?(node_id)
-              "situational"
-            else
-              "common"
-            end
+        # PvP talents: pick N from a pool per matchup.
+        # Jenks finds the natural break between always-picked (BIS), flex/matchup
+        # options (situational), and ignored talents (common) — no hardcoded thresholds.
+        def assign_pvp_tiers(group_rows)
+          return if group_rows.empty?
 
+          breaks        = jenks_breaks(group_rows.map { |r| r["usage_pct"].to_f }, 3)
+          bis_threshold = breaks[1] || BIS_THRESHOLD
+          sit_threshold = breaks[0] || SITUATIONAL_THRESHOLD
+
+          group_rows.each do |r|
+            r["tier"] = case r["usage_pct"].to_f
+            when (bis_threshold..) then "bis"
+            when (sit_threshold..) then "situational"
+            else "common"
+            end
+          end
+        end
+
+        # ── Fisher-Jenks natural breaks ──────────────────────────────────
+        #
+        # Partitions `values` into `k` classes by minimising within-class
+        # sum-of-squared deviations (Fisher's exact algorithm, O(n²k)).
+        # Returns k-1 ascending break points (first value of each upper class).
+        # Returns [] when there are not enough distinct values to form k classes.
+        #
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
+        def jenks_breaks(values, k)
+          sorted = values.map(&:to_f).sort
+          return [] if sorted.size <= k
+
+          ssd         = build_ssd_matrix(sorted)
+          min_cost    = Array.new(sorted.size) { Array.new(k + 1, Float::INFINITY) }
+          class_start = Array.new(sorted.size) { Array.new(k + 1, 0) }
+
+          sorted.each_index { |i| min_cost[i][1] = ssd[0][i] }
+
+          (2..k).each do |num_classes|
+            (num_classes - 1...sorted.size).each do |right|
+              (num_classes - 2...right).each do |split|
+                cost = min_cost[split][num_classes - 1] + ssd[split + 1][right]
+                next unless cost < min_cost[right][num_classes]
+
+                min_cost[right][num_classes]    = cost
+                class_start[right][num_classes] = split + 1
+              end
+            end
+          end
+
+          _, breaks = k.downto(2).reduce([ sorted.size - 1, [] ]) do |(i, acc), c|
+            start = class_start[i][c]
+            [ start - 1, acc << sorted[start] ]
+          end
+          breaks.reverse
+        end
+        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+        # rubocop:disable Metrics/AbcSize
+        def build_ssd_matrix(sorted)
+          n = sorted.size
+          Array.new(n) { Array.new(n, 0.0) }.tap do |ssd|
+            sorted.each_with_index do |val, i|
+              sum    = val
+              sum_sq = val**2
+              (i + 1...n).each do |j|
+                sum    += sorted[j]
+                sum_sq += sorted[j]**2
+                ssd[i][j] = sum_sq - sum**2 / (j - i + 1).to_f
+              end
+            end
+          end
+        end
+        # rubocop:enable Metrics/AbcSize
+
+        # Write final tiers to rows. Choice node alternatives demoted one level.
+        def write_tiers(node_rows, bis_nodes, sit_nodes)
+          node_rows.each do |node_id, node_group|
+            tier = case node_id
+            when bis_nodes then "bis"
+            when sit_nodes then "situational"
+            else "common"
+            end
             assign_tier_to_node(node_group, tier)
           end
         end
 
         # For a single node: primary gets the tier, choice alternatives drop one level.
+        # Contested BIS choice (gap <= 30 pts): node is required but neither talent is
+        # "the" pick — both become situational so players know to choose by matchup.
         # Multi-rank nodes (same talent, multiple ranks) all get the same tier.
+        # rubocop:disable Metrics/AbcSize
         def assign_tier_to_node(node_group, tier)
-          if choice_node?(node_group) && tier != "common"
-            primary  = primary_talent(node_group)
-            alt_tier = tier == "bis" ? "situational" : "common"
-            node_group.each { |r| r["tier"] = r.equal?(primary) ? tier : alt_tier }
-          else
-            node_group.each { |r| r["tier"] = tier }
+          return node_group.each { |r| r["tier"] = tier } unless choice_node?(node_group) && tier != "common"
+
+          primary     = primary_talent(node_group)
+          primary_pct = primary["usage_pct"].to_f
+          alts        = node_group.reject { |r| r.equal?(primary) }
+          contested   = alts.any? { |r| primary_pct - r["usage_pct"].to_f <= 30.0 }
+
+          # Contested BIS: node required but pick is matchup-dependent — demote all to situational.
+          return node_group.each { |r| r["tier"] = "situational" } if tier == "bis" && contested
+
+          primary["tier"] = tier
+          alts.each do |r|
+            r["tier"] = if contested || (tier == "bis" && r["usage_pct"].to_f >= COMMON_THRESHOLD)
+              "situational"
+            else
+              "common"
+            end
           end
         end
+        # rubocop:enable Metrics/AbcSize
 
         # A choice node has multiple talents with different blizzard_ids (real alternatives).
         # Multi-rank nodes have multiple rows but are the same talent at different ranks.
@@ -529,52 +591,6 @@ module Pvp
             .pluck(:translatable_id, :value)
             .to_h
           node_group.map { |r| @talent_names[r["talent_id"]] }.compact.uniq.size
-        end
-
-        # ── Prerequisite path finding (OR semantics) ────────────────────
-        #
-        # A node locked_by [A, B, C] only needs ONE prereq satisfied.
-        # We always pick the cheapest path through the tree.
-
-        # Total cost to unlock node_id, following cheapest OR-prereq at each step.
-        def cheapest_path_cost(node_id, selected, node_meta, memo = {})
-          return 0 if selected.include?(node_id)
-          return memo[node_id] if memo.key?(node_id)
-
-          meta     = node_meta[node_id]
-          own_cost = (meta && !meta[:free]) ? meta[:cost] : 0
-
-          prereq_ids = relevant_prereqs(node_id, node_meta)
-
-          memo[node_id] = if prereq_ids.empty?
-            own_cost
-          else
-            cheapest_prereq = prereq_ids.map { |pid|
-              cheapest_path_cost(pid, selected, node_meta, memo)
-            }.min
-            own_cost + cheapest_prereq
-          end
-        end
-
-        # Add node + its cheapest prereq chain to the selected set.
-        # Nodes in `exclude` (e.g. already-selected bis nodes) are treated as satisfied
-        # but NOT added to `selected`, preventing cross-set contamination.
-        def select_node_with_prereqs(node_id, selected, node_meta, exclude: Set.new)
-          return if selected.include?(node_id) || exclude.include?(node_id)
-
-          selected.add(node_id)
-
-          prereq_ids = relevant_prereqs(node_id, node_meta)
-          return if prereq_ids.empty?
-          return if prereq_ids.any? { |pid| selected.include?(pid) || exclude.include?(pid) }
-
-          cheapest = prereq_ids.min_by { |pid| cheapest_path_cost(pid, selected | exclude, node_meta) }
-          select_node_with_prereqs(cheapest, selected, node_meta, exclude: exclude)
-        end
-
-        # Prereq node_ids that exist in this tree's node_meta.
-        def relevant_prereqs(node_id, node_meta)
-          (@prereqs[node_id] || []).select { |pid| node_meta.key?(pid) }
         end
 
         # ── Hero tree logic ─────────────────────────────────────────────

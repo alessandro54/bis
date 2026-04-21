@@ -25,14 +25,17 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
 
       total_weighted = records.sum(&:usage_count).to_i
       total_players  = count_raw_players
+      stale_count    = compute_stale_count(records.to_a)
 
       {
         meta:    {
-          bracket:        bracket_param,
-          spec_id:        spec_id_param,
-          total_players:  total_players,
-          total_weighted: total_weighted,
-          snapshot_at:    records.first&.snapshot_at
+          bracket:         bracket_param,
+          spec_id:         spec_id_param,
+          total_players:   total_players,
+          total_weighted:  total_weighted,
+          snapshot_at:     records.first&.snapshot_at,
+          data_confidence: compute_confidence(total_players, stale_count),
+          stale_count:     stale_count
         },
         talents: talents
       }
@@ -157,6 +160,25 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         default_points:        default_points[t.id] || 0,
         prerequisite_node_ids: prereqs[t.node_id] || []
       }
+    end
+
+    def compute_stale_count(records)
+      records.count { |r|
+        r.talent_type.in?(%w[class spec]) &&
+          r.usage_pct.to_f < 1.0 &&
+          !r.in_top_build &&
+          r.tier == "common"
+      }
+    end
+
+    def compute_confidence(total_players, stale_count)
+      if total_players >= 100 && stale_count == 0
+        "high"
+      elsif total_players >= 30 && stale_count <= 5
+        "medium"
+      else
+        "low"
+      end
     end
 
     def validate_params!

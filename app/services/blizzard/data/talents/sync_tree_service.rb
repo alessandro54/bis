@@ -23,6 +23,7 @@ module Blizzard
           name_map         = {} # blizzard_id => name (from tree response, locale-aware)
           edges            = Set.new
           spec_assignments = Hash.new { |h, k| h[k] = Set.new } # spec_id => Set<blizzard_id>
+          failed_specs     = []
 
           spec_entries.each do |entry|
             tree_id, spec_id = parse_ids(entry.dig("key", "href"))
@@ -31,6 +32,7 @@ module Blizzard
             tree = fetch_tree(tree_id, spec_id)
             process_tree(tree, talent_attrs, edges, spec_assignments[spec_id], name_map)
           rescue Blizzard::Client::Error => e
+            failed_specs << spec_id
             Rails.logger.warn(
               "[SyncTreeService] Skipping tree #{tree_id}/#{spec_id}: #{e.message}"
             )
@@ -38,13 +40,13 @@ module Blizzard
 
           if force?
             apply_positions(talent_attrs)
-            apply_prerequisites(edges)
+            apply_prerequisites(edges) if failed_specs.empty?
           else
             apply_positions_for_incomplete(talent_attrs)
-            apply_prerequisites(edges) if TalentPrerequisite.none?
+            apply_prerequisites(edges) if TalentPrerequisite.none? && failed_specs.empty?
           end
 
-          apply_spec_assignments(spec_assignments)
+          apply_spec_assignments(spec_assignments, skip_specs: failed_specs)
           save_names_from_tree(name_map)
           fetch_missing_media
 
@@ -191,14 +193,16 @@ module Blizzard
               .map { |(n, p)| { node_id: n, prerequisite_node_id: p, created_at: now, updated_at: now } }
               .uniq { |r| [ r[:node_id], r[:prerequisite_node_id] ] }
 
-            TalentPrerequisite.delete_all
-            # rubocop:disable Rails/SkipsModelValidations
-            TalentPrerequisite.insert_all!(rows)
-            # rubocop:enable Rails/SkipsModelValidations
+            ApplicationRecord.transaction do
+              TalentPrerequisite.delete_all
+              # rubocop:disable Rails/SkipsModelValidations
+              TalentPrerequisite.insert_all!(rows)
+              # rubocop:enable Rails/SkipsModelValidations
+            end
           end
 
           # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
-          def apply_spec_assignments(spec_assignments)
+          def apply_spec_assignments(spec_assignments, skip_specs: [])
             return if spec_assignments.empty?
 
             all_blizzard_ids = spec_assignments.values.flat_map(&:to_a).uniq
@@ -211,15 +215,19 @@ module Blizzard
 
             # rubocop:disable Rails/SkipsModelValidations
             spec_assignments.each do |spec_id, blizzard_ids|
+              next if skip_specs.include?(spec_id)
+
               talent_ids = blizzard_ids.filter_map { |blz_id| id_map[blz_id] }
               next if talent_ids.empty?
 
-              # Remove stale assignments no longer present in the API tree.
-              # Preserves default_points on rows that remain.
-              TalentSpecAssignment.where(spec_id: spec_id).where.not(talent_id: talent_ids).delete_all
+              ApplicationRecord.transaction do
+                # Remove stale assignments no longer present in the API tree.
+                # Preserves default_points on rows that remain.
+                TalentSpecAssignment.where(spec_id: spec_id).where.not(talent_id: talent_ids).delete_all
 
-              rows = talent_ids.map { |tid| { talent_id: tid, spec_id: spec_id, created_at: now, updated_at: now } }
-              TalentSpecAssignment.insert_all(rows, unique_by: %i[talent_id spec_id])
+                rows = talent_ids.map { |tid| { talent_id: tid, spec_id: spec_id, created_at: now, updated_at: now } }
+                TalentSpecAssignment.insert_all(rows, unique_by: %i[talent_id spec_id])
+              end
             end
             # rubocop:enable Rails/SkipsModelValidations
           end

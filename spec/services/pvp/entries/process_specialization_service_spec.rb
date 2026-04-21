@@ -134,6 +134,27 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
 
           expect(character.character_talents.where(talent_id: stale.id)).to be_empty
         end
+
+        context "when insert_all! raises mid-rebuild" do
+          before do
+            allow(CharacterTalent).to receive(:insert_all!).and_raise(ActiveRecord::StatementInvalid,
+"simulated failure")
+          end
+
+          it "returns a failure result" do
+            expect(result).to be_failure
+          end
+
+          it "leaves character_talents unchanged on insert failure (transaction rollback)" do
+            existing = create(:talent, blizzard_id: 888_000, talent_type: "class")
+            character.character_talents.create!(talent: existing, talent_type: "class", rank: 1, spec_id: 262)
+            count_before = character.character_talents.count
+
+            result # triggers the service
+
+            expect(character.character_talents.reload.count).to eq(count_before)
+          end
+        end
       end
 
       context "when talent_loadout_code is already current" do

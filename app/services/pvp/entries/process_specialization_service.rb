@@ -147,33 +147,37 @@ module Pvp
         end
         # rubocop:enable Metrics/AbcSize
 
+        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def rebuild_character_talents(talent_upsert, spec_id)
-          character.character_talents.where(spec_id: spec_id).delete_all
+          ApplicationRecord.transaction do
+            character.character_talents.where(spec_id: spec_id).delete_all
 
-          now     = Time.current
-          records = []
+            now     = Time.current
+            records = []
 
-          talent_upsert.each do |_type, talents|
-            Array(talents).each do |talent_data|
-              next unless talent_data[:talent_id]
+            talent_upsert.each do |_type, talents|
+              Array(talents).each do |talent_data|
+                next unless talent_data[:talent_id]
 
-              records << {
-                character_id: character.id,
-                talent_id:    talent_data[:talent_id],
-                talent_type:  talent_data[:talent_type],
-                rank:         talent_data[:rank] || 1,
-                slot_number:  talent_data[:slot_number],
-                spec_id:      spec_id,
-                created_at:   now,
-                updated_at:   now
-              }
+                records << {
+                  character_id: character.id,
+                  talent_id:    talent_data[:talent_id],
+                  talent_type:  talent_data[:talent_type],
+                  rank:         talent_data[:rank] || 1,
+                  slot_number:  talent_data[:slot_number],
+                  spec_id:      spec_id,
+                  created_at:   now,
+                  updated_at:   now
+                }
+              end
             end
-          end
 
-          # rubocop:disable Rails/SkipsModelValidations
-          CharacterTalent.insert_all!(records) if records.any?
-          # rubocop:enable Rails/SkipsModelValidations
+            # rubocop:disable Rails/SkipsModelValidations
+            CharacterTalent.insert_all!(records) if records.any?
+            # rubocop:enable Rails/SkipsModelValidations
+          end
         end
+      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
     end
   end
 end

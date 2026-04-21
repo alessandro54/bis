@@ -57,7 +57,10 @@ class Api::V1::BaseController < ApplicationController
     end
 
     # Sets Cache-Control for CDN/browser caching.
+    # Skipped in development so browsers and Next.js never cache API responses.
     def set_cache_headers(max_age: 5.minutes, stale_while_revalidate: 1.hour)
+      return if Rails.env.development?
+
       expires_in max_age, public: true, stale_while_revalidate: stale_while_revalidate
     end
 
