@@ -88,17 +88,4 @@ class Api::V1::BaseController < ApplicationController
       loc = params[:locale]
       Wow::Locales::SUPPORTED_LOCALES.include?(loc) ? loc : "en_US"
     end
-
-    def trend_for(current_pct, prev_pct)
-      return "new" if prev_pct.nil?
-
-      delta = current_pct.to_f - prev_pct.to_f
-      if delta > 1.0
-        "up"
-      elsif delta < -1.0
-        "down"
-      else
-        "stable"
-      end
-    end
 end
