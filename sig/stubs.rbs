@@ -25,6 +25,8 @@ module ActiveJob
     def self.retry_on: (untyped, *untyped, **untyped) -> void
     def self.discard_on: (untyped, *untyped) -> void
     def self.around_perform: (Symbol) -> void
+    def job_id: () -> String
+    def arguments: () -> Array[untyped]
   end
 
   class DeserializationError < StandardError
@@ -61,6 +63,10 @@ module Async
     def wait: () -> void
     def stop: () -> void
   end
+end
+
+class String
+  def truncate: (Integer, ?omission: String) -> String
 end
 
 module Kernel
