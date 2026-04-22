@@ -36,6 +36,9 @@ module Pvp
         "SYNC CYCLE ##{cycle_id} STARTED  |  Season: #{season_name}  |  Regions: #{regions.join(', ')}"
       )
       logger.info(SEPARATOR)
+      TelegramNotifier.send(
+        "🔄 <b>Sync started</b>\nCycle ##{cycle_id} — #{season_name}\nRegions: #{regions.join(', ')}"
+      )
     end
 
     # ── Phase 1 — Leaderboard discovery ─────────────────────────────────────
@@ -112,6 +115,7 @@ module Pvp
       logger.info("  Snapshot    : #{cycle.snapshot_at&.strftime('%Y-%m-%d %H:%M:%S %Z')}")
       logger.info(SEPARATOR)
       logger.info("")
+      TelegramNotifier.send(telegram_cycle_complete_message(cycle, season_name, char_line, aggregation_counts, elapsed))
     end
     # rubocop:enable Metrics/AbcSize
 
@@ -119,6 +123,7 @@ module Pvp
 
     def self.error(message)
       logger.error("  [error]  #{message}")
+      TelegramNotifier.send("🚨 <b>Sync error</b>\n<code>#{message}</code>")
     end
 
     private_class_method def self.format_elapsed(seconds)
@@ -127,6 +132,17 @@ module Pvp
       m = (seconds / 60).floor
       s = (seconds % 60).round
       "#{m}m #{s}s"
+    end
+
+    private_class_method def self.telegram_cycle_complete_message(cycle, season_name, char_line, counts, elapsed)
+      agg = "items=#{counts[:items]}  enchants=#{counts[:enchants]}  gems=#{counts[:gems]}  talents=#{counts[:talents]}"
+      <<~MSG.strip
+        ✅ <b>Sync complete</b>#{elapsed}
+        Cycle ##{cycle.id} — #{season_name}
+        Regions: #{cycle.regions.join(', ')}
+        Characters: #{char_line}
+        <code>#{agg}</code>
+      MSG
     end
   end
 end

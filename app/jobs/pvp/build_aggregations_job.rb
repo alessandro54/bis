@@ -40,12 +40,14 @@ module Pvp
           promote_cycle(season, cycle, results, cycle_started_at)
         else
           rollback_draft(cycle)
+          failed_keys = results.select { |_, v| v == :failed }.keys
           Sentry.capture_message(
             "Aggregation cycle failed — live data preserved",
-            extra: {
-              cycle_id: cycle.id,
-              failures: results.select { |_, v| v == :failed }.keys
-            }
+            extra: { cycle_id: cycle.id, failures: failed_keys }
+          )
+          TelegramNotifier.send(
+            "🚨 <b>Aggregation cycle failed</b>\n" \
+            "Cycle ##{cycle.id} — live data preserved\nFailed: #{failed_keys.join(', ')}"
           )
         end
       end
