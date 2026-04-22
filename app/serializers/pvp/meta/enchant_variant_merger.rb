@@ -19,12 +19,15 @@ module Pvp
         attr_reader :serialized
 
         def merge_group(group)
-          return group.first if group.size == 1
+          return group.first.dup if group.size == 1
 
+          merge_multiple_variants(group)
+        end
+
+        def merge_multiple_variants(group)
           primary     = group.max_by { |e| e[:usage_pct] }
           merged_pct  = group.sum { |e| e[:usage_pct] }
-          any_prev    = group.any? { |e| e[:prev_usage_pct] }
-          merged_prev = any_prev ? group.sum { |e| e[:prev_usage_pct].to_f } : nil
+          merged_prev = compute_merged_prev(group)
 
           primary.merge(
             usage_count:    group.sum { |e| e[:usage_count] },
@@ -32,6 +35,12 @@ module Pvp
             prev_usage_pct: merged_prev,
             trend:          TrendClassifier.call(merged_pct, merged_prev)
           )
+        end
+
+        def compute_merged_prev(group)
+          return nil unless group.any? { |e| e[:prev_usage_pct] }
+
+          group.sum { |e| e[:prev_usage_pct].to_f }
         end
     end
   end

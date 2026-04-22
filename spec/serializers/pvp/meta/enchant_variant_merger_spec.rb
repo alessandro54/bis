@@ -88,6 +88,35 @@ RSpec.describe Pvp::Meta::EnchantVariantMerger do
       end
     end
 
+    context "when some variants have prev_usage_pct and some are nil" do
+      let(:entries) do
+        [
+          {
+            slot:           "MAIN_HAND",
+            enchantment:    { name: "Swift Agility" },
+            usage_count:    30,
+            usage_pct:      25.0,
+            prev_usage_pct: 20.0,
+            trend:          "up"
+          },
+          {
+            slot:           "MAIN_HAND",
+            enchantment:    { name: "Swift Agility" },
+            usage_count:    20,
+            usage_pct:      15.0,
+            prev_usage_pct: nil,
+            trend:          "new"
+          }
+        ]
+      end
+
+      it "sums only the non-nil prev values and recomputes trend" do
+        result = described_class.call(entries)
+        expect(result.first[:prev_usage_pct]).to eq(20.0)
+        expect(result.first[:trend]).to eq("up") # 40.0 - 20.0 = 20 > 1.0
+      end
+    end
+
     context "with multiple different enchants" do
       let(:entries) do
         [
