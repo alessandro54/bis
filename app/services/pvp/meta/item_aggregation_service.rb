@@ -11,8 +11,9 @@ module Pvp
       end
 
       def call
-        rows    = execute_query
-        records = build_records(rows)
+        prev_map = snapshot_prev_values
+        rows     = execute_query
+        records  = build_records(rows, prev_map)
 
         ApplicationRecord.transaction do
           PvpMetaItemPopularity.where(pvp_season_id: season.id).delete_all
@@ -62,22 +63,33 @@ module Pvp
         end
         # rubocop:enable Metrics/MethodLength
 
-        def build_records(rows)
+        def build_records(rows, prev_map = {})
           now = Time.current
           rows.map do |r|
+            prev = prev_map[[ r["bracket"], r["spec_id"].to_i, r["slot"], r["item_id"].to_i ]]
             {
-              pvp_season_id: season.id,
-              bracket:       r["bracket"],
-              spec_id:       r["spec_id"],
-              slot:          r["slot"],
-              item_id:       r["item_id"],
-              usage_count:   r["usage_count"],
-              usage_pct:     r["usage_pct"],
-              snapshot_at:   r["snapshot_at"] || now,
-              created_at:    now,
-              updated_at:    now
+              pvp_season_id:  season.id,
+              bracket:        r["bracket"],
+              spec_id:        r["spec_id"],
+              slot:           r["slot"],
+              item_id:        r["item_id"],
+              usage_count:    r["usage_count"],
+              usage_pct:      r["usage_pct"],
+              prev_usage_pct: prev,
+              snapshot_at:    r["snapshot_at"] || now,
+              created_at:     now,
+              updated_at:     now
             }
           end
+        end
+
+        def snapshot_prev_values
+          PvpMetaItemPopularity
+            .where(pvp_season_id: season.id)
+            .pluck(:bracket, :spec_id, :slot, :item_id, :usage_pct)
+            .each_with_object({}) do |(bracket, spec_id, slot, item_id, pct), h|
+              h[[ bracket, spec_id.to_i, slot, item_id.to_i ]] = pct
+            end
         end
     end
   end

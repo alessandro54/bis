@@ -11,8 +11,9 @@ module Pvp
       end
 
       def call
-        rows    = execute_query
-        records = build_records(rows)
+        prev_map = snapshot_prev_values
+        rows     = execute_query
+        records  = build_records(rows, prev_map)
 
         ApplicationRecord.transaction do
           PvpMetaEnchantPopularity.where(pvp_season_id: season.id).delete_all
@@ -29,6 +30,15 @@ module Pvp
       private
 
         attr_reader :season, :top_n
+
+        def snapshot_prev_values
+          PvpMetaEnchantPopularity
+            .where(pvp_season_id: season.id)
+            .pluck(:bracket, :spec_id, :slot, :enchantment_id, :usage_pct)
+            .each_with_object({}) do |(bracket, spec_id, slot, enchantment_id, pct), h|
+              h[[ bracket, spec_id.to_i, slot, enchantment_id.to_i ]] = pct
+            end
+        end
 
         # rubocop:disable Metrics/MethodLength
         def execute_query
@@ -64,9 +74,10 @@ module Pvp
         end
         # rubocop:enable Metrics/MethodLength
 
-        def build_records(rows)
+        def build_records(rows, prev_map = {})
           now = Time.current
           rows.map do |r|
+            prev = prev_map[[ r["bracket"], r["spec_id"].to_i, r["slot"], r["enchantment_id"].to_i ]]
             {
               pvp_season_id:  season.id,
               bracket:        r["bracket"],
@@ -75,6 +86,7 @@ module Pvp
               enchantment_id: r["enchantment_id"],
               usage_count:    r["usage_count"],
               usage_pct:      r["usage_pct"],
+              prev_usage_pct: prev,
               snapshot_at:    r["snapshot_at"] || now,
               created_at:     now,
               updated_at:     now

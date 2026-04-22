@@ -24,6 +24,7 @@ Rails.application.routes.draw do
           resources :items, only: [ :index ]
           resources :enchants, only: [ :index ]
           resources :gems, only: [ :index ]
+          resources :stats, only: [ :index ]
           resources :specs, only: %i[index show]
           resources :talents, only: [ :index ]
           get :class_distribution, to: "class_distributions#show"

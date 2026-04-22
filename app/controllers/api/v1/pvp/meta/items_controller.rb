@@ -46,6 +46,8 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
         slot:               record.slot,
         usage_count:        record.usage_count,
         usage_pct:          record.usage_pct.to_f,
+        prev_usage_pct:     record.prev_usage_pct&.to_f,
+        trend:              trend_for(record.usage_pct, record.prev_usage_pct),
         snapshot_at:        record.snapshot_at,
         crafted:            stats.present?,
         top_crafting_stats: stats || []

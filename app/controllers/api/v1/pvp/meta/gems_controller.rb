@@ -27,23 +27,27 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
 
   private
 
+    # rubocop:disable Metrics/AbcSize
     def serialize_gem(record)
       {
-        id:          record.id,
-        item:        {
+        id:             record.id,
+        item:           {
           id:          record.item.id,
           blizzard_id: record.item.blizzard_id,
           name:        record.item.t("name", locale: locale_param),
           icon_url:    record.item.icon_url,
           quality:     record.item.quality
         },
-        slot:        record.slot,
-        socket_type: record.socket_type,
-        usage_count: record.usage_count,
-        usage_pct:   record.usage_pct.to_f,
-        snapshot_at: record.snapshot_at
+        slot:           record.slot,
+        socket_type:    record.socket_type,
+        usage_count:    record.usage_count,
+        usage_pct:      record.usage_pct.to_f,
+        prev_usage_pct: record.prev_usage_pct&.to_f,
+        trend:          trend_for(record.usage_pct, record.prev_usage_pct),
+        snapshot_at:    record.snapshot_at
       }
     end
+    # rubocop:enable Metrics/AbcSize
 
     def validate_params!
       validate_bracket!(params.require(:bracket)) or return

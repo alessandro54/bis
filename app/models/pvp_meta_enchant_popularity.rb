@@ -5,6 +5,7 @@
 #
 #  id             :bigint           not null, primary key
 #  bracket        :string           not null
+#  prev_usage_pct :decimal(5, 2)
 #  slot           :string           not null
 #  snapshot_at    :datetime         not null
 #  usage_count    :integer          default(0), not null

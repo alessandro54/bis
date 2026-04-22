@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_13_042335) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -162,6 +162,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_13_042335) do
     t.string "bracket", null: false
     t.datetime "created_at", null: false
     t.bigint "enchantment_id", null: false
+    t.decimal "prev_usage_pct", precision: 5, scale: 2
     t.bigint "pvp_season_id", null: false
     t.string "slot", null: false
     t.datetime "snapshot_at", null: false
@@ -179,6 +180,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_13_042335) do
     t.string "bracket", null: false
     t.datetime "created_at", null: false
     t.bigint "item_id", null: false
+    t.decimal "prev_usage_pct", precision: 5, scale: 2
     t.bigint "pvp_season_id", null: false
     t.string "slot", null: false
     t.datetime "snapshot_at", null: false
@@ -197,6 +199,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_13_042335) do
     t.string "bracket", null: false
     t.datetime "created_at", null: false
     t.bigint "item_id", null: false
+    t.decimal "prev_usage_pct", precision: 5, scale: 2
     t.bigint "pvp_season_id", null: false
     t.string "slot", null: false
     t.datetime "snapshot_at", null: false
