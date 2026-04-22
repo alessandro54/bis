@@ -2,14 +2,10 @@ module Blizzard
   module Data
     module Items
       # rubocop:disable Metrics/ClassLength
-      class UpsertFromRawEquipmentService
+      class UpsertFromRawEquipmentService < BaseService
         EXCLUDED_SLOTS = %w[TABARD SHIRT].freeze
         SECONDARY_STATS = %w[HASTE_RATING CRIT_RATING MASTERY_RATING VERSATILITY].freeze
         CACHE_TTL = 1.hour
-
-        def self.call(raw_equipment:, locale: "en_US")
-          new(raw_equipment:, locale:).call
-        end
 
         def initialize(raw_equipment:, locale: "en_US")
           @items  = valid_items(raw_equipment)
@@ -42,7 +38,9 @@ module Blizzard
           }.uniq
 
           # rubocop:disable Rails/SkipsModelValidations
-          Item.insert_all(item_records, unique_by: :blizzard_id)
+          with_deadlock_retry do
+            Item.upsert_all(item_records, unique_by: :blizzard_id, returning: false)
+          end
 
           # Enchantment sources and socket gems are inserted as stubs — full metadata
           # (name, quality, class) is fetched later via a dedicated sync job.
@@ -320,7 +318,9 @@ module Blizzard
             unique_records = records.uniq { |r| [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ] }
 
             # rubocop:disable Rails/SkipsModelValidations
-            Translation.insert_all(unique_records, unique_by: %i[translatable_type translatable_id locale key])
+            with_deadlock_retry do
+              Translation.upsert_all(unique_records, unique_by: %i[translatable_type translatable_id locale key])
+            end
             # rubocop:enable Rails/SkipsModelValidations
           end
 
