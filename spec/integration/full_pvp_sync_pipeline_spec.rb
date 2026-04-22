@@ -263,9 +263,9 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
       end
     end
 
-    it "marks the PvpSyncCycle as completed" do
+    it "enqueues RecoverFailedCharacterSyncsJob when all batches are done" do
+      expect(Pvp::RecoverFailedCharacterSyncsJob).to receive(:perform_later).once
       run_phase2
-      expect(PvpSyncCycle.last.reload.status).to eq("completed")
     end
 
     it "increments completed_character_batches to 1" do
@@ -275,8 +275,8 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
       expect(cycle.expected_character_batches).to  eq(1)
     end
 
-    it "triggers BuildAggregationsJob once all batches are done" do
-      expect(Pvp::BuildAggregationsJob).to receive(:perform_later).once
+    it "triggers RecoverFailedCharacterSyncsJob once all batches are done" do
+      expect(Pvp::RecoverFailedCharacterSyncsJob).to receive(:perform_later).once
       run_phase2
     end
   end
@@ -452,10 +452,13 @@ RSpec.describe "Full PvP sync pipeline", type: :integration do
       expect(entries.map(&:rating)).to eq([ 3100, 3050, 3000 ])
 
       # ── Sync cycle ───────────────────────────────────────────────────────────
-      cycle = PvpSyncCycle.last
-      expect(cycle.status).to eq("completed")
+      cycle = PvpSyncCycle.last.reload
+      # Recovery job is enqueued (runs async); status progresses to completed
+      # only after RecoverFailedCharacterSyncsJob + BuildAggregationsJob complete.
+      # Here we verify the batch counters are correct and recovery was queued.
       expect(cycle.completed_character_batches).to eq(1)
       expect(cycle.expected_character_batches).to  eq(1)
+      expect(enqueued_jobs.map { |j| j[:job] }).to include(Pvp::RecoverFailedCharacterSyncsJob)
     end
   end
 end

@@ -10,7 +10,10 @@ class BaseService
       ServiceResult.success(payload, message: message, context: context)
     end
 
-    def failure(error, message: nil, payload: nil, context: {})
+    def failure(error, message: nil, payload: nil, context: {}, captured: false)
+      if error.is_a?(Exception) && !captured
+        Sentry.capture_exception(error, extra: { service: self.class.name }.merge(context))
+      end
       ServiceResult.failure(error, message: message, payload: payload, context: context)
     end
 end

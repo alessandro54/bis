@@ -166,17 +166,10 @@ module Pvp
         cycle.increment_completed_character_batches!
 
         if cycle.all_character_batches_done?
-          cycle.update!(status: :completed)
-          Pvp::BuildAggregationsJob.perform_later(
-            pvp_season_id:    cycle.pvp_season_id,
-            sync_cycle_id:    cycle.id,
-            cycle_started_at: cycle.snapshot_at.iso8601
-          )
+          Pvp::RecoverFailedCharacterSyncsJob.perform_later(cycle.id)
         end
       rescue => e
-        Rails.logger.error(
-          "[SyncCharacterBatchJob] Failed to track sync cycle #{@sync_cycle_id}: #{e.message}"
-        )
+        Rails.logger.error("[SyncCharacterBatchJob] Failed to track sync cycle #{@sync_cycle_id}: #{e.message}")
       end
   end
 end

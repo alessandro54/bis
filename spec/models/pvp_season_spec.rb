@@ -3,20 +3,26 @@
 # Table name: pvp_seasons
 # Database name: primary
 #
-#  id           :bigint           not null, primary key
-#  display_name :string
-#  end_time     :datetime
-#  is_current   :boolean          default(FALSE)
-#  start_time   :datetime
-#  created_at   :datetime         not null
-#  updated_at   :datetime         not null
-#  blizzard_id  :integer
+#  id                     :bigint           not null, primary key
+#  display_name           :string
+#  end_time               :datetime
+#  is_current             :boolean          default(FALSE)
+#  start_time             :datetime
+#  created_at             :datetime         not null
+#  updated_at             :datetime         not null
+#  blizzard_id            :integer
+#  live_pvp_sync_cycle_id :bigint
 #
 # Indexes
 #
-#  index_pvp_seasons_on_blizzard_id  (blizzard_id) UNIQUE
-#  index_pvp_seasons_on_is_current   (is_current)
-#  index_pvp_seasons_on_updated_at   (updated_at)
+#  index_pvp_seasons_on_blizzard_id             (blizzard_id) UNIQUE
+#  index_pvp_seasons_on_is_current              (is_current)
+#  index_pvp_seasons_on_live_pvp_sync_cycle_id  (live_pvp_sync_cycle_id)
+#  index_pvp_seasons_on_updated_at              (updated_at)
+#
+# Foreign Keys
+#
+#  fk_rails_...  (live_pvp_sync_cycle_id => pvp_sync_cycles.id)
 #
 require 'rails_helper'
 
@@ -121,6 +127,16 @@ RSpec.describe PvpSeason, type: :model do
     end
   end
 
+
+  describe "live_pvp_sync_cycle association" do
+    it "can be assigned and retrieved" do
+      season = create(:pvp_season)
+      cycle  = create(:pvp_sync_cycle, pvp_season: season)
+      season.update!(live_pvp_sync_cycle: cycle)
+
+      expect(season.reload.live_pvp_sync_cycle).to eq(cycle)
+    end
+  end
 
   describe 'season duration' do
     let(:season) do

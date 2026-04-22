@@ -29,9 +29,10 @@ module Pvp
       WEIGHT_COMPETITIVE = 2.0
       WEIGHT_STANDARD    = 1.0
 
-      def initialize(season:, top_n: TOP_N)
+      def initialize(season:, top_n: TOP_N, cycle: nil)
         @season = season
         @top_n  = top_n
+        @cycle  = cycle
       end
 
       # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
@@ -44,37 +45,48 @@ module Pvp
         records = build_records(rows)
 
         if records.any?
-          # rubocop:disable Rails/SkipsModelValidations
-          PvpMetaTalentPopularity.upsert_all(
-            records,
-            unique_by:   %i[pvp_season_id bracket spec_id talent_id],
-            update_only: %i[talent_type usage_count usage_pct in_top_build top_build_rank tier snapshot_at]
-          )
-          # rubocop:enable Rails/SkipsModelValidations
+          if @cycle
+            ApplicationRecord.transaction do
+              PvpMetaTalentPopularity.where(pvp_sync_cycle_id: @cycle.id).delete_all
+              # rubocop:disable Rails/SkipsModelValidations
+              PvpMetaTalentPopularity.insert_all!(records)
+              # rubocop:enable Rails/SkipsModelValidations
+            end
+          else
+            # rubocop:disable Rails/SkipsModelValidations
+            PvpMetaTalentPopularity.upsert_all(
+              records,
+              unique_by:   %i[pvp_season_id bracket spec_id talent_id],
+              update_only: %i[talent_type usage_count usage_pct in_top_build top_build_rank tier snapshot_at]
+            )
+            # rubocop:enable Rails/SkipsModelValidations
 
-          # Remove stale rank-variant rows that were merged into a primary record.
-          # Use per-(bracket, spec_id) kept_ids so a stale talent that survives in
-          # one spec's data cannot prevent its deletion from another spec's records.
-          kept_ids_by_pair = records.each_with_object(Hash.new { |h, k| h[k] = [] }) do |r, h|
-            h[[ r[:bracket], r[:spec_id] ]] << r[:talent_id]
-          end
-          kept_ids_by_pair.each do |(bracket, spec_id), ids|
-            PvpMetaTalentPopularity
-              .where(pvp_season_id: season.id, bracket: bracket, spec_id: spec_id)
-              .where.not(talent_id: ids)
-              .delete_all
+            # Remove stale rank-variant rows that were merged into a primary record.
+            # Use per-(bracket, spec_id) kept_ids so a stale talent that survives in
+            # one spec's data cannot prevent its deletion from another spec's records.
+            kept_ids_by_pair = records.each_with_object(Hash.new { |h, k| h[k] = [] }) do |r, h|
+              h[[ r[:bracket], r[:spec_id] ]] << r[:talent_id]
+            end
+            kept_ids_by_pair.each do |(bracket, spec_id), ids|
+              PvpMetaTalentPopularity
+                .where(pvp_season_id: season.id, bracket: bracket, spec_id: spec_id)
+                .where(pvp_sync_cycle_id: nil)
+                .where.not(talent_id: ids)
+                .delete_all
+            end
           end
         end
 
         success(records.size, context: { count: records.size })
       rescue => e
-        failure(e)
+        Sentry.capture_exception(e, extra: { service: self.class.name, season_id: season.id })
+        failure(e, captured: true)
       end
       # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
       private
 
-        attr_reader :season, :top_n
+        attr_reader :season, :top_n, :cycle
 
         # Override to filter on specialization_processed_at instead of equipment_processed_at
         def top_chars_cte
@@ -721,19 +733,20 @@ module Pvp
           now = Time.current
           rows.map do |r|
             {
-              pvp_season_id:  season.id,
-              bracket:        r["bracket"],
-              spec_id:        r["spec_id"],
-              talent_id:      r["talent_id"],
-              talent_type:    r["talent_type"],
-              usage_count:    r["usage_count"],
-              usage_pct:      r["usage_pct"],
-              in_top_build:   r["in_top_build"],
-              top_build_rank: r["top_build_rank"].to_i,
-              tier:           r["tier"],
-              snapshot_at:    r["snapshot_at"] || now,
-              created_at:     now,
-              updated_at:     now
+              pvp_season_id:     season.id,
+              bracket:           r["bracket"],
+              spec_id:           r["spec_id"],
+              talent_id:         r["talent_id"],
+              talent_type:       r["talent_type"],
+              usage_count:       r["usage_count"],
+              usage_pct:         r["usage_pct"],
+              in_top_build:      r["in_top_build"],
+              top_build_rank:    r["top_build_rank"].to_i,
+              tier:              r["tier"],
+              snapshot_at:       r["snapshot_at"] || now,
+              created_at:        now,
+              updated_at:        now,
+              pvp_sync_cycle_id: @cycle&.id
             }
           end
         end

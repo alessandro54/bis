@@ -465,5 +465,67 @@ RSpec.describe Pvp::Characters::SyncCharacterService do
         expect(character.reload.unavailable_until).to be_nil
       end
     end
+
+    # -------------------------------------------------------------------------
+    # Transaction atomicity
+    # -------------------------------------------------------------------------
+
+    context "when ProcessSpecializationService succeeds but ProcessEquipmentService fails" do
+      it "rolls back character_talents written by spec service (transaction atomicity)" do
+        character = create(:character)
+        leaderboard = create(:pvp_leaderboard)
+        entry = create(:pvp_leaderboard_entry,
+                       character:                   character,
+                       pvp_leaderboard:             leaderboard,
+                       equipment_processed_at:      nil,
+                       specialization_processed_at: nil)
+        talent = create(:talent)
+
+        # Spec service: writes a character_talent then returns success with attrs
+        allow(Pvp::Entries::ProcessSpecializationService).to receive(:call) do
+          CharacterTalent.create!(
+            character_id: character.id,
+            talent_id:    talent.id,
+            talent_type:  "spec",
+            rank:         1,
+            spec_id:      65
+          )
+          ServiceResult.success(nil, context: {
+            entry_attrs:         { specialization_processed_at: Time.current, spec_id: 65 },
+            char_attrs:          {},
+            per_spec_hero_trees: {}
+          })
+        end
+
+        # Equipment service: fails
+        allow(Pvp::Entries::ProcessEquipmentService).to receive(:call)
+          .and_return(ServiceResult.failure("equipment failed"))
+
+        initial_talent_count = CharacterTalent.where(character_id: character.id).count
+
+        service = Pvp::Characters::SyncCharacterService.new(
+          character: character,
+          entries:   [ entry ]
+        )
+
+        fetch_result_changed = Pvp::Characters::SyncCharacterService::FetchResult.new(
+          json:          { "equipped_items" => [], "active_specialization" => { "id" => 65 } },
+          last_modified: nil,
+          changed:       true
+        )
+
+        allow(service).to receive(:fetch_remote_data).and_return([ fetch_result_changed, fetch_result_changed ])
+        allow(service).to receive(:clear_stale_last_modified!)
+        allow(service).to receive(:latest_entries_per_bracket).and_return([ entry ])
+
+        service.call
+
+        # character_talents should be rolled back
+        expect(CharacterTalent.where(character_id: character.id).count).to eq(initial_talent_count)
+        entry.reload
+        expect(entry.specialization_processed_at).to be_nil
+        expect(entry.equipment_processed_at).to be_nil
+      end
+    end
   end
 end

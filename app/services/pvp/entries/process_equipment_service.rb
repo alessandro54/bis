@@ -50,7 +50,7 @@ module Pvp
         entry_attrs.merge!(equipment_service.tier_set) if equipment_service.tier_set.present?
 
         success(nil, context: { entry_attrs: entry_attrs })
-      rescue => e
+      rescue ActiveRecord::ActiveRecordError, ArgumentError, NoMethodError => e
         failure(e)
       end
       # rubocop:enable Metrics/MethodLength, Metrics/AbcSize

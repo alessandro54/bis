@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -129,6 +129,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.datetime "snapshot_at"
     t.integer "spec_id"
     t.datetime "specialization_processed_at"
+    t.integer "sync_retry_count", default: 0, null: false
     t.boolean "tier_4p_active", default: false
     t.integer "tier_set_id"
     t.string "tier_set_name"
@@ -164,6 +165,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.bigint "enchantment_id", null: false
     t.decimal "prev_usage_pct", precision: 5, scale: 2
     t.bigint "pvp_season_id", null: false
+    t.bigint "pvp_sync_cycle_id"
     t.string "slot", null: false
     t.datetime "snapshot_at", null: false
     t.integer "spec_id", null: false
@@ -171,9 +173,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.integer "usage_count", default: 0, null: false
     t.decimal "usage_pct", precision: 5, scale: 2
     t.index ["enchantment_id"], name: "index_pvp_meta_enchant_popularity_on_enchantment_id"
-    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "enchantment_id"], name: "idx_meta_enchant_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "enchantment_id"], name: "idx_meta_enchant_unique_no_cycle", unique: true, where: "(pvp_sync_cycle_id IS NULL)"
     t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_enchant_lookup"
     t.index ["pvp_season_id"], name: "index_pvp_meta_enchant_popularity_on_pvp_season_id"
+    t.index ["pvp_sync_cycle_id", "bracket", "spec_id", "slot", "enchantment_id"], name: "idx_meta_enchant_unique_cycle", unique: true, where: "(pvp_sync_cycle_id IS NOT NULL)"
+    t.index ["pvp_sync_cycle_id"], name: "index_pvp_meta_enchant_popularity_on_pvp_sync_cycle_id"
   end
 
   create_table "pvp_meta_gem_popularity", force: :cascade do |t|
@@ -182,6 +186,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.bigint "item_id", null: false
     t.decimal "prev_usage_pct", precision: 5, scale: 2
     t.bigint "pvp_season_id", null: false
+    t.bigint "pvp_sync_cycle_id"
     t.string "slot", null: false
     t.datetime "snapshot_at", null: false
     t.string "socket_type", null: false
@@ -190,9 +195,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.integer "usage_count", default: 0, null: false
     t.decimal "usage_pct", precision: 5, scale: 2
     t.index ["item_id"], name: "index_pvp_meta_gem_popularity_on_item_id"
-    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "socket_type", "item_id"], name: "idx_meta_gem_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "socket_type", "item_id"], name: "idx_meta_gem_unique_no_cycle", unique: true, where: "(pvp_sync_cycle_id IS NULL)"
     t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_gem_lookup"
     t.index ["pvp_season_id"], name: "index_pvp_meta_gem_popularity_on_pvp_season_id"
+    t.index ["pvp_sync_cycle_id", "bracket", "spec_id", "slot", "socket_type", "item_id"], name: "idx_meta_gem_unique_cycle", unique: true, where: "(pvp_sync_cycle_id IS NOT NULL)"
+    t.index ["pvp_sync_cycle_id"], name: "index_pvp_meta_gem_popularity_on_pvp_sync_cycle_id"
   end
 
   create_table "pvp_meta_item_popularity", force: :cascade do |t|
@@ -201,6 +208,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.bigint "item_id", null: false
     t.decimal "prev_usage_pct", precision: 5, scale: 2
     t.bigint "pvp_season_id", null: false
+    t.bigint "pvp_sync_cycle_id"
     t.string "slot", null: false
     t.datetime "snapshot_at", null: false
     t.integer "spec_id", null: false
@@ -208,9 +216,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.integer "usage_count", default: 0, null: false
     t.decimal "usage_pct", precision: 5, scale: 2
     t.index ["item_id"], name: "index_pvp_meta_item_popularity_on_item_id"
-    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "item_id"], name: "idx_meta_item_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "slot", "item_id"], name: "idx_meta_item_unique_no_cycle", unique: true, where: "(pvp_sync_cycle_id IS NULL)"
     t.index ["pvp_season_id", "bracket", "spec_id", "slot"], name: "idx_meta_item_lookup"
     t.index ["pvp_season_id"], name: "index_pvp_meta_item_popularity_on_pvp_season_id"
+    t.index ["pvp_sync_cycle_id", "bracket", "spec_id", "slot", "item_id"], name: "idx_meta_item_unique_cycle", unique: true, where: "(pvp_sync_cycle_id IS NOT NULL)"
+    t.index ["pvp_sync_cycle_id"], name: "index_pvp_meta_item_popularity_on_pvp_sync_cycle_id"
   end
 
   create_table "pvp_meta_talent_popularity", force: :cascade do |t|
@@ -218,6 +228,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.datetime "created_at", null: false
     t.boolean "in_top_build", default: false, null: false
     t.bigint "pvp_season_id", null: false
+    t.bigint "pvp_sync_cycle_id"
     t.datetime "snapshot_at", null: false
     t.integer "spec_id", null: false
     t.bigint "talent_id", null: false
@@ -227,9 +238,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.datetime "updated_at", null: false
     t.integer "usage_count", default: 0, null: false
     t.decimal "usage_pct", precision: 8, scale: 4
-    t.index ["pvp_season_id", "bracket", "spec_id", "talent_id"], name: "idx_meta_talent_unique", unique: true
+    t.index ["pvp_season_id", "bracket", "spec_id", "talent_id"], name: "idx_meta_talent_unique_no_cycle", unique: true, where: "(pvp_sync_cycle_id IS NULL)"
     t.index ["pvp_season_id", "bracket", "spec_id", "talent_type"], name: "idx_meta_talent_lookup"
     t.index ["pvp_season_id"], name: "index_pvp_meta_talent_popularity_on_pvp_season_id"
+    t.index ["pvp_sync_cycle_id", "bracket", "spec_id", "talent_id"], name: "idx_meta_talent_unique_cycle", unique: true, where: "(pvp_sync_cycle_id IS NOT NULL)"
+    t.index ["pvp_sync_cycle_id"], name: "index_pvp_meta_talent_popularity_on_pvp_sync_cycle_id"
     t.index ["talent_id"], name: "index_pvp_meta_talent_popularity_on_talent_id"
   end
 
@@ -239,10 +252,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
     t.string "display_name"
     t.datetime "end_time"
     t.boolean "is_current", default: false
+    t.bigint "live_pvp_sync_cycle_id"
     t.datetime "start_time"
     t.datetime "updated_at", null: false
     t.index ["blizzard_id"], name: "index_pvp_seasons_on_blizzard_id", unique: true
     t.index ["is_current"], name: "index_pvp_seasons_on_is_current"
+    t.index ["live_pvp_sync_cycle_id"], name: "index_pvp_seasons_on_live_pvp_sync_cycle_id"
     t.index ["updated_at"], name: "index_pvp_seasons_on_updated_at"
   end
 
@@ -321,12 +336,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_21_000001) do
   add_foreign_key "pvp_leaderboards", "pvp_seasons"
   add_foreign_key "pvp_meta_enchant_popularity", "enchantments"
   add_foreign_key "pvp_meta_enchant_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_enchant_popularity", "pvp_sync_cycles"
   add_foreign_key "pvp_meta_gem_popularity", "items"
   add_foreign_key "pvp_meta_gem_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_gem_popularity", "pvp_sync_cycles"
   add_foreign_key "pvp_meta_item_popularity", "items"
   add_foreign_key "pvp_meta_item_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_item_popularity", "pvp_sync_cycles"
   add_foreign_key "pvp_meta_talent_popularity", "pvp_seasons"
+  add_foreign_key "pvp_meta_talent_popularity", "pvp_sync_cycles"
   add_foreign_key "pvp_meta_talent_popularity", "talents"
+  add_foreign_key "pvp_seasons", "pvp_sync_cycles", column: "live_pvp_sync_cycle_id"
   add_foreign_key "pvp_sync_cycles", "pvp_seasons"
   add_foreign_key "talent_spec_assignments", "talents"
 end

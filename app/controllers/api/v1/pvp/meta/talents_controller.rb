@@ -1,91 +1,91 @@
 class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
   before_action :validate_params!
 
-  # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
   def index
     cache_key = meta_cache_key("talents", bracket_param, spec_id_param, locale_param)
-
-    json = meta_cache_fetch(cache_key) do
-      season = meta_season_for(PvpMetaTalentPopularity)
-      records = PvpMetaTalentPopularity
-        .includes(talent: :translations)
-        .where(pvp_season: season)
-        .where(bracket: bracket_param)
-        .where(spec_id: spec_id_param)
-        .order(usage_pct: :desc)
-
-      zero_talents = load_zero_fill_talents(records.to_a)
-      all_talents  = records.map(&:talent) + zero_talents
-
-      prereqs        = load_prerequisites(all_talents)
-      default_points = load_default_points(all_talents)
-
-      talents = records.map { |r| serialize(r, prereqs, default_points) } +
-        zero_talents.map { |t| serialize_zero(t, prereqs, default_points) }
-
-      total_weighted = records.sum(&:usage_count).to_i
-      total_players  = count_raw_players
-      stale_count    = compute_stale_count(records.to_a)
-
-      {
-        meta:    {
-          bracket:         bracket_param,
-          spec_id:         spec_id_param,
-          total_players:   total_players,
-          total_weighted:  total_weighted,
-          snapshot_at:     records.first&.snapshot_at,
-          data_confidence: compute_confidence(total_players, stale_count),
-          stale_count:     stale_count
-        },
-        talents: talents
-      }
-    end
-
+    json = meta_cache_fetch(cache_key) { serialize_talents_response }
     render json: json
     set_cache_headers
   end
-  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
   private
 
-    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-    def load_zero_fill_talents(records)
-      existing_ids = records.map(&:talent_id)
+    def serialize_talents_response
+      season  = meta_season_for(PvpMetaTalentPopularity)
+      records = load_talent_records(season)
+      {
+        meta:    build_talents_meta(records),
+        talents: build_talents_list(records)
+      }
+    end
 
-      # Track (node_id, name) pairs already covered by a record so we can
-      # exclude stale rank variants from the zero-fill list.
-      covered_nodes = records.each_with_object(Set.new) do |r, set|
+    def load_talent_records(season)
+      PvpMetaTalentPopularity.for_meta(
+        season: season, bracket: bracket_param, spec_id: spec_id_param
+      )
+    end
+
+    def build_talents_list(records)
+      zero_talents   = load_zero_fill_talents(records.to_a)
+      all_talents    = records.map(&:talent) + zero_talents
+      prereqs        = load_prerequisites(all_talents)
+      default_points = load_default_points(all_talents)
+      records.map { |r| serialize(r, prereqs, default_points) } +
+        zero_talents.map { |t| serialize_zero(t, prereqs, default_points) }
+    end
+
+    def build_talents_meta(records)
+      total_weighted = records.sum(&:usage_count).to_i
+      total_players  = count_raw_players
+      stale_count    = compute_stale_count(records.to_a)
+      {
+        bracket:         bracket_param,
+        spec_id:         spec_id_param,
+        total_players:   total_players,
+        total_weighted:  total_weighted,
+        snapshot_at:     records.first&.snapshot_at,
+        data_confidence: compute_confidence(total_players, stale_count),
+        stale_count:     stale_count
+      }
+    end
+
+    def load_zero_fill_talents(records)
+      existing_ids  = records.map(&:talent_id)
+      covered_nodes = build_covered_nodes(records)
+      tree_talents  = load_tree_zero_fill(existing_ids, covered_nodes)
+      pvp_talents   = load_pvp_zero_fill(existing_ids, tree_talents)
+      tree_talents + pvp_talents
+    end
+
+    def build_covered_nodes(records)
+      records.each_with_object(Set.new) do |r, set|
         node_id = r.talent.node_id
         set.add([ node_id, r.talent.t("name", locale: locale_param) ]) if node_id
       end
+    end
 
-      # Class/spec/hero talents from tree assignments
-      tree_talents = Talent
-        .includes(:translations)
-        .joins(:talent_spec_assignments)
+    def load_tree_zero_fill(existing_ids, covered_nodes)
+      scope = Talent.includes(:translations).joins(:talent_spec_assignments)
         .where(talent_spec_assignments: { spec_id: spec_id_param })
-      tree_talents = tree_talents.where.not(id: existing_ids) if existing_ids.any?
+      scope = scope.where.not(id: existing_ids) if existing_ids.any?
+      deduplicate_tree_talents(scope.to_a, covered_nodes)
+    end
 
-      # Drop old rank variants whose node is already covered, then deduplicate
-      # remaining by (node_id, name), keeping the entry with the most data.
-      tree_talents = tree_talents
-        .to_a
+    def deduplicate_tree_talents(talents, covered_nodes)
+      talents
         .reject { |t| t.node_id && covered_nodes.include?([ t.node_id, t.t("name", locale: locale_param) ]) }
         .group_by { |t| [ t.node_id, t.t("name", locale: locale_param) ] }
         .flat_map { |_, group| group.size == 1 ? group : [ group.max_by { |t| t.icon_url ? 1 : 0 } ] }
+    end
 
-      # PvP talents known for this spec (from character loadouts)
-      pvp_talent_ids = CharacterTalent
-        .where(spec_id: spec_id_param, talent_type: "pvp")
-        .distinct.pluck(:talent_id)
+    def load_pvp_zero_fill(existing_ids, tree_talents)
+      pvp_talent_ids  = CharacterTalent.where(spec_id: spec_id_param, talent_type: "pvp").distinct.pluck(:talent_id)
       pvp_talent_ids -= existing_ids if existing_ids.any?
       pvp_talent_ids -= tree_talents.map(&:id)
+      return [] if pvp_talent_ids.empty?
 
-      pvp_talents = pvp_talent_ids.any? ? Talent.includes(:translations).where(id: pvp_talent_ids).to_a : []
-
-      tree_talents + pvp_talents
+      Talent.includes(:translations).where(id: pvp_talent_ids).to_a
     end
-    # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
     def count_raw_players
       PvpLeaderboardEntry

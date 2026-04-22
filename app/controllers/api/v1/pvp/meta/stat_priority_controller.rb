@@ -35,21 +35,21 @@ class Api::V1::Pvp::Meta::StatPriorityController < Api::V1::BaseController
         .pluck(:stat_pcts)
     end
 
-    # Returns { "VERSATILITY" => 347, ... } — median rating per stat across all characters.
-    # rubocop:disable Metrics/AbcSize
     def compute_medians(rows)
-      stat_values = Hash.new { |h, k| h[k] = [] }
-      rows.each do |pcts|
-        pcts.each { |stat, rating| stat_values[stat] << rating.to_i }
-      end
-
-      stat_values.transform_values do |values|
-        sorted = values.sort
-        mid    = sorted.size / 2
-        sorted.size.odd? ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0
-      end
+      collect_stat_values(rows).transform_values { |values| median_of(values) }
     end
-    # rubocop:enable Metrics/AbcSize
+
+    def collect_stat_values(rows)
+      stat_values = Hash.new { |h, k| h[k] = [] }
+      rows.each { |pcts| pcts.each { |stat, rating| stat_values[stat] << rating.to_i } }
+      stat_values
+    end
+
+    def median_of(values)
+      sorted = values.sort
+      mid    = sorted.size / 2
+      sorted.size.odd? ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0
+    end
 
     def validate_params!
       validate_bracket!(params.require(:bracket)) or return

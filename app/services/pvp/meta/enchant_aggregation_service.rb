@@ -5,9 +5,10 @@ module Pvp
 
       TOP_N = ENV.fetch("PVP_META_TOP_N", 1000).to_i
 
-      def initialize(season:, top_n: TOP_N)
+      def initialize(season:, top_n: TOP_N, cycle: nil)
         @season = season
         @top_n  = top_n
+        @cycle  = cycle
       end
 
       def call
@@ -16,20 +17,21 @@ module Pvp
         records  = build_records(rows, prev_map)
 
         ApplicationRecord.transaction do
-          PvpMetaEnchantPopularity.where(pvp_season_id: season.id).delete_all
           # rubocop:disable Rails/SkipsModelValidations
+          PvpMetaEnchantPopularity.where(pvp_season_id: season.id).delete_all unless @cycle
           PvpMetaEnchantPopularity.insert_all!(records) if records.any?
           # rubocop:enable Rails/SkipsModelValidations
         end
 
         success(records.size, context: { count: records.size })
       rescue => e
-        failure(e)
+        Sentry.capture_exception(e, extra: { service: self.class.name, season_id: season.id })
+        failure(e, captured: true)
       end
 
       private
 
-        attr_reader :season, :top_n
+        attr_reader :season, :top_n, :cycle
 
         def snapshot_prev_values
           PvpMetaEnchantPopularity
@@ -40,9 +42,14 @@ module Pvp
             end
         end
 
-        # rubocop:disable Metrics/MethodLength
         def execute_query
-          sql = <<~SQL
+          ApplicationRecord.connection.select_all(
+            ApplicationRecord.sanitize_sql_array([ enchant_popularity_sql, { season_id: season.id, top_n: top_n } ])
+          )
+        end
+
+        def enchant_popularity_sql
+          <<~SQL
             WITH #{top_chars_cte},
             slot_totals AS (
               SELECT t.bracket, t.spec_id, ci.slot, COUNT(*) AS total
@@ -67,29 +74,25 @@ module Pvp
             GROUP BY t.bracket, t.spec_id, ci.slot, ci.enchantment_id, st.total
             ORDER BY t.bracket, t.spec_id, ci.slot, usage_count DESC
           SQL
-
-          ApplicationRecord.connection.select_all(
-            ApplicationRecord.sanitize_sql_array([ sql, { season_id: season.id, top_n: top_n } ])
-          )
         end
-        # rubocop:enable Metrics/MethodLength
 
         def build_records(rows, prev_map = {})
           now = Time.current
           rows.map do |r|
             prev = prev_map[[ r["bracket"], r["spec_id"].to_i, r["slot"], r["enchantment_id"].to_i ]]
             {
-              pvp_season_id:  season.id,
-              bracket:        r["bracket"],
-              spec_id:        r["spec_id"],
-              slot:           r["slot"],
-              enchantment_id: r["enchantment_id"],
-              usage_count:    r["usage_count"],
-              usage_pct:      r["usage_pct"],
-              prev_usage_pct: prev,
-              snapshot_at:    r["snapshot_at"] || now,
-              created_at:     now,
-              updated_at:     now
+              pvp_season_id:     season.id,
+              bracket:           r["bracket"],
+              spec_id:           r["spec_id"],
+              slot:              r["slot"],
+              enchantment_id:    r["enchantment_id"],
+              usage_count:       r["usage_count"],
+              usage_pct:         r["usage_pct"],
+              prev_usage_pct:    prev,
+              snapshot_at:       r["snapshot_at"] || now,
+              created_at:        now,
+              updated_at:        now,
+              pvp_sync_cycle_id: @cycle&.id
             }
           end
         end

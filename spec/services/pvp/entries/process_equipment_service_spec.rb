@@ -135,14 +135,40 @@ RSpec.describe Pvp::Entries::ProcessEquipmentService, type: :service do
     end
 
     context "when an unexpected error occurs" do
-      it "returns a failure wrapping the exception" do
+      it "propagates the exception instead of swallowing it" do
         allow(Blizzard::Data::Items::UpsertFromRawEquipmentService)
           .to receive(:new)
                 .and_raise(StandardError.new("unexpected error"))
 
-        expect(result).to be_failure
-        expect(result.error).to be_a(StandardError)
-        expect(result.error.message).to eq("unexpected error")
+        expect { result }.to raise_error(StandardError, "unexpected error")
+      end
+    end
+
+    context "when an unexpected RuntimeError occurs during DB write" do
+      before do
+        allow(Blizzard::Data::Items::UpsertFromRawEquipmentService)
+          .to receive(:new).and_return(
+            instance_double(
+              Blizzard::Data::Items::UpsertFromRawEquipmentService,
+              call:       { "equipped_items" => { "head" => { "item_id" => 1, "item_level" => 400 } } },
+              item_level: 400,
+              tier_set:   nil
+            )
+          )
+        allow_any_instance_of(Pvp::Entries::ProcessEquipmentService)
+          .to receive(:rebuild_character_items)
+          .and_raise(RuntimeError, "unexpected db failure")
+      end
+
+      it "propagates the exception instead of swallowing it" do
+        char = create(:character)
+        service = Pvp::Entries::ProcessEquipmentService.new(
+          character:     char,
+          raw_equipment: { "equipped_items" => [ { "slot" => { "type" => "HEAD" }, "item" => { "id" => 1 },
+"level" => { "value" => 400 } } ] },
+          spec_id:       65
+        )
+        expect { service.call }.to raise_error(RuntimeError, "unexpected db failure")
       end
     end
   end

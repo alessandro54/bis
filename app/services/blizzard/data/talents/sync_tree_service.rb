@@ -51,7 +51,7 @@ module Blizzard
           fetch_missing_media
 
           success(nil, context: { talents: talent_attrs.size, edges: edges.size })
-        rescue => e
+        rescue Blizzard::Client::Error, ActiveRecord::ActiveRecordError => e
           failure(e)
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength

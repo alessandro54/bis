@@ -12,6 +12,7 @@
 #  rating                      :integer
 #  snapshot_at                 :datetime
 #  specialization_processed_at :datetime
+#  sync_retry_count            :integer          default(0), not null
 #  tier_4p_active              :boolean          default(FALSE)
 #  tier_set_name               :string
 #  tier_set_pieces             :integer

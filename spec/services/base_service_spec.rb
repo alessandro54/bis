@@ -60,5 +60,33 @@ RSpec.describe BaseService do
       expect(result.payload).to eq({ foo: 2 })
       expect(result.context).to eq({ a: 2 })
     end
+
+    context "when error is an Exception" do
+      it "captures to Sentry" do
+        service = DummyBaseService.new
+        error   = StandardError.new("boom")
+        expect(Sentry).to receive(:capture_exception).with(
+          error,
+          extra: hash_including(service: "DummyBaseService")
+        )
+        service.send(:failure, error)
+      end
+    end
+
+    context "when error is not an Exception (e.g. a symbol)" do
+      it "does not call Sentry" do
+        service = DummyBaseService.new
+        expect(Sentry).not_to receive(:capture_exception)
+        service.send(:failure, :invalid_state)
+      end
+    end
+
+    context "when captured: true" do
+      it "does not call Sentry again" do
+        service = DummyBaseService.new
+        expect(Sentry).not_to receive(:capture_exception)
+        service.send(:failure, StandardError.new("boom"), captured: true)
+      end
+    end
   end
 end

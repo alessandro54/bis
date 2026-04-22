@@ -13,6 +13,7 @@
 #  rating                      :integer
 #  snapshot_at                 :datetime
 #  specialization_processed_at :datetime
+#  sync_retry_count            :integer          default(0), not null
 #  tier_4p_active              :boolean          default(FALSE)
 #  tier_set_name               :string
 #  tier_set_pieces             :integer
@@ -52,6 +53,7 @@ FactoryBot.define do
     rating    { Faker::Number.between(from: 1200, to: 3500) }
     wins      { 0 }
     losses    { 0 }
+    sync_retry_count { 0 }
     snapshot_at { Time.current }
 
     item_level { Faker::Number.between(from: 450, to: 700) }

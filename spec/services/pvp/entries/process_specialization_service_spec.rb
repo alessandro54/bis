@@ -263,10 +263,28 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
           .to receive(:call).and_raise(StandardError.new("boom"))
       end
 
-      it "returns a failure wrapping the exception" do
-        expect(result).to be_failure
-        expect(result.error).to be_a(StandardError)
-        expect(result.error.message).to eq("boom")
+      it "propagates the exception instead of swallowing it" do
+        expect { result }.to raise_error(StandardError, "boom")
+      end
+    end
+
+    context "when an unexpected RuntimeError occurs" do
+      before do
+        allow(Blizzard::Data::CharacterEquipmentSpecializationsService)
+          .to receive(:new).and_return(spec_service_double)
+        allow_any_instance_of(Pvp::Entries::ProcessSpecializationService)
+          .to receive(:process_all_specs_talents)
+          .and_raise(RuntimeError, "unexpected db failure")
+      end
+
+      it "propagates the exception instead of swallowing it" do
+        char = create(:character)
+        raw  = { "active_specialization" => { "id" => 65 } }
+        service = Pvp::Entries::ProcessSpecializationService.new(
+          character:          char,
+          raw_specialization: raw
+        )
+        expect { service.call }.to raise_error(RuntimeError, "unexpected db failure")
       end
     end
   end

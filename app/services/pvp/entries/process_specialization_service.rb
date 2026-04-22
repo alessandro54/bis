@@ -63,7 +63,7 @@ module Pvp
           char_attrs:          char_attrs,
           per_spec_hero_trees: per_spec_hero_trees
         })
-      rescue => e
+      rescue ActiveRecord::ActiveRecordError, ArgumentError, NoMethodError => e
         failure(e)
       end
       # rubocop:enable Metrics/MethodLength, Metrics/AbcSize

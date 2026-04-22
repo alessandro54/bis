@@ -91,6 +91,7 @@ Layout/LineLength:
   Max: 120
   AllowedPatterns:
     - '\A\s*#\s+index_'  # annotate gem index comment lines
+    - '\A\s*#\s+idx_'    # annotate gem custom-named index comment lines
 
 # ----------------------------------------------------------------------
 # Style – Ruby moderno, limpio

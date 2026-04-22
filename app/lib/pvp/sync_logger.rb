@@ -88,6 +88,31 @@ module Pvp
       logger.info("")
     end
 
+    # ── Sync report — successful cycle completion ─────────────────────────────
+
+    # rubocop:disable Metrics/AbcSize
+    def self.cycle_complete(cycle:, season_name:, synced:, total:, failed:,
+                            aggregation_counts:, elapsed_seconds: nil)
+      elapsed = elapsed_seconds ? "  (#{format_elapsed(elapsed_seconds)})" : ""
+      char_line = "#{synced}/#{total} synced"
+      char_line += "  (#{failed} failed)" if failed > 0
+
+      logger.info(SEPARATOR)
+      logger.info("SYNC REPORT — Cycle ##{cycle.id} — Season: #{season_name}#{elapsed}")
+      logger.info("  Regions     : #{cycle.regions.join(', ')}")
+      logger.info("  Characters  : #{char_line}")
+      logger.info(
+        "  Aggregations: items=#{aggregation_counts[:items]}" \
+        "  enchants=#{aggregation_counts[:enchants]}" \
+        "  gems=#{aggregation_counts[:gems]}" \
+        "  talents=#{aggregation_counts[:talents]}"
+      )
+      logger.info("  Snapshot    : #{cycle.snapshot_at&.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+      logger.info(SEPARATOR)
+      logger.info("")
+    end
+    # rubocop:enable Metrics/AbcSize
+
     # ── Errors ────────────────────────────────────────────────────────────────
 
     def self.error(message)

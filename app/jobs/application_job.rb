@@ -101,7 +101,13 @@ class ApplicationJob < ActiveJob::Base
       ActiveRecord::Base.cache(&block)
     end
 
+    # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def monitor_performance(&block)
+      Sentry.configure_scope do |scope|
+        scope.set_tags(job: self.class.name, job_id: job_id)
+        scope.set_extras(args: arguments.to_s.truncate(500))
+      end
+
       start_time = Time.current
       result = block.call
       duration = Time.current - start_time
@@ -127,4 +133,5 @@ class ApplicationJob < ActiveJob::Base
 
       raise error
     end
+  # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 end

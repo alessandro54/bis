@@ -2,25 +2,27 @@ module Pvp
   class BuildAggregationsJob < ApplicationJob
     queue_as :default
 
-    # Each entry: [key, service_class, model_class, min_interval]
-    # min_interval — skip if the latest snapshot_at for the season is more recent than this.
     AGGREGATIONS = [
-      [ :items,    Pvp::Meta::ItemAggregationService,    PvpMetaItemPopularity,    1.hour    ],
-      [ :enchants, Pvp::Meta::EnchantAggregationService, PvpMetaEnchantPopularity, 1.hour    ],
-      [ :gems,     Pvp::Meta::GemAggregationService,     PvpMetaGemPopularity,     1.hour    ],
-      [ :talents,  Pvp::Meta::TalentAggregationService,  PvpMetaTalentPopularity,  6.hours   ]
+      [ :items,    Pvp::Meta::ItemAggregationService,    PvpMetaItemPopularity    ],
+      [ :enchants, Pvp::Meta::EnchantAggregationService, PvpMetaEnchantPopularity ],
+      [ :gems,     Pvp::Meta::GemAggregationService,     PvpMetaGemPopularity     ],
+      [ :talents,  Pvp::Meta::TalentAggregationService,  PvpMetaTalentPopularity  ]
     ].freeze
 
     def perform(pvp_season_id:, sync_cycle_id: nil, cycle_started_at: nil)
       season = find_season!(pvp_season_id)
       return unless season
 
-      results = run_aggregations(season, pvp_season_id)
+      cycle   = sync_cycle_id ? PvpSyncCycle.find_by(id: sync_cycle_id) : nil
+      results = run_aggregations(season, cycle)
 
       log_completion(pvp_season_id, results)
-      sync_log_completion(results)
-
-      end_cycle_if_needed(sync_cycle_id, cycle_started_at)
+      if cycle
+        handle_cycle_results(season, cycle, results, cycle_started_at)
+      else
+        sync_log_completion(results)
+        end_cycle_if_needed(sync_cycle_id, cycle_started_at)
+      end
     end
 
     private
@@ -33,33 +35,87 @@ module Pvp
         nil
       end
 
-      def run_aggregations(season, pvp_season_id)
-        results = run_with_threads(AGGREGATIONS, concurrency: AGGREGATIONS.size) do |tuple|
-          key, service_class, model_class, min_interval = tuple
-          if stale?(model_class, season, min_interval)
-            run_single_aggregation(key, service_class, season, pvp_season_id)
-          else
-            [ key, :skipped ]
-          end
+      def handle_cycle_results(season, cycle, results, cycle_started_at)
+        if results.values.all? { |v| v != :failed }
+          promote_cycle(season, cycle, results, cycle_started_at)
+        else
+          rollback_draft(cycle)
+          Sentry.capture_message(
+            "Aggregation cycle failed — live data preserved",
+            extra: {
+              cycle_id: cycle.id,
+              failures: results.select { |_, v| v == :failed }.keys
+            }
+          )
         end
+      end
 
+      def run_aggregations(season, cycle)
+        results = run_with_threads(AGGREGATIONS, concurrency: AGGREGATIONS.size) do |tuple|
+          key, service_class, _model_class = tuple
+          run_single_aggregation(key, service_class, season, cycle)
+        end
         results.to_h
       end
 
-      def stale?(model_class, season, min_interval)
-        last = model_class.where(pvp_season_id: season.id).maximum(:snapshot_at)
-        last.nil? || last < min_interval.ago
-      end
-
-      def run_single_aggregation(key, service_class, season, pvp_season_id)
-        result = service_class.call(season: season)
-
+      def run_single_aggregation(key, service_class, season, cycle)
+        result = service_class.call(season: season, cycle: cycle)
         if result.success?
           [ key, result.context[:count] ]
         else
-          log_aggregation_failure(service_class, pvp_season_id, result.error)
+          log_aggregation_failure(service_class, season.id, result.error)
           [ key, :failed ]
         end
+      end
+
+      def promote_cycle(season, cycle, results, cycle_started_at)
+        ApplicationRecord.transaction do
+          old_cycle_id = season.live_pvp_sync_cycle_id
+          season.update!(live_pvp_sync_cycle_id: cycle.id)
+          cycle.update!(status: :completed)
+          purge_old_cycle_data(old_cycle_id) if old_cycle_id
+        end
+        clear_meta_cache
+        log_sync_report(season, cycle, results, cycle_started_at)
+      end
+
+      def rollback_draft(cycle)
+        ApplicationRecord.transaction do
+          popularity_models.each { |m| m.where(pvp_sync_cycle_id: cycle.id).delete_all }
+          cycle.update!(status: :failed)
+        end
+      end
+
+      def purge_old_cycle_data(old_cycle_id)
+        popularity_models.each do |model|
+          model.where(pvp_sync_cycle_id: old_cycle_id).delete_all
+        end
+      end
+
+      def popularity_models
+        [ PvpMetaItemPopularity, PvpMetaEnchantPopularity,
+          PvpMetaGemPopularity,  PvpMetaTalentPopularity ]
+      end
+
+      def log_sync_report(season, cycle, results, cycle_started_at)
+        total  = PvpLeaderboardEntry
+                   .joins(:pvp_leaderboard)
+                   .where(pvp_leaderboards: { pvp_season_id: season.id })
+                   .count
+        failed = PvpLeaderboardEntry
+                   .joins(:pvp_leaderboard)
+                   .where(pvp_leaderboards: { pvp_season_id: season.id })
+                   .where("equipment_processed_at IS NULL OR specialization_processed_at IS NULL")
+                   .count
+        Pvp::SyncLogger.cycle_complete(
+          cycle:              cycle,
+          season_name:        season.display_name,
+          synced:             total - failed,
+          total:              total,
+          failed:             failed,
+          aggregation_counts: results,
+          elapsed_seconds:    compute_elapsed_seconds(cycle_started_at)
+        )
       end
 
       def log_aggregation_failure(service_class, pvp_season_id, error)
@@ -84,8 +140,6 @@ module Pvp
           gems:     results[:gems],
           talents:  results[:talents]
         )
-
-        clear_meta_cache
       end
 
       def clear_meta_cache

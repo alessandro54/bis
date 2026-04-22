@@ -21,18 +21,22 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
     set_cache_headers
   end
 
-  # GET /api/v1/pvp/meta/specs/:spec_id
-  # Returns detailed meta for a specific spec including talent builds
-  # rubocop:disable Metrics/AbcSize
   def show
     cache_key = meta_cache_key("specs", bracket_param, spec_id_param, limit_param)
-
     json = meta_cache_fetch(cache_key) do
       entries = PvpLeaderboardEntry
         .latest_snapshot_for_bracket(bracket_param)
         .where(spec_id: spec_id_param)
         .includes(:character)
+      serialize_spec_show(entries)
+    end
+    render json: json
+    set_cache_headers
+  end
 
+  private
+
+    def serialize_spec_show(entries)
       {
         spec_id:       spec_id_param,
         bracket:       bracket_param,
@@ -43,13 +47,6 @@ class Api::V1::Pvp::Meta::SpecsController < Api::V1::BaseController
         snapshot_at:   entries.first&.snapshot_at
       }
     end
-
-    render json: json
-    set_cache_headers
-  end
-  # rubocop:enable Metrics/AbcSize
-
-  private
 
     def build_spec_stats(entries)
       total = entries.count.to_f
