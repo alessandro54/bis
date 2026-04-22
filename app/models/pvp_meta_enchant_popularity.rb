@@ -33,4 +33,10 @@ class PvpMetaEnchantPopularity < ApplicationRecord
 
   belongs_to :pvp_season
   belongs_to :enchantment
+
+  scope :for_meta, ->(season:, bracket:, spec_id:) {
+    includes(enchantment: :translations)
+      .where(pvp_season: season, bracket:, spec_id:)
+      .order(usage_pct: :desc)
+  }
 end
