@@ -77,6 +77,7 @@ module Pvp
         end
         clear_meta_cache
         log_sync_report(season, cycle, results, cycle_started_at)
+        Pvp::PurgeStaleCharacterDataJob.perform_later
       end
 
       def rollback_draft(cycle)

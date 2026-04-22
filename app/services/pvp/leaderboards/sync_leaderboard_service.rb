@@ -50,12 +50,15 @@ module Pvp
 
         unique_character_records = character_records.uniq { |c| [ c[:blizzard_id], c[:region] ] }
 
+        upsert_result = nil
         # rubocop:disable Rails/SkipsModelValidations
-        upsert_result = Character.upsert_all(
-          unique_character_records,
-          unique_by: %i[blizzard_id region],
-          returning: %i[blizzard_id id]
-        )
+        with_deadlock_retry do
+          upsert_result = Character.upsert_all(
+            unique_character_records,
+            unique_by: %i[blizzard_id region],
+            returning: %i[blizzard_id id]
+          )
+        end
         # rubocop:enable Rails/SkipsModelValidations
 
         char_id_map = upsert_result.rows.to_h { |row| [ row[0].to_s, row[1] ] }

@@ -73,12 +73,12 @@ module Blizzard
           # Deduplicate by blizzard_id
           unique_records = talent_records.uniq { |r| r[:blizzard_id] }
 
-          # Bulk upsert talent entities (name lives in translations, not in the talents table)
+          # Insert talent entities — skip on conflict. blizzard_id/talent_type/spell_id are
+          # static reference data; DO NOTHING avoids ShareLock contention under concurrent syncs.
           # rubocop:disable Rails/SkipsModelValidations
-          Talent.upsert_all(
+          Talent.insert_all(
             unique_records.map { |r| r.except(:name) },
-            unique_by: :blizzard_id,
-            returning: false
+            unique_by: :blizzard_id
           )
           # rubocop:enable Rails/SkipsModelValidations
 
@@ -180,7 +180,7 @@ module Blizzard
             end
 
             # rubocop:disable Rails/SkipsModelValidations
-            Translation.upsert_all(
+            Translation.insert_all(
               unique_translations,
               unique_by: %i[translatable_type translatable_id locale key]
             )

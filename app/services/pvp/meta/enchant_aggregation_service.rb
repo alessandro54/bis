@@ -15,14 +15,7 @@ module Pvp
         prev_map = snapshot_prev_values
         rows     = execute_query
         records  = build_records(rows, prev_map)
-
-        ApplicationRecord.transaction do
-          # rubocop:disable Rails/SkipsModelValidations
-          PvpMetaEnchantPopularity.where(pvp_season_id: season.id).delete_all unless @cycle
-          PvpMetaEnchantPopularity.insert_all!(records) if records.any?
-          # rubocop:enable Rails/SkipsModelValidations
-        end
-
+        persist_records(records)
         success(records.size, context: { count: records.size })
       rescue => e
         Sentry.capture_exception(e, extra: { service: self.class.name, season_id: season.id })
@@ -32,6 +25,19 @@ module Pvp
       private
 
         attr_reader :season, :top_n, :cycle
+
+        def persist_records(records)
+          ApplicationRecord.transaction do
+            # rubocop:disable Rails/SkipsModelValidations
+            if @cycle
+              PvpMetaEnchantPopularity.where(pvp_sync_cycle_id: @cycle.id).delete_all
+            else
+              PvpMetaEnchantPopularity.where(pvp_season_id: season.id).delete_all
+            end
+            PvpMetaEnchantPopularity.insert_all!(records) if records.any?
+            # rubocop:enable Rails/SkipsModelValidations
+          end
+        end
 
         def snapshot_prev_values
           PvpMetaEnchantPopularity

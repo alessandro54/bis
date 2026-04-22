@@ -17,7 +17,9 @@ module Pvp
     SEPARATOR = ("═" * 80).freeze
 
     def self.logger
-      @logger ||= begin
+      @logger ||= if Rails.env.production?
+        Rails.logger
+      else
         logger = Logger.new(LOG_PATH, "daily", progname: "pvp_sync")
         logger.formatter = proc do |_severity, datetime, _progname, msg|
           "[#{datetime.strftime('%Y-%m-%d %H:%M:%S')}] #{msg}\n"

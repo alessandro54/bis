@@ -8,8 +8,9 @@ module Pvp
     # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
     def perform(pvp_sync_cycle_id)
       cycle  = PvpSyncCycle.find(pvp_sync_cycle_id)
-      season = cycle.pvp_season
+      return if cycle.completed? || cycle.failed?
 
+      season  = cycle.pvp_season
       entries = unsynced_entries(season)
 
       if entries.none?
