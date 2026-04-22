@@ -84,77 +84,79 @@ module Pvp
           eq_changed          = eq_fetch.changed?
 
           # rubocop:disable Metrics/BlockLength
-          ApplicationRecord.transaction do
-            # --- Specialization FIRST (to get active spec_id) ---
-            if spec_fetch.changed?
-              spec_result = Pvp::Entries::ProcessSpecializationService.call(
-                character:          character,
-                raw_specialization: spec_fetch.json,
-                locale:             locale
-              )
-
-              unless spec_result.success?
-                log_service_failure("Specialization", character, spec_result.error)
-                raise ActiveRecord::Rollback
-              end
-
-              entry_attrs.merge!(spec_result.context[:entry_attrs]) if spec_result.context[:entry_attrs]
-              char_attrs.merge!(spec_result.context[:char_attrs])   if spec_result.context[:char_attrs]
-              char_attrs[:talents_last_modified] = spec_fetch.last_modified if spec_fetch.last_modified.present?
-              active_spec_id      = spec_result.context[:entry_attrs]&.dig(:spec_id)
-              per_spec_hero_trees = spec_result.context[:per_spec_hero_trees] || {}
-            else
-              # 304: talents unchanged — propagate attrs from latest processed entry
-              entry_attrs.merge!(spec_entry_attrs_from_latest)
-              active_spec_id = entry_attrs[:spec_id]
-            end
-
-            # --- Equipment (with active_spec_id) ---
-            if eq_changed
-              if active_spec_id
-                eq_result = Pvp::Entries::ProcessEquipmentService.call(
-                  character:     character,
-                  raw_equipment: eq_fetch.json,
-                  spec_id:       active_spec_id,
-                  locale:        locale
+          with_deadlock_retry do
+            ApplicationRecord.transaction do
+              # --- Specialization FIRST (to get active spec_id) ---
+              if spec_fetch.changed?
+                spec_result = Pvp::Entries::ProcessSpecializationService.call(
+                  character:          character,
+                  raw_specialization: spec_fetch.json,
+                  locale:             locale
                 )
 
-                unless eq_result.success?
-                  log_service_failure("Equipment", character, eq_result.error)
+                unless spec_result.success?
+                  log_service_failure("Specialization", character, spec_result.error)
                   raise ActiveRecord::Rollback
                 end
 
-                entry_attrs.merge!(eq_result.context[:entry_attrs]) if eq_result.context[:entry_attrs]
+                entry_attrs.merge!(spec_result.context[:entry_attrs]) if spec_result.context[:entry_attrs]
+                char_attrs.merge!(spec_result.context[:char_attrs])   if spec_result.context[:char_attrs]
+                char_attrs[:talents_last_modified] = spec_fetch.last_modified if spec_fetch.last_modified.present?
+                active_spec_id      = spec_result.context[:entry_attrs]&.dig(:spec_id)
+                per_spec_hero_trees = spec_result.context[:per_spec_hero_trees] || {}
+              else
+                # 304: talents unchanged — propagate attrs from latest processed entry
+                entry_attrs.merge!(spec_entry_attrs_from_latest)
+                active_spec_id = entry_attrs[:spec_id]
               end
-              char_attrs[:equipment_last_modified] = eq_fetch.last_modified if eq_fetch.last_modified.present?
-            else
-              # 304: equipment unchanged — propagate attrs from latest processed entry
-              entry_attrs.merge!(equipment_entry_attrs_from_latest)
-            end
 
-            # Compute stat totals from character_items whenever gear changed or not yet computed.
-            if eq_changed || character.stat_pcts.blank?
-              spec_id = active_spec_id || entry_attrs[:spec_id]
-              if spec_id
-                totals_result = ComputeStatTotalsService.call(character: character, spec_id: spec_id)
-                if totals_result.success? && totals_result.payload.present?
-                  char_attrs[:stat_pcts] = totals_result.payload
+              # --- Equipment (with active_spec_id) ---
+              if eq_changed
+                if active_spec_id
+                  eq_result = Pvp::Entries::ProcessEquipmentService.call(
+                    character:     character,
+                    raw_equipment: eq_fetch.json,
+                    spec_id:       active_spec_id,
+                    locale:        locale
+                  )
+
+                  unless eq_result.success?
+                    log_service_failure("Equipment", character, eq_result.error)
+                    raise ActiveRecord::Rollback
+                  end
+
+                  entry_attrs.merge!(eq_result.context[:entry_attrs]) if eq_result.context[:entry_attrs]
+                end
+                char_attrs[:equipment_last_modified] = eq_fetch.last_modified if eq_fetch.last_modified.present?
+              else
+                # 304: equipment unchanged — propagate attrs from latest processed entry
+                entry_attrs.merge!(equipment_entry_attrs_from_latest)
+              end
+
+              # Compute stat totals from character_items whenever gear changed or not yet computed.
+              if eq_changed || character.stat_pcts.blank?
+                spec_id = active_spec_id || entry_attrs[:spec_id]
+                if spec_id
+                  totals_result = ComputeStatTotalsService.call(character: character, spec_id: spec_id)
+                  if totals_result.success? && totals_result.payload.present?
+                    char_attrs[:stat_pcts] = totals_result.payload
+                  end
                 end
               end
+
+              # --- Spec-aware entry updates ---
+              update_entries_with_spec_awareness(entries, entry_attrs, active_spec_id, per_spec_hero_trees)
+
+              char_attrs[:last_equipment_snapshot_at] = Time.current
+              char_attrs[:unavailable_until]          = nil
+
+              # rubocop:disable Rails/SkipsModelValidations
+              character.update_columns(char_attrs)
+              # rubocop:enable Rails/SkipsModelValidations
+
+              sync_done = true
             end
-
-            # --- Spec-aware entry updates ---
-            update_entries_with_spec_awareness(entries, entry_attrs, active_spec_id, per_spec_hero_trees)
-
-            char_attrs[:last_equipment_snapshot_at] = Time.current
-            char_attrs[:unavailable_until]          = nil
-
-            # rubocop:disable Rails/SkipsModelValidations
-            character.update_columns(char_attrs)
-            # rubocop:enable Rails/SkipsModelValidations
-
-            sync_done = true
-          end
+          end # with_deadlock_retry
           # rubocop:enable Metrics/BlockLength
 
           # Extra locale translations make HTTP API calls — must run OUTSIDE the DB transaction

@@ -138,13 +138,11 @@ module Pvp
           return if records.empty?
 
           # rubocop:disable Rails/SkipsModelValidations
-          with_deadlock_retry do
-            TalentSpecAssignment.upsert_all(
-              records,
-              unique_by:   %i[talent_id spec_id],
-              update_only: %i[default_points]
-            )
-          end
+          TalentSpecAssignment.upsert_all(
+            records,
+            unique_by:   %i[talent_id spec_id],
+            update_only: %i[default_points]
+          )
           # rubocop:enable Rails/SkipsModelValidations
         end
         # rubocop:enable Metrics/AbcSize
