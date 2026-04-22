@@ -154,20 +154,6 @@ module Pvp
             .where.not(character_id: active_character_ids)
             .delete_all
         end
-
-        def with_deadlock_retry(max_retries: 3)
-          retries = 0
-
-          begin
-            yield
-          rescue ActiveRecord::Deadlocked
-            retries += 1
-            raise if retries > max_retries
-
-            sleep(rand * 0.1)
-            retry
-          end
-        end
     end
   end
 end

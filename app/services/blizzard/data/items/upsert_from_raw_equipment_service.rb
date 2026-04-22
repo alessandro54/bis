@@ -42,7 +42,7 @@ module Blizzard
           }.uniq
 
           # rubocop:disable Rails/SkipsModelValidations
-          Item.upsert_all(item_records, unique_by: :blizzard_id, returning: false)
+          Item.insert_all(item_records, unique_by: :blizzard_id)
 
           # Enchantment sources and socket gems are inserted as stubs — full metadata
           # (name, quality, class) is fetched later via a dedicated sync job.
@@ -320,7 +320,7 @@ module Blizzard
             unique_records = records.uniq { |r| [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ] }
 
             # rubocop:disable Rails/SkipsModelValidations
-            Translation.upsert_all(unique_records, unique_by: %i[translatable_type translatable_id locale key])
+            Translation.insert_all(unique_records, unique_by: %i[translatable_type translatable_id locale key])
             # rubocop:enable Rails/SkipsModelValidations
           end
 

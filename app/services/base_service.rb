@@ -16,4 +16,17 @@ class BaseService
       end
       ServiceResult.failure(error, message: message, payload: payload, context: context)
     end
+
+    def with_deadlock_retry(max_retries: 5)
+      retries = 0
+      begin
+        yield
+      rescue ActiveRecord::Deadlocked
+        retries += 1
+        raise if retries > max_retries
+
+        sleep(rand * 0.1 * (2**retries))
+        retry
+      end
+    end
 end
