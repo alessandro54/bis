@@ -7,22 +7,11 @@ module Pvp
         @crafting_stats = crafting_stats
       end
 
-      # rubocop:disable Metrics/AbcSize
       def call
-        {
-          id:                 record.id,
-          item:               serialize_item_ref,
-          slot:               record.slot,
-          usage_count:        record.usage_count,
-          usage_pct:          record.usage_pct.to_f,
-          prev_usage_pct:     record.prev_usage_pct&.to_f,
-          trend:              TrendClassifier.call(record.usage_pct, record.prev_usage_pct),
-          snapshot_at:        record.snapshot_at,
-          crafted:            crafting_stats.present?,
-          top_crafting_stats: crafting_stats || []
-        }
+        { id: record.id, item: serialize_item_ref, slot: record.slot }
+          .merge(serialize_usage)
+          .merge(serialize_crafting)
       end
-      # rubocop:enable Metrics/AbcSize
 
       private
 
@@ -35,6 +24,23 @@ module Pvp
             name:        record.item.t("name", locale: locale),
             icon_url:    record.item.icon_url,
             quality:     record.item.quality
+          }
+        end
+
+        def serialize_usage
+          {
+            usage_count:    record.usage_count,
+            usage_pct:      record.usage_pct.to_f,
+            prev_usage_pct: record.prev_usage_pct&.to_f,
+            trend:          TrendClassifier.call(record.usage_pct, record.prev_usage_pct),
+            snapshot_at:    record.snapshot_at
+          }
+        end
+
+        def serialize_crafting
+          {
+            crafted:            crafting_stats.present?,
+            top_crafting_stats: crafting_stats || []
           }
         end
     end
