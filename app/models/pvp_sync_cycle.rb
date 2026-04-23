@@ -71,8 +71,11 @@ class PvpSyncCycle < ApplicationRecord
   def eta_seconds
     return nil if completed_character_batches.zero?
 
-    elapsed = Time.current - created_at
     remaining = expected_character_batches - completed_character_batches
+    return nil if remaining <= 0
+    return nil if remaining.to_f / expected_character_batches < 0.02
+
+    elapsed = Time.current - created_at
     (elapsed / completed_character_batches) * remaining
   end
 
