@@ -84,7 +84,14 @@ class PvpSyncCycle < ApplicationRecord
       milestone = crossed_milestone
       return unless milestone
 
-      Pvp::NotifyCycleProgressJob.perform_later(id, milestone)
+      Pvp::NotifyCycleProgressJob.perform_later(
+        id,
+        milestone,
+        completed_batches: completed_character_batches,
+        expected_batches:  expected_character_batches,
+        elapsed_seconds:   (Time.current - created_at).round,
+        eta_seconds_snap:  eta_seconds&.round
+      )
     end
 
     def crossed_milestone
