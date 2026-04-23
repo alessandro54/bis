@@ -13,15 +13,23 @@ module Pvp
 
       return unless stale
 
-      elapsed_m = ((Time.current - stale.created_at) / 60).round(0)
-      pct = stale.progress_pct
-
-      TelegramNotifier.send(
-        "🚨 <b>Stale cycle detected — Cycle ##{stale.id}</b>\n" \
-        "Status: #{stale.status} · #{elapsed_m}m elapsed · #{pct}% complete\n" \
-        "#{stale.completed_character_batches}/#{stale.expected_character_batches} batches\n" \
-        "Regions: #{stale.regions.join(', ')}"
-      )
+      recover_and_notify(stale)
     end
+
+    private
+
+      def recover_and_notify(cycle)
+        elapsed_m = ((Time.current - cycle.created_at) / 60).round(0)
+
+        Pvp::RecoverFailedCharacterSyncsJob.perform_later(cycle.id)
+
+        TelegramNotifier.send(
+          "🚨 <b>Stale cycle detected — Cycle ##{cycle.id}</b>\n" \
+          "Status: #{cycle.status} · #{elapsed_m}m elapsed · #{cycle.progress_pct}% complete\n" \
+          "#{cycle.completed_character_batches}/#{cycle.expected_character_batches} batches\n" \
+          "Regions: #{cycle.regions.join(', ')}\n" \
+          "⟳ Recovery triggered automatically"
+        )
+      end
   end
 end
