@@ -1,6 +1,4 @@
 class TelegramWebhooksController < ApplicationController
-  skip_before_action :verify_authenticity_token
-
   WEBHOOK_SECRET = ENV["TELEGRAM_WEBHOOK_SECRET"]
 
   def create
