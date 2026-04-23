@@ -106,10 +106,12 @@ GET  /avo                                            # Avo admin panel
 
 Four-phase pipeline, all jobs under `app/jobs/pvp/`:
 
-1. **`Pvp::SyncCurrentSeasonLeaderboardsJob`** — orchestrator; creates a `PvpSyncCycle`, discovers brackets for US+EU concurrently, calls `SyncLeaderboardService` per bracket, then enqueues `SyncCharacterBatchJob` batches to region-isolated queues (`character_sync_us`, `character_sync_eu`). Accepts `locale:` param.
-2. **`Pvp::SyncCharacterBatchJob`** — processes a batch of characters concurrently via threads; calls `SyncCharacterService` per character; atomically increments `PvpSyncCycle#completed_character_batches` and triggers `BuildAggregationsJob` when all batches finish.
-3. **`Pvp::BuildAggregationsJob`** — runs `ItemAggregationService`, `EnchantAggregationService`, `GemAggregationService`, `TalentAggregationService`, and `ClassDistributionService` per bracket.
+1. **`Pvp::SyncCurrentSeasonLeaderboardsJob`** — orchestrator; creates a `PvpSyncCycle`, discovers brackets for US+EU concurrently, calls `SyncLeaderboardService` per bracket, then enqueues `SyncCharacterBatchJob` batches to region-isolated queues (`character_sync_us`, `character_sync_eu`). Skips if a cycle is already active (notifies Telegram). Accepts `locale:` param.
+2. **`Pvp::SyncCharacterBatchJob`** — processes a batch of characters concurrently via threads; calls `SyncCharacterService` per character; atomically increments `PvpSyncCycle#completed_character_batches` and triggers `BuildAggregationsJob` when all batches finish. Skips entire batch if cycle status is `:aborted`.
+3. **`Pvp::BuildAggregationsJob`** — runs `ItemAggregationService`, `EnchantAggregationService`, `GemAggregationService`, `TalentAggregationService`, and `ClassDistributionService` per bracket. Skips if cycle is `:aborted`.
 4. **`Pvp::SyncBracketJob`** — standalone single-bracket sync (no sync cycle), for ad-hoc/manual use.
+
+`PvpSyncCycle` status machine: `syncing_leaderboards → syncing_characters → completed / failed / aborted`. Abort is set via Telegram `/abort <id>` or button; all in-flight batch and aggregation jobs respect it.
 
 ### Other Jobs
 
@@ -120,6 +122,10 @@ Four-phase pipeline, all jobs under `app/jobs/pvp/`:
 | `Items::SyncItemMetaBatchJob` | default | Fetch item metadata (icons, names) from Blizzard API |
 | `SyncTalentTreesJob` | default | Sync full talent tree from Blizzard API via `Blizzard::Data::Talents::SyncTreeService` |
 | `EnsureMetaTranslationsJob` | default | Ensure `en_US`/`es_MX` translations exist for all items, enchantments, talents in current meta |
+| `Pvp::RecoverFailedCharacterSyncsJob` | default | Re-enqueues unprocessed characters from a cycle; triggered when all batches complete |
+| `Pvp::NotifyCycleProgressJob` | default | Sends Telegram milestone notification (25/50/75%) |
+| `Pvp::NotifyFailedCharactersJob` | default | Sends `.txt` report if failed characters exceed 5% threshold |
+| `Pvp::DetectStaleCycleJob` | default | Recurring; alerts Telegram if a cycle has been stuck in `syncing_characters` for >2h |
 
 ### Service Pattern
 
@@ -188,6 +194,7 @@ Multi-database Rails setup:
 | `Pvp::SyncCurrentSeasonLeaderboardsJob` | Every 6 hours | Full leaderboard + character sync |
 | `EnsureMetaTranslationsJob` | Every 12 hours | Ensure all meta items/enchants/talents have i18n |
 | `clear_solid_queue_finished_jobs` | Every hour at :12 | Prune finished job records |
+| `Pvp::DetectStaleCycleJob` | Every 30 minutes | Alert if a cycle is stuck for >2h |
 
 ### Queue Configuration (`config/queue.yml`)
 
@@ -209,6 +216,9 @@ Set `QUEUE_PROFILE=low_resource` for a single-worker low-thread profile.
 - `Wow::Locales` — `SUPPORTED_LOCALES` (`["en_US", "es_MX"]`)
 - `ServiceResult` — result object returned by all services
 - `BatchOutcome` — tracks batch job outcomes
+- `TelegramNotifier` — fire-and-forget Telegram Bot API client; `send`, `reply`, `reply_with_buttons`, `answer_callback_query`, `send_document`
+- `TelegramCommandHandler` — handles inbound bot commands from whitelisted chat IDs; commands: `/help`, `/cycle [id]`, `/progress`, `/history`, `/errors`, `/jobs`, `/syncnow`, `/currentsync`, `/abort <id>`
+- `TelegramCallbackHandler` — handles inline keyboard button presses; actions: `abort:<cycle_id>`, `retry:<cycle_id>`
 
 ### Key Environment Variables
 
@@ -227,6 +237,10 @@ Set `QUEUE_PROFILE=low_resource` for a single-worker low-thread profile.
 | `PVP_BLIZZARD_RPS` | 95.0 | Blizzard API requests per second |
 | `PVP_BLIZZARD_HOURLY_QUOTA` | 36,000 | Blizzard API hourly request cap |
 | `PVP_PROCESSING_THREADS` | 3 | Threads for CPU-bound aggregation worker |
+| `TELEGRAM_BOT_TOKEN` | — | Telegram Bot API token |
+| `TELEGRAM_CHAT_ID` | — | Default chat for broadcast notifications |
+| `TELEGRAM_ALLOWED_CHAT_IDS` | — | Comma-separated chat IDs allowed to send commands |
+| `TELEGRAM_WEBHOOK_SECRET` | — | Secret token validated in `X-Telegram-Bot-Api-Secret-Token` header |
 
 ### Schema Highlights
 
@@ -245,6 +259,7 @@ Set `QUEUE_PROFILE=low_resource` for a single-worker low-thread profile.
 - `JobPerformanceMonitor` records duration and success/failure for every job via `JobPerformanceMetric`
 - Sentry integration (`sentry-rails`, `sentry-ruby`) for error tracking
 - `rack-attack` — blocks scanner paths, throttles 120 req/min per IP (health check exempted)
+- **Telegram Bot** — webhook at `POST /telegram/webhook` (secret header auth via `TELEGRAM_WEBHOOK_SECRET`). Commands: `/cycle [id]` (with inline buttons), `/progress`, `/history`, `/syncnow`, `/currentsync`, `/abort <id>`, `/errors`, `/jobs`. Auto-notifications: cycle milestones (25/50/75%), failed-character reports, stale-cycle alerts, deploy notifications (`rake telegram:notify_deploy` via `app.json` postdeploy). Chat IDs whitelisted via `TELEGRAM_ALLOWED_CHAT_IDS`.
 
 ### Testing
 

@@ -257,5 +257,41 @@ RSpec.describe Pvp::SyncCharacterBatchJob, type: :job do
           .to raise_error(BatchOutcome::TotalBatchFailureError, /rate_limited: 2/)
       end
     end
+
+    context "when sync_cycle_id points to an aborted cycle" do
+      let(:cycle) { create(:pvp_sync_cycle, status: :aborted) }
+
+      subject(:perform_job) do
+        described_class.perform_now(
+          character_ids: character_ids,
+          locale:        locale,
+          sync_cycle_id: cycle.id
+        )
+      end
+
+      it "skips processing without calling SyncCharacterService" do
+        perform_job
+
+        expect(Pvp::Characters::SyncCharacterService).not_to have_received(:call)
+      end
+    end
+
+    context "when sync_cycle_id points to an active cycle" do
+      let(:cycle) { create(:pvp_sync_cycle, status: :syncing_characters) }
+
+      subject(:perform_job) do
+        described_class.perform_now(
+          character_ids: character_ids,
+          locale:        locale,
+          sync_cycle_id: cycle.id
+        )
+      end
+
+      it "processes characters normally" do
+        perform_job
+
+        expect(Pvp::Characters::SyncCharacterService).to have_received(:call).twice
+      end
+    end
   end
 end

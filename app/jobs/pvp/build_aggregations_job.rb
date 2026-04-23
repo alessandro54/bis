@@ -13,7 +13,13 @@ module Pvp
       season = find_season!(pvp_season_id)
       return unless season
 
-      cycle   = sync_cycle_id ? PvpSyncCycle.find_by(id: sync_cycle_id) : nil
+      cycle = sync_cycle_id ? PvpSyncCycle.find_by(id: sync_cycle_id) : nil
+
+      if cycle&.aborted?
+        Rails.logger.info("[BuildAggregationsJob] Cycle ##{cycle.id} aborted — skipping aggregations")
+        return
+      end
+
       results = run_aggregations(season, cycle)
 
       log_completion(pvp_season_id, results)
@@ -74,7 +80,7 @@ module Pvp
         ApplicationRecord.transaction do
           old_cycle_id = season.live_pvp_sync_cycle_id
           season.update!(live_pvp_sync_cycle_id: cycle.id)
-          cycle.update!(status: :completed)
+          cycle.update!(status: :completed, completed_at: Time.current)
           purge_old_cycle_data(old_cycle_id) if old_cycle_id
         end
         clear_meta_cache
@@ -119,6 +125,7 @@ module Pvp
           aggregation_counts: results,
           elapsed_seconds:    compute_elapsed_seconds(cycle_started_at)
         )
+        Pvp::NotifyFailedCharactersJob.perform_later(cycle.id, total: total, failed: failed)
       end
 
       def log_aggregation_failure(service_class, pvp_season_id, error)

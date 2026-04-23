@@ -109,6 +109,10 @@ Pvp::SyncBracketJob.perform_later(region: "us", season: PvpSeason.current, brack
 | `PVP_BLIZZARD_HOURLY_QUOTA` | `36000` | Blizzard API hourly request cap |
 | `PVP_META_TOP_N` | `1000` | Top N entries used in meta aggregations |
 | `RAILS_MAX_THREADS` | `3` | Puma thread count |
+| `TELEGRAM_BOT_TOKEN` | — | Telegram Bot API token |
+| `TELEGRAM_CHAT_ID` | — | Default chat for broadcast notifications |
+| `TELEGRAM_ALLOWED_CHAT_IDS` | — | Comma-separated chat IDs allowed to send commands |
+| `TELEGRAM_WEBHOOK_SECRET` | — | Secret token for webhook auth |
 
 ## API Endpoints
 
@@ -129,6 +133,31 @@ GET /api/v1/pvp/meta/class_distribution     # Class distribution
 
 - **Job monitor** — `http://localhost:3000/jobs` (Mission Control UI for SolidQueue)
 - **Admin panel** — `http://localhost:3000/avo` (Avo resource management)
+
+### Telegram Bot
+
+The app exposes a Telegram bot for sync visibility and control. Register the webhook once:
+
+```bash
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://api.wowinsights.xyz/telegram/webhook&secret_token=<SECRET>"
+```
+
+**Commands:**
+
+| Command | Description |
+|---|---|
+| `/cycle [id]` | Last (or specific) cycle status with inline action buttons |
+| `/progress` | Live batch progress bar + ETA |
+| `/history` | Last 5 completed cycles with duration |
+| `/syncnow` | Trigger an immediate sync |
+| `/currentsync` | Active cycle details |
+| `/abort <id>` | Abort a running cycle |
+| `/errors` | Job errors in the last 24h |
+| `/jobs` | Job success rate summary |
+
+**Inline buttons** on `/cycle`: active cycles show **Abort**, failed/aborted cycles show **Retry failed chars**.
+
+**Auto-notifications**: sync milestones (25/50/75%), failed-character report if >5% fail, stale-cycle alert if stuck >2h, deploy notification on each Dokku deploy.
 
 ## Tests
 

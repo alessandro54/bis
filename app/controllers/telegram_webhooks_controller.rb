@@ -7,16 +7,32 @@ class TelegramWebhooksController < ApplicationController
       return
     end
 
-    update  = params.permit!.to_h
-    message = update.dig("message") || update.dig("edited_message")
-
-    if message
-      chat_id = message.dig("chat", "id")
-      text    = message["text"].to_s
-
-      TelegramCommandHandler.new(chat_id, text).call if text.start_with?("/")
-    end
+    update = params.permit!.to_h
+    dispatch_message(update.dig("message") || update.dig("edited_message")) ||
+      dispatch_callback(update.dig("callback_query"))
 
     head :ok
   end
+
+  private
+
+    def dispatch_message(message)
+      return false unless message
+
+      chat_id = message.dig("chat", "id")
+      text    = message["text"].to_s
+      TelegramCommandHandler.new(chat_id, text).call if text.start_with?("/")
+      true
+    end
+
+    def dispatch_callback(cq)
+      return false unless cq
+
+      TelegramCallbackHandler.new(
+        cq.dig("message", "chat", "id"),
+        cq["id"],
+        cq["data"].to_s
+      ).call
+      true
+    end
 end
