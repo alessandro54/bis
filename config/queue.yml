@@ -56,8 +56,8 @@ production: &production
       processes: 1
       polling_interval: 0.25
 
-    # CPU-bound: aggregations + default catch-all
-    - queues: [pvp_processing, "*"]
+    # CPU-bound: aggregations, meta sync backlog, default catch-all
+    - queues: [pvp_processing, character_sync, "*"]
       threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 3) %>
       processes: 1
       polling_interval: 0.25
