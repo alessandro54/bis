@@ -59,7 +59,7 @@ class TelegramCommandHandler
         "in progress"
 
       <<~MSG.strip
-        <b>Cycle ##{cycle.id}</b> — #{season&.name || "Season #{season&.id}"}
+        <b>Cycle ##{cycle.id}</b> — #{"Season #{season&.id}"}
         Status: <b>#{cycle.status}</b>
         Regions: #{cycle.regions.join(", ")}
         Characters: #{batches}
