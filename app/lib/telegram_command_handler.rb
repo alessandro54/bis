@@ -4,12 +4,10 @@ class TelegramCommandHandler
     "/help" => :cmd_help,
     "/cycle" => :cmd_cycle,
     "/status" => :cmd_cycle,
-    "/progress" => :cmd_progress,
     "/history" => :cmd_history,
     "/errors" => :cmd_errors,
     "/jobs" => :cmd_jobs,
     "/syncnow" => :cmd_sync_now,
-    "/currentsync" => :cmd_current_sync,
     "/abort" => :cmd_abort
   }.freeze
 
@@ -40,14 +38,12 @@ class TelegramCommandHandler
       TelegramNotifier.reply(@chat_id, <<~MSG.strip)
       <b>WoW Overseer Bot</b>
 
-      /cycle        — last sync cycle status
+      /cycle [id]   — cycle status (progress bar if active)
       /status       — alias for /cycle
-      /progress     — live batch progress + ETA
       /history      — last 5 completed cycles
       /errors       — job errors in last 24h
       /jobs         — job success rate last 24h
       /syncnow      — trigger a sync immediately
-      /currentsync  — active cycle details
       /abort &lt;id&gt;  — abort a running cycle
     MSG
     end
@@ -73,44 +69,35 @@ class TelegramCommandHandler
       end
     end
 
-    def cmd_progress
-      cycle = PvpSyncCycle.where(status: :syncing_characters).order(created_at: :desc).first
-      cycle ||= PvpSyncCycle.order(created_at: :desc).first
-      return TelegramNotifier.reply(@chat_id, "No sync cycles found.") unless cycle
-
-      TelegramNotifier.reply(@chat_id, progress_message(cycle))
-    end
-
-    def progress_message(cycle)
-      pct     = cycle.progress_pct
-      bar     = progress_bar(pct)
-      elapsed = format_elapsed(Time.current - cycle.created_at)
-      eta_str = cycle.eta_seconds ? " · ETA #{format_elapsed(cycle.eta_seconds)}" : ""
-      <<~MSG.strip
-        <b>Cycle ##{cycle.id} — #{cycle.status}</b>
-        #{bar} #{pct}%
-        #{cycle.completed_character_batches}/#{cycle.expected_character_batches} batches · #{elapsed} elapsed#{eta_str}
-      MSG
-    end
-
+    # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def cycle_message(cycle)
       season  = cycle.pvp_season
-      batches = cycle.expected_character_batches > 0 ?
-        "#{cycle.completed_character_batches}/#{cycle.expected_character_batches} batches" :
-        "pending"
-      elapsed = cycle.completed_at ?
-        "#{((cycle.completed_at - cycle.created_at) / 60).round(1)}m" :
-        "in progress"
+      active  = cycle.syncing_leaderboards? || cycle.syncing_characters?
+      elapsed = Time.current - cycle.created_at
 
-      <<~MSG.strip
-        <b>Cycle ##{cycle.id}</b> — Season #{season&.id}
-        Status: <b>#{cycle.status}</b>
-        Regions: #{cycle.regions.join(", ")}
-        Characters: #{batches}
-        Duration: #{elapsed}
-        Started: #{cycle.created_at.strftime("%H:%M UTC")}
-      MSG
+      lines = []
+      lines << "<b>Cycle ##{cycle.id}</b> — #{season&.display_name || "Season #{season&.id}"}"
+      lines << "Status: <b>#{cycle.status}</b>"
+      lines << "Regions: #{cycle.regions.join(', ')}"
+
+      if active
+        pct     = cycle.progress_pct
+        eta_str = cycle.eta_seconds ? " · ETA #{format_elapsed(cycle.eta_seconds)}" : ""
+        lines << "Progress: #{progress_bar(pct)} #{pct}%"
+        batches_line = "#{cycle.completed_character_batches}/#{cycle.expected_character_batches} batches"
+        lines << "#{batches_line} · #{format_elapsed(elapsed)} elapsed#{eta_str}"
+      elsif cycle.expected_character_batches > 0
+        duration = cycle.completed_at ? format_elapsed(cycle.completed_at - cycle.created_at) : format_elapsed(elapsed)
+        lines << "Batches: #{cycle.completed_character_batches}/#{cycle.expected_character_batches}"
+        lines << "Duration: #{duration}"
+        failed = count_failed_characters(cycle)
+        lines << (failed > 0 ? "⚠️ Errors: #{failed} chars failed" : "✅ No errors")
+      end
+
+      lines << "Started: #{format_elapsed(elapsed)} ago"
+      lines.join("\n")
     end
+    # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
 
     def cmd_history
       cycles = PvpSyncCycle.where(status: :completed)
@@ -124,7 +111,7 @@ class TelegramCommandHandler
       end
 
       lines = cycles.map do |c|
-        duration = "#{((c.completed_at - c.created_at) / 60).round(1)}m"
+        duration = format_elapsed(c.completed_at - c.created_at)
         "Cycle ##{c.id} · #{duration} · #{c.regions.join('/')}"
       end
 
@@ -142,13 +129,6 @@ class TelegramCommandHandler
 
       Pvp::SyncCurrentSeasonLeaderboardsJob.perform_later
       TelegramNotifier.reply(@chat_id, "▶️ Sync triggered.")
-    end
-
-    def cmd_current_sync
-      cycle = PvpSyncCycle.active
-      return TelegramNotifier.reply(@chat_id, "No active sync cycle.") unless cycle
-
-      TelegramNotifier.reply(@chat_id, progress_message(cycle))
     end
 
     def cmd_abort
@@ -193,6 +173,14 @@ class TelegramCommandHandler
     MSG
     end
 
+    def count_failed_characters(cycle)
+      PvpLeaderboardEntry
+        .joins(:pvp_leaderboard)
+        .where(pvp_leaderboards: { pvp_season_id: cycle.pvp_season_id })
+        .where("equipment_processed_at IS NULL OR specialization_processed_at IS NULL")
+        .count
+    end
+
     def cycle_buttons(cycle)
       if cycle.syncing_leaderboards? || cycle.syncing_characters?
         [ [ { text: "🛑 Abort", callback_data: "abort:#{cycle.id}" } ] ]
@@ -209,6 +197,7 @@ class TelegramCommandHandler
     end
 
     def format_elapsed(seconds)
+      seconds = seconds.abs
       return "#{seconds.round(0)}s" if seconds < 60
 
       m = (seconds / 60).floor

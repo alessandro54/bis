@@ -60,7 +60,10 @@ module Pvp
         eq_fallbacks_by_character_id = batch_load_eq_fallbacks(character_ids)
         sp_fallbacks_by_character_id = batch_load_spec_fallbacks(character_ids)
 
-        concurrency = safe_concurrency(CONCURRENCY, characters.size, threads: THREADS * PROCESSES)
+        # Both region workers (US + EU) run in the same OS process and share DB_POOL.
+        # Divide by REGIONS.size so the total peak across all workers stays within the pool.
+        total_threads = THREADS * PROCESSES * Pvp::RegionConfig::REGIONS.size
+        concurrency   = safe_concurrency(CONCURRENCY, characters.size, threads: total_threads)
 
         run_with_threads(characters, concurrency: concurrency) do |character|
           sync_one(
