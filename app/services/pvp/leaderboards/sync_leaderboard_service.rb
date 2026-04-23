@@ -48,7 +48,9 @@ module Pvp
           character_attrs
         end
 
-        unique_character_records = character_records.uniq { |c| [ c[:blizzard_id], c[:region] ] }
+        unique_character_records = character_records
+          .uniq { |c| [ c[:blizzard_id], c[:region] ] }
+          .sort_by { |c| [ c[:blizzard_id], c[:region] ] }
 
         upsert_result = nil
         # rubocop:disable Rails/SkipsModelValidations

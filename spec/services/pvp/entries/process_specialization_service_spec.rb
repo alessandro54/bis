@@ -231,19 +231,11 @@ RSpec.describe Pvp::Entries::ProcessSpecializationService, type: :service do
         end
       end
 
-      it "writes default_points to talent_spec_assignments for talents with dp > 0" do
+      it "does not modify default_points (owned by SyncTalentTreesJob, not character sync)" do
         result
 
         assignments = TalentSpecAssignment.where(spec_id: 256).where("default_points > 0")
-        expect(assignments.count).to eq(2)
-      end
-
-      it "stores the correct default_points value per talent" do
-        result
-
-        talent = Talent.find_by(blizzard_id: 82_717)
-        assignment = TalentSpecAssignment.find_by(talent_id: talent.id, spec_id: 256)
-        expect(assignment.default_points).to eq(1)
+        expect(assignments.count).to eq(0)
       end
 
       it "does not create default_points entries for pvp talents" do
