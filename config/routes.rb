@@ -4,6 +4,7 @@ Rails.application.routes.draw do
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
   get "up" => "rails/health#show", as: :rails_health_check
+  post "/telegram/webhook", to: "telegram_webhooks#create"
   get "api-docs" => "api_docs#index"
   get "api-docs/openapi.yaml" => "api_docs#spec"
 

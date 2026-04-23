@@ -6,17 +6,40 @@ require "uri"
 module TelegramNotifier
   API_URL = "https://api.telegram.org"
 
+  def self.allowed_chat_ids
+    raw = ENV["TELEGRAM_ALLOWED_CHAT_IDS"].to_s
+    raw.split(",").map(&:strip).reject(&:empty?)
+  end
+
+  def self.allowed?(chat_id)
+    allowed_chat_ids.include?(chat_id.to_s)
+  end
+
+  # Broadcast to the default TELEGRAM_CHAT_ID (job notifications).
   # rubocop:disable Metrics/AbcSize
   def self.send(text)
     token = ENV["TELEGRAM_BOT_TOKEN"]
     chat  = ENV["TELEGRAM_CHAT_ID"]
     return unless token.present? && chat.present?
 
-    uri  = URI("#{API_URL}/bot#{token}/sendMessage")
-    body = URI.encode_www_form(chat_id: chat, text: text, parse_mode: "HTML")
+    post_message(token, chat, text)
+  end
 
-    http           = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl   = true
+  # Reply to a specific chat_id (bot commands).
+  def self.reply(chat_id, text)
+    token = ENV["TELEGRAM_BOT_TOKEN"]
+    return unless token.present?
+
+    post_message(token, chat_id, text)
+  end
+  # rubocop:enable Metrics/AbcSize
+
+  def self.post_message(token, chat_id, text)
+    uri  = URI("#{API_URL}/bot#{token}/sendMessage")
+    body = URI.encode_www_form(chat_id: chat_id, text: text, parse_mode: "HTML")
+
+    http              = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl      = true
     http.open_timeout = 3
     http.read_timeout = 5
 
@@ -28,5 +51,5 @@ module TelegramNotifier
   rescue StandardError => e
     Rails.logger.error("[TelegramNotifier] #{e.message}")
   end
-  # rubocop:enable Metrics/AbcSize
+  private_class_method :post_message
 end

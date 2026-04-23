@@ -1,4 +1,6 @@
 class Api::V1::BaseController < ApplicationController
+  before_action :prefetch_meta_prereqs
+
   private
 
     META_CACHE_TTL = 30.minutes
@@ -41,10 +43,18 @@ class Api::V1::BaseController < ApplicationController
       value.match?(VALID_SLOT_PATTERN) ? value : nil
     end
 
+    def prefetch_meta_prereqs
+      return if Rails.env.development?
+
+      values = Rails.cache.read_multi(META_CACHE_VERSION_KEY, "pvp_season/current")
+      @meta_cache_version = values[META_CACHE_VERSION_KEY] || 0
+      @current_season     = values["pvp_season/current"]
+    end
+
     # Builds a versioned cache key so all meta caches can be busted at once
     # by incrementing the version.
     def meta_cache_key(*segments)
-      version = Rails.cache.read(META_CACHE_VERSION_KEY) || 0
+      version = @meta_cache_version ||= (Rails.cache.read(META_CACHE_VERSION_KEY) || 0)
       "pvp_meta/v#{version}/#{segments.compact.join("/")}"
     end
 
