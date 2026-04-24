@@ -49,8 +49,8 @@ class PvpSyncCycle < ApplicationRecord
 
   def increment_completed_character_batches!
     result = self.class.connection.exec_query(
-      "UPDATE pvp_sync_cycles SET completed_character_batches = completed_character_batches + 1 " \
-      "WHERE id = $1 RETURNING completed_character_batches",
+      "UPDATE pvp_sync_cycles SET completed_character_batches = completed_character_batches + 1, " \
+      "updated_at = NOW() WHERE id = $1 RETURNING completed_character_batches",
       "IncrCharacterBatches",
       [ id ]
     )
