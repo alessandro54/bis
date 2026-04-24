@@ -88,7 +88,7 @@ Rails.application.configure do
   #
   # Skip DNS rebinding protection for the default health check endpoint.
   config.host_authorization = { exclude: ->(request) { request.path == "/up" } }
-  config.hosts << "api.wowinsights.xyz"
+  config.hosts << "api.wowstats.gg"
 
   # Trust Cloudflare proxy IPs for correct remote_ip resolution
   config.action_dispatch.trusted_proxies = ActionDispatch::RemoteIp::TRUSTED_PROXIES + %w[
