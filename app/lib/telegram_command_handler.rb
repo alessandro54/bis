@@ -8,7 +8,8 @@ class TelegramCommandHandler
     "/errors" => :cmd_errors,
     "/jobs" => :cmd_jobs,
     "/syncnow" => :cmd_sync_now,
-    "/abort" => :cmd_abort
+    "/abort" => :cmd_abort,
+    "/revalidate_cache" => :cmd_revalidate_cache
   }.freeze
 
   def initialize(chat_id, text)
@@ -43,8 +44,9 @@ class TelegramCommandHandler
       /history      — last 5 completed cycles
       /errors       — job errors in last 24h
       /jobs         — job success rate last 24h
-      /syncnow      — trigger a sync immediately
-      /abort &lt;id&gt;  — abort a running cycle
+      /syncnow           — trigger a sync immediately
+      /abort &lt;id&gt;       — abort a running cycle
+      /revalidate-cache  — force Next.js cache revalidation
     MSG
     end
 
@@ -129,6 +131,15 @@ class TelegramCommandHandler
 
       Pvp::SyncCurrentSeasonLeaderboardsJob.perform_later
       TelegramNotifier.reply(@chat_id, "▶️ Sync triggered.")
+    end
+
+    def cmd_revalidate_cache
+      result = Pvp::NotifyFrontendRevalidateService.call
+      if result.success?
+        TelegramNotifier.reply(@chat_id, "✅ Frontend cache revalidated.")
+      else
+        TelegramNotifier.reply(@chat_id, "❌ Revalidation failed — check logs.")
+      end
     end
 
     def cmd_abort

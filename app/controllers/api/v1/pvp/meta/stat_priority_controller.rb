@@ -18,37 +18,29 @@ class Api::V1::Pvp::Meta::StatPriorityController < Api::V1::BaseController
   private
 
     def build_stats
-      rows = stat_pct_rows
+      rows = stat_medians_sql
       return [] if rows.empty?
 
-      compute_medians(rows)
-        .sort_by { |_, median| -median }
-        .map { |stat, median| { stat: stat, median: median.round(1) } }
+      rows.map { |stat, median| { stat: stat, median: median.to_f.round(1) } }
     end
 
-    def stat_pct_rows
-      Character
-        .joins(pvp_leaderboard_entries: :pvp_leaderboard)
-        .where(pvp_leaderboards: { bracket: bracket_param, pvp_season: current_season })
-        .where(pvp_leaderboard_entries: { spec_id: spec_id_param })
-        .where("stat_pcts <> '{}'")
-        .pluck(:stat_pcts)
-    end
-
-    def compute_medians(rows)
-      collect_stat_values(rows).transform_values { |values| median_of(values) }
-    end
-
-    def collect_stat_values(rows)
-      stat_values = Hash.new { |h, k| h[k] = [] }
-      rows.each { |pcts| pcts.each { |stat, rating| stat_values[stat] << rating.to_i } }
-      stat_values
-    end
-
-    def median_of(values)
-      sorted = values.sort
-      mid    = sorted.size / 2
-      sorted.size.odd? ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2.0
+    def stat_medians_sql
+      conn = ApplicationRecord.connection
+      conn.select_rows(<<~SQL.squish)
+        SELECT
+          kv.key AS stat,
+          PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY kv.value::numeric) AS median
+        FROM characters
+        INNER JOIN pvp_leaderboard_entries ON pvp_leaderboard_entries.character_id = characters.id
+        INNER JOIN pvp_leaderboards ON pvp_leaderboards.id = pvp_leaderboard_entries.pvp_leaderboard_id
+        CROSS JOIN LATERAL jsonb_each_text(characters.stat_pcts) AS kv(key, value)
+        WHERE pvp_leaderboards.bracket = #{conn.quote(bracket_param)}
+          AND pvp_leaderboards.pvp_season_id = #{current_season.id.to_i}
+          AND pvp_leaderboard_entries.spec_id = #{spec_id_param.to_i}
+          AND characters.stat_pcts <> '{}'
+        GROUP BY kv.key
+        ORDER BY median DESC
+      SQL
     end
 
     def validate_params!
