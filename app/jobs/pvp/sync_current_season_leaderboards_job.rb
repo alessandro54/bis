@@ -8,6 +8,14 @@ module Pvp
 
     # rubocop:disable Metrics/MethodLength, Metrics/AbcSize
     def perform(locale: "en_US")
+      if (active = PvpSyncCycle.active)
+        TelegramNotifier.send(
+          "⏭️ <b>Sync skipped</b> — Cycle ##{active.id} still running\n" \
+          "Status: #{active.status} · #{active.progress_pct}% complete"
+        )
+        return
+      end
+
       begin
         Blizzard::Data::PvpSeasons::SyncCurrentSeasonService.call
       rescue => e # rubocop:disable Style/RescueStandardError

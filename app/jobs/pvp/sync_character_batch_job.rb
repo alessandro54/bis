@@ -22,10 +22,8 @@ module Pvp
 
       ids = Array(character_ids).compact
       return if ids.empty?
+      return if cycle_aborted?(sync_cycle_id)
 
-      # No TTL filter here — the service decides whether to fetch from
-      # Blizzard (TTL expired) or reuse cached data (recently synced).
-      # Either way, new entries always get processed.
       characters_by_id = Character
         .where(id: ids)
         .where(is_private: false)
@@ -37,10 +35,6 @@ module Pvp
       return if characters_by_id.empty?
 
       outcome = BatchOutcome.new
-
-      # Characters are fetched from the Blizzard API and processed inline —
-      # equipment and talents are written directly to character_items /
-      # character_talents without an intermediate blob storage step.
       process_characters_concurrently(characters_by_id.values, locale, outcome)
 
       Rails.logger.info(outcome.summary_message(job_label: "SyncCharacterBatchJob"))
@@ -66,7 +60,10 @@ module Pvp
         eq_fallbacks_by_character_id = batch_load_eq_fallbacks(character_ids)
         sp_fallbacks_by_character_id = batch_load_spec_fallbacks(character_ids)
 
-        concurrency = safe_concurrency(CONCURRENCY, characters.size, threads: THREADS * PROCESSES)
+        # Both region workers (US + EU) run in the same OS process and share DB_POOL.
+        # Divide by REGIONS.size so the total peak across all workers stays within the pool.
+        total_threads = THREADS * PROCESSES * Pvp::RegionConfig::REGIONS.size
+        concurrency   = safe_concurrency(CONCURRENCY, characters.size, threads: total_threads)
 
         run_with_threads(characters, concurrency: concurrency) do |character|
           sync_one(
@@ -143,6 +140,17 @@ module Pvp
         outcome.record_failure(id: character&.id, status: :unexpected_error, error: "#{e.class}: #{e.message}")
       end
       # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
+
+      def cycle_aborted?(sync_cycle_id)
+        return false unless sync_cycle_id
+
+        if PvpSyncCycle.where(id: sync_cycle_id, status: :aborted).exists?
+          Rails.logger.info("[SyncCharacterBatchJob] Cycle ##{sync_cycle_id} aborted — skipping batch")
+          return true
+        end
+
+        false
+      end
 
       def enqueue_meta_sync_for_stale(character_ids)
         stale_ids = Character

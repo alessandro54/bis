@@ -93,4 +93,33 @@ RSpec.describe Pvp::BuildAggregationsJob, type: :job do
       expect(season.reload.live_pvp_sync_cycle_id).to be_nil
     end
   end
+
+  describe "abort guard" do
+    context "when cycle is aborted" do
+      let(:cycle) { create(:pvp_sync_cycle, pvp_season: season, status: :aborted) }
+
+      it "skips aggregations entirely" do
+        described_class.new.perform(pvp_season_id: season.id, sync_cycle_id: cycle.id)
+
+        [
+          Pvp::Meta::ItemAggregationService,
+          Pvp::Meta::EnchantAggregationService,
+          Pvp::Meta::GemAggregationService,
+          Pvp::Meta::TalentAggregationService
+        ].each { |svc| expect(svc).not_to have_received(:call) }
+      end
+
+      it "does not change cycle status" do
+        described_class.new.perform(pvp_season_id: season.id, sync_cycle_id: cycle.id)
+
+        expect(cycle.reload.status).to eq("aborted")
+      end
+
+      it "does not promote the cycle to live" do
+        described_class.new.perform(pvp_season_id: season.id, sync_cycle_id: cycle.id)
+
+        expect(season.reload.live_pvp_sync_cycle_id).to be_nil
+      end
+    end
+  end
 end

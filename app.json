@@ -15,7 +15,8 @@
   },
   "scripts": {
     "dokku": {
-      "predeploy": "bundle exec rails db:prepare"
+      "predeploy": "bundle exec rails db:prepare",
+      "postdeploy": "bundle exec rake telegram:notify_deploy"
     }
   }
 }

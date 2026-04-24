@@ -30,12 +30,11 @@ production: &production
   workers:
     # US characters — dedicated worker so a Blizzard US rate-limit never stalls EU.
     # PVP_SYNC_THREADS controls SolidQueue parallelism AND safe_concurrency math inside
-    # SyncCharacterBatchJob. PVP_CHARACTER_SYNC_PROCESSES adds parallel OS processes for
-    # the same queue (sharding). safe_concurrency divides by THREADS * PROCESSES so the
-    # total peak DB connections stays within DB_POOL across all processes:
-    #   per_thread = floor(DB_POOL / (PVP_SYNC_THREADS * PVP_CHARACTER_SYNC_PROCESSES)) - 1
-    #   8 threads, 1 process  → 15 chars/job → 120 peak connections (safe under pool of 130)
-    #   8 threads, 2 processes → 7 chars/job → 112 peak connections (safe, 2× throughput)
+    # SyncCharacterBatchJob. Both US and EU workers run in the same process and share
+    # DB_POOL, so safe_concurrency divides by THREADS * PROCESSES * REGIONS (2).
+    #   per_thread = floor(DB_POOL / (PVP_SYNC_THREADS * PVP_CHARACTER_SYNC_PROCESSES * 2)) - 1
+    #   8 threads, 1 process  → 7 chars/job → 7×8×2=112 peak connections (safe under pool of 130)
+    #   8 threads, 2 processes → 3 chars/job → 3×16×2=96 peak connections (safe, 2× throughput)
     - queues: [character_sync_us]
       threads: <%= ENV.fetch("PVP_SYNC_THREADS", 8) %>
       processes: <%= ENV.fetch("PVP_CHARACTER_SYNC_PROCESSES", 1) %>
@@ -57,8 +56,8 @@ production: &production
       processes: 1
       polling_interval: 0.25
 
-    # CPU-bound: aggregations + default catch-all
-    - queues: [pvp_processing, "*"]
+    # CPU-bound: aggregations, meta sync backlog, default catch-all
+    - queues: [pvp_processing, character_sync, "*"]
       threads: <%= ENV.fetch("PVP_PROCESSING_THREADS", 3) %>
       processes: 1
       polling_interval: 0.25
