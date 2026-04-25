@@ -28,7 +28,7 @@ Rails.application.routes.draw do
           resources :gems, only: [ :index ]
           resources :stats, only: [ :index ]
           resources :specs, only: %i[index show]
-          resources :talents, only: [ :index ]
+          resources :talents, only: %i[index show]
           get :class_distribution, to: "class_distributions#show"
           get :top_players, to: "top_players#index"
           get :stat_priority, to: "stat_priority#show"

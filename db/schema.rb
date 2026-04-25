@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_24_173203) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -78,6 +78,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_22_031915) do
     t.index ["blizzard_id", "region"], name: "index_characters_on_blizzard_id_and_region", unique: true
     t.index ["is_private"], name: "index_characters_on_is_private", where: "(is_private = true)"
     t.index ["name", "realm", "region"], name: "index_characters_on_name_and_realm_and_region"
+    t.index ["stat_pcts"], name: "index_characters_on_stat_pcts", using: :gin
     t.index ["unavailable_until"], name: "index_characters_on_unavailable_until_active", where: "(unavailable_until IS NOT NULL)"
   end
 

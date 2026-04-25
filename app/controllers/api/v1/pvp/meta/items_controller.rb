@@ -26,7 +26,11 @@ class Api::V1::Pvp::Meta::ItemsController < Api::V1::BaseController
       crafting_map = Pvp::Meta::CraftingStatsQuery.new(
         items.map(&:item_id), season:, bracket: bracket_param, spec_id: spec_id_param
       ).call
-      items.map { |r| Pvp::Meta::ItemSerializer.new(r, locale: locale_param, crafting_stats: crafting_map[r.item_id]).call }
+      serialized = items.map { |r| Pvp::Meta::ItemSerializer.new(r, locale: locale_param, crafting_stats: crafting_map[r.item_id]).call }
+      {
+        meta:  { snapshot_at: items.first&.snapshot_at },
+        items: serialized
+      }
     end
 
     def filtered_items(season)

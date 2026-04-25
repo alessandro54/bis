@@ -8,6 +8,18 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
     set_cache_headers
   end
 
+  def show
+    talent = Talent.includes(:translations).find_by(id: params[:id])
+    return render json: { error: "not found" }, status: :not_found unless talent
+
+    cache_key = "talents/tooltip/v1/#{params[:id]}/#{locale_param}"
+    json = Rails.cache.fetch(cache_key, expires_in: 24.hours) do
+      { id: talent.id, description: talent.t("description", locale: locale_param) }
+    end
+    render json: json
+    set_cache_headers(max_age: 24.hours, stale_while_revalidate: 48.hours)
+  end
+
   private
 
     def serialize_talents_response
@@ -125,8 +137,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         usage_pct:      record.usage_pct.to_f,
         in_top_build:   record.in_top_build,
         top_build_rank: record.top_build_rank,
-        tier:           record.tier,
-        snapshot_at:    record.snapshot_at
+        tier:           record.tier
       }
     end
 
@@ -139,8 +150,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         usage_pct:      0.0,
         in_top_build:   false,
         top_build_rank: 0,
-        tier:           dp > 0 ? "bis" : "common",
-        snapshot_at:    nil
+        tier:           dp > 0 ? "bis" : "common"
       }
     end
 
@@ -149,7 +159,6 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         id:                    t.id,
         blizzard_id:           t.blizzard_id,
         name:                  t.t("name", locale: locale_param),
-        description:           t.t("description", locale: locale_param),
         talent_type:           talent_type,
         spell_id:              t.spell_id,
         node_id:               t.node_id,
@@ -182,6 +191,8 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
     end
 
     def validate_params!
+      return if action_name == "show"
+
       validate_bracket!(params.require(:bracket)) or return
       validate_spec_id!(params.require(:spec_id)) or return
     end
