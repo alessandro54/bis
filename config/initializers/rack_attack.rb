@@ -32,8 +32,9 @@ class Rack::Attack
   }
 
   # Return 429 for throttled requests
-  self.throttled_responder = ->(env) {
-    retry_after = (env["rack.attack.match_data"] || {})[:period]
+  # Rack::Attack v5+ passes a Request object, not a raw env hash.
+  self.throttled_responder = ->(req) {
+    retry_after = (req.env["rack.attack.match_data"] || {})[:period]
     [ 429, { "content-type" => "text/plain", "retry-after" => retry_after.to_s }, [ "Rate limit exceeded" ] ]
   }
 

@@ -1,6 +1,8 @@
 class SyncTalentTreesJob < ApplicationJob
   queue_as :default
 
+  retry_on Blizzard::Client::Error, wait: :polynomially_longer, attempts: 3
+
   def perform(region: "us", locale: "en_US", force: false)
     result = Blizzard::Data::Talents::SyncTreeService.call(region:, locale:, force:)
 

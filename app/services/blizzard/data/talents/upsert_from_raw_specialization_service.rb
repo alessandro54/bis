@@ -1,7 +1,7 @@
 module Blizzard
   module Data
     module Talents
-      class UpsertFromRawSpecializationService
+      class UpsertFromRawSpecializationService < BaseService
         TALENT_CACHE_TTL = 1.hour
 
         def self.call(raw_specialization:, locale: "en_US")
@@ -73,12 +73,15 @@ module Blizzard
           # Deduplicate by blizzard_id
           unique_records = talent_records.uniq { |r| r[:blizzard_id] }
 
-          # Insert talent entities — skip on conflict. blizzard_id/talent_type/spell_id are
-          # static reference data; DO NOTHING avoids ShareLock contention under concurrent syncs.
+          # Upsert talent entities, updating talent_type on conflict. Hero classification
+          # comes from character profile data and is more authoritative than the static tree
+          # API (which keeps gateway talents like Halo in class_talent_nodes). Updating
+          # talent_type here self-heals any drift introduced by SyncTreeService.
           # rubocop:disable Rails/SkipsModelValidations
-          Talent.insert_all(
+          Talent.upsert_all(
             unique_records.map { |r| r.except(:name) },
-            unique_by: :blizzard_id
+            unique_by:   :blizzard_id,
+            update_only: [ :talent_type ]
           )
           # rubocop:enable Rails/SkipsModelValidations
 

@@ -1,5 +1,5 @@
 module Admin
-  class LeaderboardDistribution
+  class LeaderboardDistribution < BaseService
     CLASS_COLORS = {
       "warrior" => "#C79C6E",
       "paladin" => "#F58CBA",

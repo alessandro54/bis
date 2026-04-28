@@ -17,14 +17,14 @@ module Pvp
     def call
       season = PvpSeason.find_by(id: pvp_season_id)
       unless season
-        Rails.logger.warn("[BuildAggregationsService] Season #{pvp_season_id} not found, skipping")
+        log_warn("Season #{pvp_season_id} not found, skipping")
         return success(nil)
       end
 
       cycle = sync_cycle_id ? PvpSyncCycle.find_by(id: sync_cycle_id) : nil
 
       if cycle&.aborted?
-        Rails.logger.info("[BuildAggregationsService] Cycle ##{cycle.id} aborted — skipping aggregations")
+        log_info("Cycle ##{cycle.id} aborted — skipping aggregations")
         return success(nil)
       end
 
@@ -66,9 +66,7 @@ module Pvp
           Pvp::Meta::TalentIntegrityCheckService.call(season: season, cycle: cycle) if key == :talents
           [ key, result.context[:count] ]
         else
-          Rails.logger.error(
-            "[BuildAggregationsService] #{service_class} failed for season #{season.id}: #{result.error}"
-          )
+          log_error("#{service_class} failed for season #{season.id}: #{result.error}")
           Pvp::SyncLogger.error("#{service_class} failed for season #{season.id}: #{result.error}")
           [ key, :failed ]
         end
@@ -129,12 +127,12 @@ module Pvp
 
       def bump_meta_cache
         Rails.cache.increment(Api::V1::BaseController::META_CACHE_VERSION_KEY)
-        Rails.logger.info("[BuildAggregationsService] Meta cache version bumped")
+        log_info("Meta cache version bumped")
       end
 
       def log_completion(results)
-        Rails.logger.info(
-          "[BuildAggregationsService] Season #{pvp_season_id} done — " \
+        log_info(
+          "Season #{pvp_season_id} done — " \
           "items: #{results[:items]}, enchants: #{results[:enchants]}, " \
           "gems: #{results[:gems]}, talents: #{results[:talents]}"
         )

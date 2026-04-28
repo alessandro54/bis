@@ -57,7 +57,7 @@ module Pvp
             "⚠️ <b>Talent integrity error</b>\n" \
             "Season #{season.display_name} — hero talents missing:\n#{lines}"
           )
-          Rails.logger.warn("[TalentIntegrityCheckService] Hero talents missing for: #{violations.inspect}")
+          log_warn("Hero talents missing for: #{violations.inspect}")
         end
     end
   end

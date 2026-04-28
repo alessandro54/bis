@@ -2,7 +2,7 @@
 
 module Pvp
   module Meta
-    class ClassDistributionService
+    class ClassDistributionService < BaseService
       # --- Reliability priors ---
       WINRATE_PRIOR_GAMES   = 5_000.0
       WINRATE_PRIOR_WINRATE = 0.5
