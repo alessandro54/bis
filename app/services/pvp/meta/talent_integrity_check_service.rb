@@ -13,10 +13,10 @@ module Pvp
 
       def call
         violations = find_violations
-        return success(violations: []) if violations.empty?
+        return success(nil, context: { violations: [] }) if violations.empty?
 
         notify(violations)
-        success(violations: violations)
+        success(nil, context: { violations: violations })
       end
 
       private
