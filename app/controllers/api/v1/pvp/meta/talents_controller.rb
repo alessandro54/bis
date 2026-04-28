@@ -165,7 +165,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
         display_row:           t.display_row,
         display_col:           t.display_col,
         max_rank:              t.max_rank,
-        icon_url:              CdnProxy.rewrite(t.icon_url),
+        icon_url:              t.icon_url,
         default_points:        default_points[t.id] || 0,
         prerequisite_node_ids: prereqs[t.node_id] || []
       }

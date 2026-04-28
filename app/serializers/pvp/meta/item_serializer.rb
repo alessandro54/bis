@@ -22,7 +22,7 @@ module Pvp
             id:          record.item.id,
             blizzard_id: record.item.blizzard_id,
             name:        record.item.t("name", locale: locale),
-            icon_url:    CdnProxy.rewrite(record.item.icon_url),
+            icon_url:    record.item.icon_url,
             quality:     record.item.quality
           }
         end
