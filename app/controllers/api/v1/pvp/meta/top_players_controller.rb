@@ -134,7 +134,7 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
           losses:     row.losses,
           rank:       row.rank,
           score:      row.score.to_f,
-          avatar_url: proxy_avatar_url(row.avatar_url),
+          avatar_url: CdnProxy.rewrite(row.avatar_url),
           class_slug: row.class_slug
         }
       end
@@ -146,19 +146,5 @@ class Api::V1::Pvp::Meta::TopPlayersController < Api::V1::BaseController
 
     def format_region(region)
       region.to_s.upcase
-    end
-
-    BLIZZARD_CDN_HOST = "render.worldofwarcraft.com"
-    CDN_AVATAR_BASE   = "https://cdn.wowstats.gg/avatars"
-
-    def proxy_avatar_url(url)
-      return nil unless url.present?
-
-      uri = URI.parse(url)
-      return url unless uri.host == BLIZZARD_CDN_HOST
-
-      "#{CDN_AVATAR_BASE}#{uri.path}"
-    rescue URI::InvalidURIError
-      url
     end
 end

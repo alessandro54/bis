@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_24_173203) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_26_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -48,6 +48,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_173203) do
     t.index ["character_id", "spec_id"], name: "idx_character_talents_on_char_spec"
     t.index ["character_id", "talent_id", "spec_id"], name: "idx_character_talents_on_char_talent_spec", unique: true
     t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
+    t.index ["spec_id", "talent_type", "talent_id"], name: "idx_character_talents_spec_type_talent"
     t.index ["talent_id"], name: "index_character_talents_on_talent_id"
   end
 
@@ -143,6 +144,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_24_173203) do
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["id", "equipment_processed_at"], name: "index_entries_for_batch_processing"
     t.index ["pvp_leaderboard_id", "rating"], name: "index_entries_on_leaderboard_and_rating"
+    t.index ["pvp_leaderboard_id", "spec_id", "character_id"], name: "idx_entries_for_talent_player_count", where: "(specialization_processed_at IS NOT NULL)"
     t.index ["pvp_leaderboard_id", "spec_id", "rating"], name: "index_entries_for_spec_meta"
     t.index ["pvp_leaderboard_id"], name: "index_pvp_leaderboard_entries_on_pvp_leaderboard_id"
     t.index ["rank"], name: "index_pvp_leaderboard_entries_on_rank"

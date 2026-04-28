@@ -309,6 +309,10 @@ module Pvp
         # TalentSpecAssignment for the current spec. Merge its usage into the
         # canonical (TSA-assigned) entry and discard the stale one.
         #
+        # When no canonical appears in the current rows (e.g. no player uses the
+        # new blizzard_id yet in this bracket), remap the stale row to the
+        # canonical talent_id so max_rank/spell_id come from the correct record.
+        #
         # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def merge_stale_variants(rows)
           return rows if rows.empty?
@@ -323,24 +327,65 @@ module Pvp
             .pluck(:talent_id, :spec_id)
             .to_set
 
+          # Canonical talent_id lookup for stale rows whose canonical is not in
+          # the current rows. Keyed by [spec_id, name] → single assigned talent_id.
+          # Skips ambiguous cases (multiple assigned talents with the same name = choice node).
+          canonical_by_spec_name = build_canonical_tid_map(spec_ids, names.values.uniq.compact)
+
           rows
             .group_by { |r| [ r["bracket"], r["spec_id"], names[r["talent_id"]] ] }
-            .flat_map do |(_bracket, spec_id, _name), group|
-              next group if group.size == 1
-
+            .flat_map do |(_bracket, spec_id, name), group|
               canonical = group.select { |r| assigned_ids.include?([ r["talent_id"], spec_id ]) }
-              stale     = group.reject { |r| assigned_ids.include?([ r["talent_id"], spec_id ]) }
 
-              # Only discard stale when exactly one canonical entry exists; otherwise pass through unchanged.
-              next group unless canonical.size == 1
+              # Happy path: exactly one canonical in current rows — discard stale.
+              next canonical if canonical.size == 1
 
-              # Do not sum stale usage into canonical — re-processed characters contribute to both
-              # old and new CharacterTalent records, so summing would double-count and exceed 100%.
-              # Just keep the canonical entry and discard the stale ones.
-              canonical
+              # Multiple canonicals (real choice node) or all canonical: pass through.
+              next group if canonical.size > 1 || canonical.size == group.size
+
+              # All entries are stale (no TSA match in current rows).
+              # Remap the highest-usage row to the canonical talent_id so that
+              # max_rank/spell_id come from the correct record.
+              if name
+                canonical_tid = canonical_by_spec_name[[ spec_id, name ]]
+                if canonical_tid
+                  remapped = group.max_by { |r| r["usage_pct"].to_f }.dup
+                  remapped["talent_id"] = canonical_tid
+                  next [ remapped ]
+                end
+              end
+
+              # No assigned canonical found: pass through unchanged.
+              group
             end
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+        # Returns { [spec_id, name] => talent_id } for names that map to exactly
+        # one assigned talent per spec (skips choice nodes with multiple assignments).
+        # rubocop:disable Metrics/AbcSize
+        def build_canonical_tid_map(spec_ids, names)
+          return {} if names.empty?
+
+          assigned_pairs = TalentSpecAssignment.where(spec_id: spec_ids).pluck(:talent_id, :spec_id)
+          tid_names      = load_tid_names(assigned_pairs.map(&:first).uniq)
+
+          assigned_pairs
+            .select { |(tid, _)| names.include?(tid_names[tid]) }
+            .group_by { |(tid, sid)| [ sid, tid_names[tid] ] }
+            .each_with_object({}) do |((sid, name), pairs), h|
+              next unless pairs.size == 1
+
+              h[[ sid, name ]] = pairs.first.first
+            end
+        end
+        # rubocop:enable Metrics/AbcSize
+
+        def load_tid_names(talent_ids)
+          Translation
+            .where(translatable_type: "Talent", translatable_id: talent_ids, key: "name", locale: "en_US")
+            .pluck(:translatable_id, :value).to_h
+        end
 
         # ── Drop unresolvable stale talents ─────────────────────────────
         #

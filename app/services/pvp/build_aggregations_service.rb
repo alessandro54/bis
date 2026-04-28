@@ -63,6 +63,7 @@ module Pvp
       def run_single_aggregation(key, service_class, season, cycle)
         result = service_class.call(season: season, cycle: cycle)
         if result.success?
+          Pvp::Meta::TalentIntegrityCheckService.call(season: season, cycle: cycle) if key == :talents
           [ key, result.context[:count] ]
         else
           Rails.logger.error(
