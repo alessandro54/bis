@@ -39,7 +39,7 @@ class BatchOutcome
     failed    = @failures.size
     breakdown = counts_by_status.map { |status, count| "#{status}=#{count}" }.join(" ")
 
-    ctx = []
+    ctx = [] # : Array[String]
     ctx << "cycle=#{cycle_id}" if cycle_id
     ctx << "region=#{region}"  if region
     prefix = ctx.any? ? "[#{ctx.join(' ')}] " : ""
