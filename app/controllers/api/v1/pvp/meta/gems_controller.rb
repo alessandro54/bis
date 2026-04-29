@@ -6,6 +6,7 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
     json = meta_cache_fetch(cache_key) { serialize_gems_response }
     render json: json
     set_cache_headers
+    enqueue_unsynced_items
   end
 
   private
@@ -31,5 +32,13 @@ class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
       scope = scope.where(slot: slot_param) if slot_param.present?
       scope = scope.where(socket_type: socket_type_param) if socket_type_param.present?
       scope
+    end
+
+    def enqueue_unsynced_items
+      gems = PvpMetaGemPopularity
+        .includes(:item)
+        .where(pvp_season: meta_season_for(PvpMetaGemPopularity), bracket: bracket_param, spec_id: spec_id_param)
+      unsynced_ids = gems.map(&:item).reject(&:meta_synced?).map(&:id)
+      Items::SyncItemMetaBatchJob.perform_later(item_ids: unsynced_ids) if unsynced_ids.any?
     end
 end
