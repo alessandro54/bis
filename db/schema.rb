@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_26_000001) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_28_000002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -45,6 +45,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_26_000001) do
     t.bigint "talent_id", null: false
     t.string "talent_type", null: false
     t.datetime "updated_at", null: false
+    t.index ["character_id", "spec_id"], name: "idx_character_talents_covering_for_agg", where: "(rank > 0)", include: ["talent_id"]
     t.index ["character_id", "spec_id"], name: "idx_character_talents_on_char_spec"
     t.index ["character_id", "talent_id", "spec_id"], name: "idx_character_talents_on_char_talent_spec", unique: true
     t.index ["character_id", "talent_type"], name: "idx_character_talents_on_char_and_type"
@@ -143,6 +144,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_26_000001) do
     t.index ["character_id"], name: "index_pvp_leaderboard_entries_on_character_id"
     t.index ["hero_talent_tree_id"], name: "index_pvp_leaderboard_entries_on_hero_talent_tree_id"
     t.index ["id", "equipment_processed_at"], name: "index_entries_for_batch_processing"
+    t.index ["pvp_leaderboard_id", "character_id", "rating"], name: "idx_entries_top_chars_equipment", order: { rating: :desc }, where: "((spec_id IS NOT NULL) AND (equipment_processed_at IS NOT NULL))"
+    t.index ["pvp_leaderboard_id", "character_id", "rating"], name: "idx_entries_top_chars_specialization", order: { rating: :desc }, where: "((spec_id IS NOT NULL) AND (specialization_processed_at IS NOT NULL))"
     t.index ["pvp_leaderboard_id", "rating"], name: "index_entries_on_leaderboard_and_rating"
     t.index ["pvp_leaderboard_id", "spec_id", "character_id"], name: "idx_entries_for_talent_player_count", where: "(specialization_processed_at IS NOT NULL)"
     t.index ["pvp_leaderboard_id", "spec_id", "rating"], name: "index_entries_for_spec_meta"

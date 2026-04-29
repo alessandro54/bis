@@ -245,7 +245,6 @@ module Pvp
             ORDER BY tu.bracket, tu.spec_id, tu.talent_type, tu.usage_count DESC
           SQL
 
-          ApplicationRecord.connection.execute("SET LOCAL work_mem = '256MB'")
           ApplicationRecord.connection.select_all(
             ApplicationRecord.sanitize_sql_array(
               [ sql, {

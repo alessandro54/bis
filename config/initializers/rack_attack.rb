@@ -7,6 +7,7 @@ class Rack::Attack
     wp-login
     wp-content
     wp-includes
+    wp-json
     phpmyadmin
     phpMyAdmin
     xmlrpc.php
@@ -31,8 +32,7 @@ class Rack::Attack
     [ 403, { "content-type" => "text/plain" }, [ "Forbidden" ] ]
   }
 
-  # Return 429 for throttled requests
-  # Rack::Attack v5+ passes a Request object, not a raw env hash.
+  # Rack::Attack passes a Request object — use .env to reach the raw Rack env.
   self.throttled_responder = ->(req) {
     retry_after = (req.env["rack.attack.match_data"] || {})[:period]
     [ 429, { "content-type" => "text/plain", "retry-after" => retry_after.to_s }, [ "Rate limit exceeded" ] ]

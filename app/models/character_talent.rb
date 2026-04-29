@@ -15,6 +15,7 @@
 #
 # Indexes
 #
+#  idx_character_talents_covering_for_agg     (character_id,spec_id) WHERE (rank > 0)
 #  idx_character_talents_on_char_and_type     (character_id,talent_type)
 #  idx_character_talents_on_char_spec         (character_id,spec_id)
 #  idx_character_talents_on_char_talent_spec  (character_id,talent_id,spec_id) UNIQUE

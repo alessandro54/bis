@@ -177,6 +177,9 @@ module Pvp
         cycle.increment_completed_character_batches!
 
         if cycle.all_character_batches_done?
+          elapsed = (Time.current - cycle.created_at).round
+          season_name = cycle.pvp_season&.display_name || "Season #{cycle.pvp_season_id}"
+          Pvp::SyncLogger.characters_complete(cycle: cycle, season_name: season_name, elapsed_seconds: elapsed)
           Pvp::RecoverFailedCharacterSyncsJob.perform_later(cycle.id)
         end
       rescue => e
