@@ -11,20 +11,14 @@
 #    Fixed by: restoring hero for all siblings sharing that node_id.
 #
 # 2. Fully-downgraded gateway nodes — every variant was downgraded to "class",
-#    so there is no surviving "hero" sibling on the node.  These gateway nodes
-#    are identifiable by their node_ids sitting inside a run of hero-tree
-#    node_ids (≥ 9 of the 11 nearest node_ids belong to hero talents).
-#    Currently confirmed: node_id 94697 (Halo, Shadow/Holy Priest) and
-#    node_id 94684 (Void Torrent, Shadow Priest).
+#    so there is no surviving "hero" sibling. These nodes are detected structurally:
+#    a node qualifies when it has no hero variants left AND at least 8 of its 10
+#    nearest node_id neighbours belong to hero talents. This signals a gateway node
+#    sitting inside a hero-tree block — no hardcoded IDs needed.
 #
 # After this migration, UpsertFromRawSpecializationService has been patched with
 # a `where.not(talent_type: "hero")` guard so this regression cannot recur.
 class FixHeroTalentTypeDowngrade < ActiveRecord::Migration[8.0]
-  # node_ids of gateway/apex talents that are fully downgraded (no hero sibling survives).
-  # Halo sits at node_id 94697; Void Torrent at 94684.  Both are surrounded by
-  # Shadow/Holy Priest hero-tree node_ids (94677–94703).
-  FULLY_DOWNGRADED_GATEWAY_NODE_IDS = [ 94697, 94684 ].freeze
-
   def up
     # Pass 1: restore siblings whose node_id still has at least one hero variant.
     result1 = execute(<<~SQL)
@@ -40,19 +34,41 @@ class FixHeroTalentTypeDowngrade < ActiveRecord::Migration[8.0]
       AND talent_type != 'hero'
     SQL
 
-    # Pass 2: restore fully-downgraded gateway nodes (no hero sibling survives).
-    node_ids_sql = FULLY_DOWNGRADED_GATEWAY_NODE_IDS.join(", ")
+    # Pass 2: restore fully-downgraded gateway nodes.
+    # Detected structurally: node_ids where every talent lost its 'hero' type
+    # AND >= 8 of the 10 surrounding node_ids belong to hero talents.
     result2 = execute(<<~SQL)
+      WITH hero_node_ids AS (
+        SELECT DISTINCT node_id FROM talents WHERE talent_type = 'hero' AND node_id IS NOT NULL
+      ),
+      fully_downgraded AS (
+        SELECT node_id
+        FROM talents
+        WHERE node_id IS NOT NULL
+        GROUP BY node_id
+        HAVING COUNT(*) FILTER (WHERE talent_type = 'hero') = 0
+           AND COUNT(*) FILTER (WHERE talent_type != 'pvp') > 0
+      ),
+      gateway_nodes AS (
+        SELECT fd.node_id
+        FROM fully_downgraded fd
+        WHERE (
+          SELECT COUNT(*)
+          FROM hero_node_ids h
+          WHERE h.node_id BETWEEN fd.node_id - 5 AND fd.node_id + 5
+        ) >= 8
+      )
       UPDATE talents
       SET talent_type = 'hero',
           updated_at  = NOW()
-      WHERE node_id IN (#{node_ids_sql})
-        AND talent_type != 'hero'
+      FROM gateway_nodes
+      WHERE talents.node_id = gateway_nodes.node_id
+        AND talents.talent_type != 'hero'
     SQL
 
     total = result1.cmd_tuples + result2.cmd_tuples
     say "Restored hero classification for #{total} downgraded gateway talent(s) " \
-        "(#{result1.cmd_tuples} via surviving sibling, #{result2.cmd_tuples} via known gateway node_ids)"
+        "(#{result1.cmd_tuples} via surviving sibling, #{result2.cmd_tuples} via structural gateway detection)"
   end
 
   def down
