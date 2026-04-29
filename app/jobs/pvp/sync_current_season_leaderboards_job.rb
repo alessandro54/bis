@@ -22,6 +22,20 @@ module Pvp
         Rails.logger.warn("[SyncCurrentSeasonLeaderboardsJob] Season auto-detect failed: #{e.message}")
       end
 
+      # Ensure talent tree classifications are up to date before character sync
+      # starts. This prevents new or reclassified talents (e.g. gateway hero
+      # talents added in a patch) from being inserted with wrong talent_type by
+      # UpsertFromRawSpecializationService before SyncTreeService has seen them.
+      # Runs inline (not perform_later) so the tree is correct before any
+      # character batch jobs are enqueued. Uses force: false — only fills gaps
+      # (node_id IS NULL or spell_id IS NULL). The daily forced sync at 3am
+      # handles position drift from full tree reorganisations.
+      begin
+        Blizzard::Data::Talents::SyncTreeService.call(force: false)
+      rescue => e # rubocop:disable Style/RescueStandardError
+        Rails.logger.warn("[SyncCurrentSeasonLeaderboardsJob] Tree sync failed: #{e.message}")
+      end
+
       season = PvpSeason.current
       return unless season
 
