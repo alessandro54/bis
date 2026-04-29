@@ -132,7 +132,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
       t = record.talent
       {
         id:             record.id,
-        talent:         serialize_talent_fields(t, record.talent_type, prereqs, default_points),
+        talent:         serialize_talent_fields(t, t.talent_type, prereqs, default_points),
         usage_count:    record.usage_count,
         usage_pct:      record.usage_pct.to_f,
         in_top_build:   record.in_top_build,
@@ -173,7 +173,7 @@ class Api::V1::Pvp::Meta::TalentsController < Api::V1::BaseController
 
     def compute_stale_count(records)
       records.count { |r|
-        r.talent_type.in?(%w[class spec]) &&
+        r.talent.talent_type.in?(%w[class spec]) &&
           r.usage_pct.to_f < 1.0 &&
           !r.in_top_build &&
           r.tier == "common"
