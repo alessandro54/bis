@@ -52,7 +52,7 @@ namespace :db do
       FROM pg_stat_activity
       WHERE datname = '#{local}' AND pid <> pg_backend_pid()
     SQL
-    ActiveRecord::Base.connection.close
+    ActiveRecord::Base.connection_handler.clear_all_connections!
     system("dropdb --if-exists #{local}") || abort("dropdb failed")
     system("createdb #{local}") || abort("createdb failed")
 
