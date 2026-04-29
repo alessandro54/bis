@@ -73,16 +73,24 @@ module Blizzard
           unique_records = talent_records.uniq { |r| r[:blizzard_id] }
                                          .sort_by { |r| r[:blizzard_id] }
 
-          # Upsert talent entities, updating talent_type on conflict. Hero classification
-          # comes from character profile data and is more authoritative than the static tree
-          # API (which keeps gateway talents like Halo in class_talent_nodes). Updating
-          # talent_type here self-heals any drift introduced by SyncTreeService.
+          # Insert new talents; skip existing rows to avoid ShareLock deadlocks when
+          # many character-sync threads upsert the same class-tree blizzard_ids concurrently.
           # rubocop:disable Rails/SkipsModelValidations
-          Talent.upsert_all(
+          Talent.insert_all(
             unique_records.map { |r| r.except(:name) },
-            unique_by:   :blizzard_id,
-            update_only: [ :talent_type ]
+            unique_by: :blizzard_id
           )
+
+          # Hero classification from character data is more authoritative than the static
+          # tree API (gateway talents like Halo stay in class_talent_nodes there). Correct
+          # any drift with a targeted UPDATE — only touches rows that actually differ,
+          # so this is a no-op in the common case and takes no row locks.
+          unique_records.group_by { |r| r[:talent_type] }.each do |talent_type, records|
+            blizzard_ids = records.map { |r| r[:blizzard_id] }
+            Talent.where(blizzard_id: blizzard_ids)
+                  .where.not(talent_type: talent_type)
+                  .update_all(talent_type: talent_type)
+          end
           # rubocop:enable Rails/SkipsModelValidations
 
           # Fetch internal IDs with caching
