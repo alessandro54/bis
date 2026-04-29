@@ -108,6 +108,7 @@ module Pvp
         end
         bump_meta_cache
         Pvp::WarmMetaCacheJob.perform_later
+        enqueue_unsynced_item_icons(season)
         log_sync_report(season, cycle, results)
         Pvp::PurgeStaleCharacterDataJob.perform_later
       end
@@ -161,6 +162,13 @@ module Pvp
           elapsed_seconds:    elapsed_seconds
         )
         Pvp::NotifyFailedCharactersJob.perform_later(cycle.id, total: total, failed: failed)
+      end
+
+      def enqueue_unsynced_item_icons(season)
+        item_ids = PvpMetaItemPopularity.where(pvp_season: season).distinct.pluck(:item_id) +
+                   PvpMetaGemPopularity.where(pvp_season: season).distinct.pluck(:item_id)
+        unsynced = Item.where(id: item_ids.uniq).reject(&:meta_synced?).map(&:id)
+        Items::SyncItemMetaBatchJob.perform_later(item_ids: unsynced) if unsynced.any?
       end
 
       def elapsed_seconds
