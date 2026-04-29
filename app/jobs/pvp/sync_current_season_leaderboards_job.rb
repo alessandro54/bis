@@ -194,7 +194,8 @@ module Pvp
               .perform_later(
                 character_ids: batch,
                 locale:        region_locale,
-                sync_cycle_id: sync_cycle.id
+                sync_cycle_id: sync_cycle.id,
+                region:        region
               )
           end
         end
