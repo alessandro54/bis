@@ -15,6 +15,8 @@ module Pvp
 
       def vacuum_character_tables
         conn = ApplicationRecord.connection
+        return if conn.open_transactions > 0
+
         conn.execute("VACUUM ANALYZE character_talents")
         conn.execute("VACUUM ANALYZE character_items")
       end
