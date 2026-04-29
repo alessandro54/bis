@@ -49,14 +49,19 @@ module Pvp
         end
 
         def execute_query
-          ApplicationRecord.connection.select_all(
-            ApplicationRecord.sanitize_sql_array([ gem_popularity_sql, { season_id: season.id, top_n: top_n } ])
-          )
+          run_per_bracket(season_brackets) do |bracket|
+            ApplicationRecord.connection.select_all(
+              ApplicationRecord.sanitize_sql_array([
+                gem_popularity_sql(bracket),
+                { season_id: season.id, top_n: top_n, bracket: bracket }
+              ])
+            )
+          end
         end
 
-        def gem_popularity_sql
+        def gem_popularity_sql(bracket)
           <<~SQL
-            WITH #{top_chars_cte},
+            WITH #{top_chars_cte(bracket: bracket)},
             slot_totals AS (
               SELECT t.bracket, t.spec_id, ci.slot, COUNT(DISTINCT t.character_id) AS total
               FROM top_chars t

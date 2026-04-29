@@ -88,11 +88,23 @@ module Pvp
 
         attr_reader :season, :top_n, :cycle
 
-        # Override to filter on specialization_processed_at instead of equipment_processed_at
-        def top_chars_cte
+        # Override: filters on specialization_processed_at (not equipment_processed_at)
+        # and adds wins/losses/weight columns needed for the weighted talent query.
+        # rubocop:disable Metrics/MethodLength
+        def top_chars_cte(bracket: nil)
+          if bracket
+            distinct_on  = "e.character_id"
+            order_by     = "e.character_id, e.rating DESC"
+            bracket_cond = "AND l.bracket = :bracket"
+          else
+            distinct_on  = "l.bracket, e.character_id"
+            order_by     = "l.bracket, e.character_id, e.rating DESC"
+            bracket_cond = ""
+          end
+
           <<~SQL
             latest_per_char AS (
-              SELECT DISTINCT ON (l.bracket, e.character_id)
+              SELECT DISTINCT ON (#{distinct_on})
                 e.character_id,
                 l.bracket,
                 e.spec_id,
@@ -102,9 +114,10 @@ module Pvp
               FROM pvp_leaderboard_entries e
               JOIN pvp_leaderboards l ON l.id = e.pvp_leaderboard_id
               WHERE l.pvp_season_id = :season_id
+                #{bracket_cond}
                 AND e.spec_id IS NOT NULL
                 AND e.specialization_processed_at IS NOT NULL
-              ORDER BY l.bracket, e.character_id, e.rating DESC
+              ORDER BY #{order_by}
             ),
             ranked AS (
               SELECT *,
@@ -127,6 +140,7 @@ module Pvp
             )
           SQL
         end
+        # rubocop:enable Metrics/MethodLength
 
         # Builds the top-build CTEs: fingerprint each character's full talent loadout,
         # find the single most common loadout per bracket/spec, expose its talent ids,
@@ -186,10 +200,22 @@ module Pvp
           SQL
         end
 
-        # rubocop:disable Metrics/MethodLength
         def execute_query
-          sql = <<~SQL
-            WITH #{top_chars_cte},
+          run_per_bracket(season_brackets) do |bracket|
+            ApplicationRecord.connection.select_all(
+              ApplicationRecord.sanitize_sql_array([
+                talent_sql(bracket),
+                { season_id: season.id, top_n: top_n, bracket: bracket,
+                  bis_pct: BIS_THRESHOLD, sit_pct: SITUATIONAL_THRESHOLD }
+              ])
+            )
+          end
+        end
+
+        # rubocop:disable Metrics/MethodLength
+        def talent_sql(bracket)
+          <<~SQL
+            WITH #{top_chars_cte(bracket: bracket)},
             spec_totals AS (
               SELECT bracket, spec_id, SUM(weight) AS total
               FROM top_chars
@@ -244,17 +270,6 @@ module Pvp
               AND tbmr.talent_id = tu.talent_id
             ORDER BY tu.bracket, tu.spec_id, tu.talent_type, tu.usage_count DESC
           SQL
-
-          ApplicationRecord.connection.select_all(
-            ApplicationRecord.sanitize_sql_array(
-              [ sql, {
-                season_id: season.id,
-                top_n:     top_n,
-                bis_pct:   BIS_THRESHOLD,
-                sit_pct:   SITUATIONAL_THRESHOLD
-              } ]
-            )
-          )
         end
         # rubocop:enable Metrics/MethodLength
 

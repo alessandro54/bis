@@ -27,14 +27,19 @@ module Pvp
         attr_reader :season, :top_n, :cycle
 
         def execute_query
-          ApplicationRecord.connection.select_all(
-            ApplicationRecord.sanitize_sql_array([ item_popularity_sql, { season_id: season.id, top_n: top_n } ])
-          )
+          run_per_bracket(season_brackets) do |bracket|
+            ApplicationRecord.connection.select_all(
+              ApplicationRecord.sanitize_sql_array([
+                item_popularity_sql(bracket),
+                { season_id: season.id, top_n: top_n, bracket: bracket }
+              ])
+            )
+          end
         end
 
-        def item_popularity_sql
+        def item_popularity_sql(bracket)
           <<~SQL
-            WITH #{top_chars_cte},
+            WITH #{top_chars_cte(bracket: bracket)},
             slot_totals AS (
               SELECT t.bracket, t.spec_id, ci.slot, COUNT(*) AS total
               FROM top_chars t
