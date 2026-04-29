@@ -44,6 +44,11 @@ class PvpMetaGemPopularity < ApplicationRecord
     base = includes(item: :translations)
              .where(pvp_season: season, bracket:, spec_id:)
              .order(usage_pct: :desc)
-    live_cycle_id ? base.where(pvp_sync_cycle_id: live_cycle_id) : base
+    if live_cycle_id
+      cycle_data = base.where(pvp_sync_cycle_id: live_cycle_id)
+      cycle_data.exists? ? cycle_data : base.where(pvp_sync_cycle_id: nil)
+    else
+      base.where(pvp_sync_cycle_id: nil)
+    end
   }
 end

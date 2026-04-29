@@ -9,7 +9,7 @@ module Pvp
       # With 4 parallel aggregation threads (BuildAggregationsService) each
       # spawning up to this many bracket threads, total concurrent DB
       # connections = 4 × BRACKET_CONCURRENCY. Keep well inside DB_POOL.
-      BRACKET_CONCURRENCY = ENV.fetch("PVP_AGG_BRACKET_CONCURRENCY", 8).to_i
+      BRACKET_CONCURRENCY = ENV.fetch("PVP_AGG_BRACKET_CONCURRENCY", 3).to_i
 
       # Returns distinct bracket names for the season's leaderboards.
       def season_brackets

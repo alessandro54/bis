@@ -42,22 +42,15 @@ module Pvp
       # rubocop:disable Metrics/AbcSize
       def run_aggregations(season, cycle)
         results   = []
-        mutex     = Mutex.new
-        work      = AGGREGATIONS.dup
         agg_start = Time.current
 
-        Array.new(AGGREGATIONS.size) do
-          Thread.new do
-            loop do
-              tuple = mutex.synchronize { work.shift }
-              break unless tuple
-
-              key, service_class, = tuple
-              result = run_single_aggregation(key, service_class, season, cycle)
-              mutex.synchronize { results << result }
-            end
-          end
-        end.each(&:join)
+        # Run services sequentially to avoid exhausting the DB connection pool.
+        # Each service already parallelises internally (bracket-level threads via
+        # run_per_bracket), so running 4 services in parallel would multiply the
+        # peak connection count by 4 and cause ConnectionTimeoutError.
+        AGGREGATIONS.each do |(key, service_class, _)|
+          results << run_single_aggregation(key, service_class, season, cycle)
+        end
 
         log_aggregations_complete(cycle, agg_start)
         results.to_h
