@@ -70,8 +70,8 @@ module Blizzard
 
           return empty_result if talent_records.empty?
 
-          # Deduplicate by blizzard_id
           unique_records = talent_records.uniq { |r| r[:blizzard_id] }
+                                         .sort_by { |r| r[:blizzard_id] }
 
           # Upsert talent entities, updating talent_type on conflict. Hero classification
           # comes from character profile data and is more authoritative than the static tree
@@ -178,9 +178,9 @@ module Blizzard
 
             return if translation_records.empty?
 
-            unique_translations = translation_records.uniq do |r|
-              [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ]
-            end
+            unique_translations = translation_records
+              .uniq { |r| [ r[:translatable_type], r[:translatable_id], r[:locale], r[:key] ] }
+              .sort_by { |r| [ r[:translatable_id].to_s, r[:locale], r[:key] ] }
 
             # rubocop:disable Rails/SkipsModelValidations
             Translation.insert_all(
