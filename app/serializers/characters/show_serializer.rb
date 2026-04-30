@@ -49,7 +49,16 @@ module Characters
 
         item_names    = fetch_translation_names("Item", items.map(&:item_id))
         enchant_names = fetch_translation_names("Enchantment", items.filter_map(&:enchantment_id))
-        items.map { |ci| serialize_equipment_item(ci, item_names, enchant_names) }
+        gem_icons, gem_names = fetch_gem_data(items)
+
+        items.map { |ci| serialize_equipment_item(ci, item_names, enchant_names, gem_icons, gem_names) }
+      end
+
+      def fetch_gem_data(items)
+        ids = items.flat_map { |ci| Array(ci.sockets).filter_map { |s| s["item_id"] } }.uniq
+        return [ {}, {} ] if ids.empty?
+
+        [ Item.where(id: ids).pluck(:id, :icon_url).to_h, fetch_translation_names("Item", ids) ]
       end
 
       def fetch_translation_names(type, ids)
@@ -60,11 +69,18 @@ module Characters
           .pluck(:translatable_id, :value).to_h
       end
 
-      def serialize_equipment_item(ci, item_names, enchant_names)
+      def serialize_equipment_item(ci, item_names, enchant_names, gem_icons, gem_names)
         { slot: ci.slot, item_level: ci.item_level, quality: ci.item&.quality,
           blizzard_id: ci.item&.blizzard_id, name: item_names[ci.item_id],
           icon_url: ci.item&.icon_url, enchant: enchant_names[ci.enchantment_id],
-          sockets: Array(ci.sockets).filter_map { |s| s["display_string"].presence } }
+          sockets: serialize_sockets(ci.sockets, gem_icons, gem_names) }
+      end
+
+      def serialize_sockets(sockets, gem_icons, gem_names)
+        Array(sockets).filter_map do |s|
+          name = (s["item_id"] && gem_names[s["item_id"]]) || s["display_string"].presence
+          { name: name, icon_url: gem_icons[s["item_id"]] } if name
+        end
       end
 
       def build_talents
