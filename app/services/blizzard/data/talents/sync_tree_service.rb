@@ -13,6 +13,19 @@ module Blizzard
       class SyncTreeService < BaseService # rubocop:disable Metrics/ClassLength
         TALENT_TYPE_PRIORITY = { "class" => 0, "spec" => 1, "hero" => 2 }.freeze
 
+        # Required top-level keys in a per-spec tree response. Empty arrays are OK
+        # (logged + skipped); a missing key signals an API contract change and aborts.
+        REQUIRED_TREE_KEYS = %w[class_talent_nodes spec_talent_nodes hero_talent_trees].freeze
+
+        # Per-talent_type ratio at which the new sync's count is considered a
+        # regression vs the last successful run. 0.5 = abort if new is < 50% of old.
+        REGRESSION_RATIO_THRESHOLD = 0.5
+
+        # Per-talent_type minimum absolute count below which the result is suspect
+        # regardless of ratio (e.g. previous run had 5 hero talents, ratio comparison
+        # is meaningless — but 0 is still wrong). Hand-tuned, conservative.
+        REGRESSION_FLOOR = { "class" => 100, "spec" => 100, "hero" => 100 }.freeze
+
         def initialize(region: "us", locale: "en_US", force: false)
           @region = region
           @force  = force
@@ -21,6 +34,11 @@ module Blizzard
 
         # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def call
+          @run = TalentSyncRun.create!(
+            region: @region, locale: @client.locale, force: force?,
+            status: "running", started_at: Time.current
+          )
+
           spec_entries     = Array(fetch_index["spec_talent_trees"])
           talent_attrs     = {}
           name_map         = {} # blizzard_id => name (from tree response, locale-aware)
@@ -34,11 +52,22 @@ module Blizzard
             next unless tree_id && spec_id
 
             tree = fetch_tree(tree_id, spec_id)
+
+            unless validate_tree_response!(tree, spec_id)
+              failed_specs << spec_id
+              next
+            end
+
             process_tree(tree, talent_attrs, edges, spec_assignments[spec_id], name_map, spec_id: spec_id)
           rescue Blizzard::Client::Error => e
             failed_specs << spec_id
             log_warn("Skipping tree #{tree_id}/#{spec_id}: #{e.message}")
           end
+
+          counts     = build_counts(talent_attrs, edges)
+          regression = detect_regression(counts)
+
+          return abort_for_regression!(regression, counts, failed_specs) if regression[:detected] && !force?
 
           if force?
             apply_positions(talent_attrs)
@@ -55,8 +84,10 @@ module Blizzard
           # Media (icons, descriptions) only changes on patch day — only fetch on force sync.
           SyncTalentMediaJob.perform_later(region: @region, locale: @client.locale) if force?
 
-          success(nil, context: { talents: talent_attrs.size, edges: edges.size })
+          finalize_run!("success", counts: counts, failed_specs: failed_specs, regression: regression)
+          success(nil, context: { talents: talent_attrs.size, edges: edges.size, run_id: @run.id })
         rescue Blizzard::Client::Error, ActiveRecord::ActiveRecordError => e
+          finalize_run!("failure", error: e.message)
           failure(e)
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
@@ -66,6 +97,103 @@ module Blizzard
           attr_reader :region, :client
 
           def force? = @force
+
+          # ── Schema validation (#3) ──────────────────────────────────────
+          #
+          # A missing top-level key signals a Blizzard API contract change.
+          # Empty arrays are OK (logged in process_tree); a missing key skips
+          # the spec rather than silently treating it as zero data.
+          def validate_tree_response!(tree, spec_id)
+            return false unless tree.is_a?(Hash)
+
+            missing = REQUIRED_TREE_KEYS - tree.keys
+            return true if missing.empty?
+
+            log_warn("Tree response for spec #{spec_id} missing keys: #{missing.inspect} — skipping spec")
+            Sentry.capture_message(
+              "SyncTreeService schema regression",
+              level: :warning,
+              extra: { spec_id: spec_id, missing_keys: missing, present_keys: tree.keys }
+            )
+            false
+          end
+
+          # ── Run-level counts (#7) ───────────────────────────────────────
+          def build_counts(talent_attrs, edges)
+            counts = Hash.new(0)
+            talent_attrs.each_value { |attrs| counts[attrs[:talent_type].to_s] += 1 }
+            counts["edges"]   = edges.size
+            counts["talents"] = talent_attrs.size
+            counts.transform_keys(&:to_s)
+          end
+
+          # ── Regression detection (#2) ───────────────────────────────────
+          #
+          # Compares per-talent_type counts against the last successful run.
+          # Either a hard floor breach (e.g. hero=0) or a sharp drop versus
+          # the prior run flags the result as a regression. force: true skips
+          # this guard for legitimate post-patch resyncs that genuinely shrink.
+          # rubocop:disable Metrics/AbcSize
+          def detect_regression(counts)
+            baseline = TalentSyncRun.last_success_for(@region)&.counts.to_h
+            details  = []
+
+            %w[class spec hero].each do |type|
+              new_n  = counts[type].to_i
+              prev_n = baseline[type].to_i
+              floor  = REGRESSION_FLOOR.fetch(type, 0)
+
+              if new_n < floor
+                details << { type: type, reason: "below_floor", new: new_n, floor: floor, prev: prev_n }
+                next
+              end
+
+              next if prev_n.zero? # no baseline → don't flag
+
+              ratio = new_n.to_f / prev_n
+              if ratio < REGRESSION_RATIO_THRESHOLD
+                details << { type: type, reason: "ratio_drop", new: new_n, prev: prev_n, ratio: ratio.round(2) }
+              end
+            end
+
+            { detected: details.any?, details: details, baseline_run_at: baseline.present? ? "present" : "none" }
+          end
+          # rubocop:enable Metrics/AbcSize
+
+          def abort_for_regression!(regression, counts, failed_specs)
+            log_error("Aborting sync — count regression: #{regression[:details].inspect}")
+            Sentry.capture_message(
+              "SyncTreeService aborted for count regression",
+              level: :error,
+              extra: { region: @region, counts: counts, regression: regression }
+            )
+            finalize_run!("aborted_regression",
+              counts: counts, failed_specs: failed_specs, regression: regression,
+              error: "count regression vs prior run; pass force: true to override"
+            )
+            failure(StandardError.new("count regression detected"),
+              context: { region: @region, regression: regression }, captured: true
+            )
+          end
+
+          # ── Run persistence (#7) ────────────────────────────────────────
+          def finalize_run!(status, counts: nil, failed_specs: nil, regression: nil, error: nil)
+            return unless @run
+
+            attrs = { status: status, completed_at: Time.current }
+            attrs[:counts]        = counts        if counts
+            attrs[:failed_specs]  = failed_specs  if failed_specs
+            attrs[:regression]    = regression    if regression
+            attrs[:error_message] = error         if error
+            attrs[:tsa_counts]    = current_tsa_counts if status == "success"
+            @run.update!(attrs)
+          end
+
+          def current_tsa_counts
+            TalentSpecAssignment.joins(:talent).group("talents.talent_type").count
+          rescue StandardError
+            {}
+          end
 
           def fetch_index
             client.get("/data/wow/talent-tree/index", namespace: client.static_namespace)

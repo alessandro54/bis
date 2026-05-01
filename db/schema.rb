@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_29_000002) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_01_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -298,6 +298,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_29_000002) do
     t.datetime "updated_at", null: false
     t.index ["spec_id"], name: "index_talent_spec_assignments_on_spec_id"
     t.index ["talent_id", "spec_id"], name: "index_talent_spec_assignments_on_talent_id_and_spec_id", unique: true
+  end
+
+  create_table "talent_sync_runs", force: :cascade do |t|
+    t.datetime "completed_at"
+    t.jsonb "counts", default: {}, null: false
+    t.datetime "created_at", null: false
+    t.text "error_message"
+    t.jsonb "failed_specs", default: [], null: false
+    t.boolean "force", default: false, null: false
+    t.string "locale", null: false
+    t.string "region", null: false
+    t.jsonb "regression", default: {}, null: false
+    t.datetime "started_at", null: false
+    t.string "status", default: "running", null: false
+    t.jsonb "tsa_counts", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["started_at"], name: "index_talent_sync_runs_on_started_at"
+    t.index ["status", "started_at"], name: "index_talent_sync_runs_on_status_and_started_at"
   end
 
   create_table "talents", force: :cascade do |t|
