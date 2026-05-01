@@ -25,7 +25,8 @@ module Blizzard
           talent_attrs     = {}
           name_map         = {} # blizzard_id => name (from tree response, locale-aware)
           edges            = Set.new
-          spec_assignments = Hash.new { |h, k| h[k] = Set.new } # spec_id => Set<blizzard_id>
+          # spec_id => { talent_type => Set<blizzard_id> }
+          spec_assignments = Hash.new { |h, k| h[k] = Hash.new { |hh, kk| hh[kk] = Set.new } }
           failed_specs     = []
 
           spec_entries.each do |entry|
@@ -33,7 +34,7 @@ module Blizzard
             next unless tree_id && spec_id
 
             tree = fetch_tree(tree_id, spec_id)
-            process_tree(tree, talent_attrs, edges, spec_assignments[spec_id], name_map)
+            process_tree(tree, talent_attrs, edges, spec_assignments[spec_id], name_map, spec_id: spec_id)
           rescue Blizzard::Client::Error => e
             failed_specs << spec_id
             log_warn("Skipping tree #{tree_id}/#{spec_id}: #{e.message}")
@@ -86,16 +87,32 @@ module Blizzard
             [ m[1].to_i, m[2].to_i ]
           end
 
-          def process_tree(tree, talent_attrs, edges, spec_blizzard_ids, name_map)
-            process_nodes(Array(tree["class_talent_nodes"]), "class", talent_attrs, edges, spec_blizzard_ids, name_map)
-            process_nodes(Array(tree["spec_talent_nodes"]),  "spec",  talent_attrs, edges, spec_blizzard_ids, name_map)
-            Array(tree["hero_talent_trees"]).each do |hero|
-              process_nodes(Array(hero["nodes"]), "hero", talent_attrs, edges, spec_blizzard_ids, name_map)
+          # rubocop:disable Metrics/AbcSize
+          def process_tree(tree, talent_attrs, edges, assignments, name_map, spec_id: nil)
+            process_nodes(Array(tree["class_talent_nodes"]), "class", talent_attrs, edges, assignments, name_map)
+            process_nodes(Array(tree["spec_talent_nodes"]),  "spec",  talent_attrs, edges, assignments, name_map)
+            hero_trees = Array(tree["hero_talent_trees"])
+            if hero_trees.empty?
+              log_warn("Tree response missing hero_talent_trees for spec #{spec_id || '?'} — " \
+                       "existing hero TSAs preserved")
+            end
+            hero_trees.each do |hero|
+              # Blizzard's API renamed "nodes" → "hero_talent_nodes" inside each hero tree.
+              # Fall back to the old key for backwards compatibility.
+              hero_nodes = Array(hero["hero_talent_nodes"]).presence || Array(hero["nodes"])
+              if hero_nodes.empty?
+                log_warn("Hero tree #{hero['id']} (#{hero['name']}) for spec #{spec_id || '?'} has no nodes")
+              end
+              process_nodes(hero_nodes, "hero", talent_attrs, edges, assignments, name_map)
             end
           end
+          # rubocop:enable Metrics/AbcSize
 
           # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-          def process_nodes(nodes, talent_type, talent_attrs, edges, spec_blizzard_ids, name_map)
+          def process_nodes(nodes, talent_type, talent_attrs, edges, assignments, name_map)
+            # Backwards-compat: accept either Hash<type, Set> or a plain Set (used by legacy specs).
+            ids_bucket = assignments.is_a?(Hash) ? assignments[talent_type] : assignments
+
             nodes.each do |node|
               node_id     = node["id"]
               display_row = node["display_row"]
@@ -120,7 +137,7 @@ module Blizzard
                 end
 
                 name_map[blizzard_id] = name if name.present?
-                spec_blizzard_ids.add(blizzard_id)
+                ids_bucket.add(blizzard_id)
               end
 
               Array(node["locked_by"]).each do |prereq|
@@ -250,7 +267,9 @@ module Blizzard
           def apply_spec_assignments(spec_assignments, skip_specs: [])
             return if spec_assignments.empty?
 
-            all_blizzard_ids = spec_assignments.values.flat_map(&:to_a).uniq
+            normalized = normalize_spec_assignments(spec_assignments)
+
+            all_blizzard_ids = normalized.values.flat_map { |by_type| by_type.values.flat_map(&:to_a) }.uniq
             id_map = Talent
               .where(blizzard_id: all_blizzard_ids)
               .pluck(:blizzard_id, :id)
@@ -259,16 +278,24 @@ module Blizzard
             now = Time.current
 
             # rubocop:disable Rails/SkipsModelValidations
-            spec_assignments.each do |spec_id, blizzard_ids|
+            normalized.each do |spec_id, by_type|
               next if skip_specs.include?(spec_id)
+              next if by_type.empty?
 
-              talent_ids = blizzard_ids.filter_map { |blz_id| id_map[blz_id] }
+              seen_types = by_type.keys
+              talent_ids = by_type.values.flat_map(&:to_a).uniq.filter_map { |blz_id| id_map[blz_id] }
               next if talent_ids.empty?
 
               ApplicationRecord.transaction do
-                # Remove stale assignments no longer present in the API tree.
-                # Preserves default_points on rows that remain.
-                TalentSpecAssignment.where(spec_id: spec_id).where.not(talent_id: talent_ids).delete_all
+                # Only delete TSAs for talent_types present in this sync. If a tree
+                # section (e.g. hero_talent_trees) is missing from the API response,
+                # existing assignments for that type are preserved instead of wiped.
+                TalentSpecAssignment
+                  .where(spec_id: spec_id)
+                  .joins(:talent)
+                  .where(talents: { talent_type: seen_types })
+                  .where.not(talent_id: talent_ids)
+                  .delete_all
 
                 rows = talent_ids.map { |tid| { talent_id: tid, spec_id: spec_id, created_at: now, updated_at: now } }
                 TalentSpecAssignment.insert_all(rows, unique_by: %i[talent_id spec_id])
@@ -277,6 +304,20 @@ module Blizzard
             # rubocop:enable Rails/SkipsModelValidations
           end
           # rubocop:enable Metrics/MethodLength, Metrics/AbcSize
+
+          # Accepts the new shape ({ spec_id => { type => Set } }) or legacy
+          # shape ({ spec_id => Enumerable<blizzard_id> }) used by older tests.
+          # Legacy entries are bucketed under "unknown" so all talent_types get
+          # cleaned (mirrors the prior behaviour for those callers).
+          def normalize_spec_assignments(spec_assignments)
+            spec_assignments.each_with_object({}) do |(spec_id, value), out|
+              if value.is_a?(Hash)
+                out[spec_id] = value
+              else
+                out[spec_id] = { "__legacy__" => Set.new(value) }
+              end
+            end
+          end
 
           def save_names_from_tree(name_map)
             return if name_map.empty?
