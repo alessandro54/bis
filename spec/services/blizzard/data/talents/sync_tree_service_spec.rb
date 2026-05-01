@@ -155,6 +155,25 @@ spell_id: nil } }
       expect(assignments["hero"]).to include(800)
     end
 
+    it "does not register hero bucket when hero_talent_nodes is empty" do
+      talent_attrs = {}
+      edges        = Set.new
+      assignments  = Hash.new { |h, k| h[k] = Hash.new { |hh, kk| hh[kk] = Set.new } }
+      name_map     = {}
+
+      tree = { "class_talent_nodes" => [],
+               "spec_talent_nodes" => [],
+               "hero_talent_trees" => [
+                 { "id" => 31, "name" => "Empty", "hero_talent_nodes" => [] }
+               ] }
+
+      service.send(:process_tree, tree, talent_attrs, edges, assignments[5], name_map, spec_id: 5)
+
+      # Crucial: hero key must NOT be registered, otherwise apply_spec_assignments
+      # would treat hero as a "seen" type and wipe every existing hero TSA.
+      expect(assignments[5].key?("hero")).to be(false)
+    end
+
     it "falls back to nodes (legacy Blizzard shape) when hero_talent_nodes is absent" do
       talent_attrs = {}
       edges        = Set.new
