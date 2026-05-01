@@ -30,11 +30,11 @@ RSpec.describe Blizzard::Data::Talents::SyncTreeService, type: :service do
 
   describe "#apply_spec_assignments (private)" do
     it "rolls back delete when insert_all raises (per-spec transaction)" do
-      existing_talent = create(:talent, blizzard_id: 50_001)
+      existing_talent = create(:talent, blizzard_id: 50_001, talent_type: "class")
       TalentSpecAssignment.create!(talent: existing_talent, spec_id: 1, default_points: 0)
 
-      new_talent = create(:talent, blizzard_id: 50_002)
-      spec_assignments = { 1 => [ 50_002 ] }
+      create(:talent, blizzard_id: 50_002, talent_type: "class")
+      spec_assignments = { 1 => { "class" => Set.new([ 50_002 ]) } }
 
       allow(TalentSpecAssignment).to receive(:insert_all).and_raise(ActiveRecord::StatementInvalid, "simulated")
 
@@ -43,6 +43,35 @@ RSpec.describe Blizzard::Data::Talents::SyncTreeService, type: :service do
       }.to raise_error(ActiveRecord::StatementInvalid)
 
       expect(TalentSpecAssignment.where(spec_id: 1, talent_id: existing_talent.id).count).to eq(1)
+    end
+
+    it "preserves TSAs of talent_types absent from the current sync" do
+      hero_talent  = create(:talent, blizzard_id: 60_001, talent_type: "hero")
+      class_talent = create(:talent, blizzard_id: 60_002, talent_type: "class")
+      TalentSpecAssignment.create!(talent: hero_talent,  spec_id: 5, default_points: 0)
+      TalentSpecAssignment.create!(talent: class_talent, spec_id: 5, default_points: 0)
+
+      new_class_talent = create(:talent, blizzard_id: 60_003, talent_type: "class")
+      spec_assignments = { 5 => { "class" => Set.new([ 60_003 ]) } }
+
+      service.send(:apply_spec_assignments, spec_assignments)
+
+      expect(TalentSpecAssignment.where(spec_id: 5, talent_id: hero_talent.id).count).to eq(1)
+      expect(TalentSpecAssignment.where(spec_id: 5, talent_id: class_talent.id).count).to eq(0)
+      expect(TalentSpecAssignment.where(spec_id: 5, talent_id: new_class_talent.id).count).to eq(1)
+    end
+
+    it "deletes stale TSAs of talent_types that ARE present in the sync" do
+      stale_class = create(:talent, blizzard_id: 70_001, talent_type: "class")
+      TalentSpecAssignment.create!(talent: stale_class, spec_id: 6, default_points: 0)
+
+      kept_class = create(:talent, blizzard_id: 70_002, talent_type: "class")
+      spec_assignments = { 6 => { "class" => Set.new([ 70_002 ]) } }
+
+      service.send(:apply_spec_assignments, spec_assignments)
+
+      expect(TalentSpecAssignment.where(spec_id: 6, talent_id: stale_class.id).count).to eq(0)
+      expect(TalentSpecAssignment.where(spec_id: 6, talent_id: kept_class.id).count).to eq(1)
     end
   end
 
@@ -101,6 +130,68 @@ spell_id: nil } }
       service.send(:process_nodes, [ class_node ], "class", talent_attrs, edges, ids, name_map)
 
       expect(talent_attrs[501][:talent_type]).to eq("hero")
+    end
+  end
+
+  describe "process_tree (private) — Blizzard hero key compatibility" do
+    it "reads hero nodes from hero_talent_nodes (current Blizzard shape)" do
+      talent_attrs = {}
+      edges        = Set.new
+      assignments  = Hash.new { |h, k| h[k] = Set.new }
+      name_map     = {}
+
+      rank      = { "tooltip" => { "talent" => { "id" => 800, "name" => "Vampiric Strike" },
+                                   "spell_tooltip" => { "spell" => { "id" => 99 } } } }
+      hero_node = { "id" => 9, "display_row" => 1, "display_col" => 1, "ranks" => [ rank ] }
+      tree      = { "class_talent_nodes" => [],
+                    "spec_talent_nodes" => [],
+                    "hero_talent_trees" => [
+                      { "id" => 31, "name" => "San'layn", "hero_talent_nodes" => [ hero_node ] }
+                    ] }
+
+      service.send(:process_tree, tree, talent_attrs, edges, assignments, name_map, spec_id: 252)
+
+      expect(talent_attrs[800][:talent_type]).to eq("hero")
+      expect(assignments["hero"]).to include(800)
+    end
+
+    it "does not register hero bucket when hero_talent_nodes is empty" do
+      talent_attrs = {}
+      edges        = Set.new
+      assignments  = Hash.new { |h, k| h[k] = Hash.new { |hh, kk| hh[kk] = Set.new } }
+      name_map     = {}
+
+      tree = { "class_talent_nodes" => [],
+               "spec_talent_nodes" => [],
+               "hero_talent_trees" => [
+                 { "id" => 31, "name" => "Empty", "hero_talent_nodes" => [] }
+               ] }
+
+      service.send(:process_tree, tree, talent_attrs, edges, assignments[5], name_map, spec_id: 5)
+
+      # Crucial: hero key must NOT be registered, otherwise apply_spec_assignments
+      # would treat hero as a "seen" type and wipe every existing hero TSA.
+      expect(assignments[5].key?("hero")).to be(false)
+    end
+
+    it "falls back to nodes (legacy Blizzard shape) when hero_talent_nodes is absent" do
+      talent_attrs = {}
+      edges        = Set.new
+      assignments  = Hash.new { |h, k| h[k] = Set.new }
+      name_map     = {}
+
+      rank      = { "tooltip" => { "talent" => { "id" => 801, "name" => "Old Hero" },
+                                   "spell_tooltip" => { "spell" => { "id" => 100 } } } }
+      hero_node = { "id" => 10, "display_row" => 1, "display_col" => 1, "ranks" => [ rank ] }
+      tree      = { "class_talent_nodes" => [],
+                    "spec_talent_nodes" => [],
+                    "hero_talent_trees" => [
+                      { "id" => 32, "name" => "Legacy", "nodes" => [ hero_node ] }
+                    ] }
+
+      service.send(:process_tree, tree, talent_attrs, edges, assignments, name_map, spec_id: 252)
+
+      expect(talent_attrs[801][:talent_type]).to eq("hero")
     end
   end
 
