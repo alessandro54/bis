@@ -36,7 +36,7 @@ module Pvp
 
       DEFAULT_WEIGHTS = ARENA_WEIGHTS[:dps].freeze
 
-      SOLO_BRACKETS = %w[shuffle-overall blitz-overall].freeze
+      SOLO_BRACKETS = %w[shuffle blitz].freeze
 
       def initialize(season:, bracket:, region:, role: nil)
         @season  = season

@@ -25,13 +25,16 @@ class PvpLeaderboard < ApplicationRecord
 
   has_many :entries, class_name: "PvpLeaderboardEntry", dependent: :destroy
 
+  # Aggregate slugs used by the API/UI. Each one fans out to its per-spec
+  # leaderboards via the LIKE pattern; no standalone leaderboard is stored
+  # under these keys (sync skips Blizzard's "*-overall" buckets entirely).
   OVERALL_BRACKETS = {
-    "blitz-overall" => "blitz-%",
-    "shuffle-overall" => "shuffle-%"
+    "blitz" => "blitz-%",
+    "shuffle" => "shuffle-%"
   }.freeze
 
-  # Resolves "blitz-overall" / "shuffle-overall" to all per-spec brackets,
-  # or matches a single bracket exactly.
+  # Resolves any aggregate slug to its per-spec bracket pattern, or matches
+  # a single bracket exactly when no aggregation is needed.
   scope :for_bracket, ->(bracket) {
     pattern = OVERALL_BRACKETS[bracket]
     pattern ? where("bracket LIKE ?", pattern) : where(bracket: bracket)
