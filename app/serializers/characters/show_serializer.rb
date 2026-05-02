@@ -9,9 +9,10 @@ module Characters
 
     def call
       base_fields.merge(
-        pvp_entries: serialize_pvp_entries,
-        equipment:   primary_spec_id ? build_equipment : [],
-        talents:     primary_spec_id ? build_talents : []
+        pvp_entries:         serialize_pvp_entries,
+        equipment:           primary_spec_id ? build_equipment : [],
+        talents:             primary_spec_id ? build_talents : [],
+        talent_loadout_code: talent_loadout_code_for_primary_spec
       )
     end
 
@@ -24,6 +25,15 @@ module Characters
           primary_spec_id: primary_spec_id,
           stat_pcts:       character.stat_pcts || {}
         )
+      end
+
+      # WoW in-game import string for the primary spec's talent loadout.
+      # Stored per-spec by ProcessSpecializationService; lookup is by string
+      # key because spec_talent_loadout_codes is a JSONB column.
+      def talent_loadout_code_for_primary_spec
+        return nil unless primary_spec_id
+
+        character.spec_talent_loadout_codes&.[](primary_spec_id.to_s)
       end
 
       def character_identity
