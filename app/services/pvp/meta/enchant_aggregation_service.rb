@@ -1,65 +1,26 @@
 module Pvp
   module Meta
-    class EnchantAggregationService < BaseService
-      include AggregationSql
-
-      TOP_N = ENV.fetch("PVP_META_TOP_N", 1000).to_i
-
-      def initialize(season:, top_n: TOP_N, cycle: nil)
-        @season = season
-        @top_n  = top_n
-        @cycle  = cycle
-      end
-
-      def call
-        prev_map = snapshot_prev_values
-        rows     = execute_query
-        records  = build_records(rows, prev_map)
-        persist_records(records)
-        success(records.size, context: { count: records.size })
-      rescue => e
-        Sentry.capture_exception(e, extra: { service: self.class.name, season_id: season.id })
-        failure(e, captured: true)
-      end
-
+    class EnchantAggregationService < AggregationBase
       private
 
-        attr_reader :season, :top_n, :cycle
-
-        def persist_records(records)
-          ApplicationRecord.transaction do
-            # rubocop:disable Rails/SkipsModelValidations
-            if @cycle
-              PvpMetaEnchantPopularity.where(pvp_sync_cycle_id: @cycle.id).delete_all
-            else
-              PvpMetaEnchantPopularity.where(pvp_season_id: season.id).delete_all
-            end
-            PvpMetaEnchantPopularity.insert_all!(records) if records.any?
-            # rubocop:enable Rails/SkipsModelValidations
-          end
-        end
-
-        def snapshot_prev_values
+        def model_class
           PvpMetaEnchantPopularity
-            .where(pvp_season_id: season.id)
-            .pluck(:bracket, :spec_id, :slot, :enchantment_id, :usage_pct)
-            .each_with_object({}) do |(bracket, spec_id, slot, enchantment_id, pct), h|
-              h[[ bracket, spec_id.to_i, slot, enchantment_id.to_i ]] = pct
-            end
         end
 
-        def execute_query
-          run_per_bracket(season_brackets) do |bracket|
-            ApplicationRecord.connection.select_all(
-              ApplicationRecord.sanitize_sql_array([
-                enchant_popularity_sql(bracket),
-                { season_id: season.id, top_n: top_n, bracket: bracket }
-              ])
-            )
-          end
+        def snapshot_keys
+          %i[bracket spec_id slot enchantment_id]
         end
 
-        def enchant_popularity_sql(bracket)
+        def record_fields(row)
+          {
+            bracket:        row["bracket"],
+            spec_id:        row["spec_id"],
+            slot:           row["slot"],
+            enchantment_id: row["enchantment_id"]
+          }
+        end
+
+        def popularity_sql(bracket)
           <<~SQL
             WITH #{top_chars_cte(bracket: bracket)},
             slot_totals AS (
@@ -85,27 +46,6 @@ module Pvp
             GROUP BY t.bracket, t.spec_id, ci.slot, ci.enchantment_id, st.total
             ORDER BY t.bracket, t.spec_id, ci.slot, usage_count DESC
           SQL
-        end
-
-        def build_records(rows, prev_map = {})
-          now = Time.current
-          rows.map do |r|
-            prev = prev_map[[ r["bracket"], r["spec_id"].to_i, r["slot"], r["enchantment_id"].to_i ]]
-            {
-              pvp_season_id:     season.id,
-              bracket:           r["bracket"],
-              spec_id:           r["spec_id"],
-              slot:              r["slot"],
-              enchantment_id:    r["enchantment_id"],
-              usage_count:       r["usage_count"],
-              usage_pct:         r["usage_pct"],
-              prev_usage_pct:    prev,
-              snapshot_at:       r["snapshot_at"] || now,
-              created_at:        now,
-              updated_at:        now,
-              pvp_sync_cycle_id: @cycle&.id
-            }
-          end
         end
     end
   end

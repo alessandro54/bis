@@ -57,12 +57,7 @@ class PvpLeaderboardEntry < ApplicationRecord
       .where(pvp_seasons: { id: season_filter })
       .where.not(spec_id: nil)
 
-    pattern = PvpLeaderboard::OVERALL_BRACKETS[bracket]
-    if pattern
-      base.where("pvp_leaderboards.bracket LIKE ?", pattern)
-    else
-      base.where(pvp_leaderboards: { bracket: bracket })
-    end
+    Pvp::BracketResolver.scope(base, bracket, column: "pvp_leaderboards.bracket")
   }
 
   def winrate
