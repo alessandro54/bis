@@ -195,6 +195,114 @@ spell_id: nil } }
     end
   end
 
+  describe "#validate_tree_response! (private)" do
+    it "rejects responses missing top-level keys" do
+      tree = { "class_talent_nodes" => [], "spec_talent_nodes" => [] } # missing hero_talent_trees
+      allow(Sentry).to receive(:capture_message)
+
+      expect(service.send(:validate_tree_response!, tree, 71)).to be(false)
+      expect(Sentry).to have_received(:capture_message)
+        .with("SyncTreeService schema regression", hash_including(level: :warning))
+    end
+
+    it "accepts responses with all required keys (even if arrays are empty)" do
+      tree = { "class_talent_nodes" => [], "spec_talent_nodes" => [], "hero_talent_trees" => [] }
+      expect(service.send(:validate_tree_response!, tree, 71)).to be(true)
+    end
+
+    it "rejects non-Hash responses" do
+      expect(service.send(:validate_tree_response!, nil, 71)).to be(false)
+      expect(service.send(:validate_tree_response!, [], 71)).to be(false)
+    end
+  end
+
+  describe "#detect_regression (private)" do
+    let(:region) { "us" }
+
+    before { service.instance_variable_set(:@region, region) }
+
+    it "flags when a talent_type falls below the absolute floor" do
+      counts = { "class" => 1000, "spec" => 1000, "hero" => 5 }
+
+      result = service.send(:detect_regression, counts)
+
+      expect(result[:detected]).to be(true)
+      expect(result[:details].first).to include(type: "hero", reason: "below_floor")
+    end
+
+    it "flags when a talent_type drops below the ratio threshold vs prior success" do
+      TalentSyncRun.create!(region: region, locale: "en_US", force: false, status: "success",
+        started_at: 1.hour.ago, completed_at: 30.minutes.ago,
+        counts: { "class" => 1000, "spec" => 3000, "hero" => 700 })
+      counts = { "class" => 1000, "spec" => 3000, "hero" => 200 } # 200/700 ≈ 0.28 < 0.5
+
+      result = service.send(:detect_regression, counts)
+
+      expect(result[:detected]).to be(true)
+      expect(result[:details].first).to include(type: "hero", reason: "ratio_drop")
+    end
+
+    it "does not flag when counts hold steady" do
+      TalentSyncRun.create!(region: region, locale: "en_US", force: false, status: "success",
+        started_at: 1.hour.ago, completed_at: 30.minutes.ago,
+        counts: { "class" => 1000, "spec" => 3000, "hero" => 700 })
+      counts = { "class" => 1000, "spec" => 3000, "hero" => 700 }
+
+      expect(service.send(:detect_regression, counts)[:detected]).to be(false)
+    end
+
+    it "does not compare ratios when no baseline exists, only floors" do
+      counts = { "class" => 1000, "spec" => 3000, "hero" => 700 }
+      expect(service.send(:detect_regression, counts)[:detected]).to be(false)
+    end
+  end
+
+  describe "#call full flow with regression guard" do
+    let(:valid_tree) do
+      rank = { "tooltip" => { "talent" => { "id" => 600, "name" => "Halo" },
+                              "spell_tooltip" => { "spell" => { "id" => 1 } } } }
+      class_node = { "id" => 1, "display_row" => 1, "display_col" => 1, "ranks" => [ rank ] }
+      { "class_talent_nodes" => [ class_node ],
+        "spec_talent_nodes" => [],
+        "hero_talent_trees" => [] }
+    end
+
+    before do
+      allow(client_double).to receive(:static_namespace).and_return("static-us")
+      allow(client_double).to receive(:locale).and_return("en_US")
+      allow(client_double).to receive(:get)
+        .with("/data/wow/talent-tree/index", anything)
+        .and_return({ "spec_talent_trees" => [
+          { "key" => { "href" => "https://us.api.blizzard.com/data/wow/talent-tree/786/" \
+                                  "playable-specialization/71?namespace=static-us" } }
+        ] })
+      allow(client_double).to receive(:get)
+        .with("/data/wow/talent-tree/786/playable-specialization/71", anything)
+        .and_return(valid_tree)
+      allow(Sentry).to receive(:capture_message)
+    end
+
+    it "creates a TalentSyncRun, persists counts, and marks aborted_regression on collapse" do
+      result = service.call
+
+      expect(result.success?).to be(false)
+      run = TalentSyncRun.recent.first
+      expect(run.status).to eq("aborted_regression")
+      expect(run.regression["detected"]).to be(true)
+      expect(run.counts).to include("class" => 1)
+      expect(run.completed_at).to be_present
+    end
+
+    it "force: true bypasses regression guard and finalizes as success" do
+      force_service = described_class.new(region: "us", locale: "en_US", force: true)
+      force_service.call
+
+      run = TalentSyncRun.recent.first
+      expect(run.status).to eq("success")
+      expect(run.force).to be(true)
+    end
+  end
+
   describe "#call with a failing spec" do
     let(:empty_tree) { { "class_talent_nodes" => [], "spec_talent_nodes" => [], "hero_talent_trees" => [] } }
 

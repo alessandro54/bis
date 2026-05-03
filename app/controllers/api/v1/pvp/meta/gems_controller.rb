@@ -1,25 +1,14 @@
-class Api::V1::Pvp::Meta::GemsController < Api::V1::BaseController
-  before_action :validate_params!
+class Api::V1::Pvp::Meta::GemsController < Api::V1::Pvp::Meta::BaseController
+  before_action :validate_meta_params!
 
   def index
-    cache_key = meta_cache_key("gems", bracket_param, spec_id_param, slot_param, socket_type_param, locale_param)
-    json = meta_cache_fetch(cache_key) { serialize_gems_response }
-    render json: json
-    set_cache_headers
+    serve_meta("gems", bracket_param, spec_id_param, slot_param, socket_type_param, locale_param) do
+      serialize_gems_response
+    end
     enqueue_unsynced_items
   end
 
   private
-
-    def validate_params!
-      validate_bracket!(params.require(:bracket)) or return
-      validate_spec_id!(params.require(:spec_id)) or return
-    end
-
-    def bracket_param     = @bracket_param ||= params.require(:bracket)
-    def spec_id_param     = @spec_id_param ||= params.require(:spec_id).to_i
-    def slot_param        = @slot_param ||= validate_slot(params[:slot])
-    def socket_type_param = @socket_type_param ||= validate_slot(params[:socket_type])
 
     def serialize_gems_response
       season = meta_season_for(PvpMetaGemPopularity)

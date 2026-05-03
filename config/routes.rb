@@ -22,6 +22,13 @@ Rails.application.routes.draw do
           resources :leaderboards, only: [ :show ], param: :bracket
         end
 
+        # Bracket-wide ladder mirror (Blizzard data, paginated + filterable).
+        # /api/v1/pvp/:bracket/leaderboard
+        get ":bracket/leaderboard",
+            to:          "leaderboard#show",
+            as:          :bracket_leaderboard,
+            constraints: { bracket: /[a-z0-9\-]+/ }
+
         namespace :meta do
           resources :items, only: [ :index ]
           resources :enchants, only: [ :index ]
