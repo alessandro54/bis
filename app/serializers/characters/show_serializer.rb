@@ -38,7 +38,7 @@ module Characters
 
       def character_identity
         { name: character.name, realm: character.realm,
-          region: character.region.upcase, class_slug: character.class_slug,
+          region: character.region.upcase, class_slug: character.class_slug.to_s.tr("_", "-").presence,
           race: character.race, faction: character.faction }
       end
 
